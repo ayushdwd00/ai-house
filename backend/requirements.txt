@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+shapely
+ortools
+networkx
+python-multipart
+httpx
+Pillow
