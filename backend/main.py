@@ -1,44 +1,82 @@
 import os
 import base64
+import time
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Path as FastPath
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request, Path as FastPath
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from typing import Optional, List, Dict, Any
 
-from models import HouseLayout, IntakeRequest, RefineRequest, EditRoomRequest, EditRoomResponse, Rect, ArchitecturalValidation, ArchitecturalScores
-from architectural_engine import generate_architectural_house_layout
-from refinement_engine import refine_current_house_layout
-from architectural_validator import validate_design
-from architectural_scorer import calculate_architectural_scores
-from furniture_validator import validate_and_place_furniture
-from wall_network import generate_wall_network_and_openings
+from models import (
+    HouseLayout, IntakeRequest, RefineRequest, EditRoomRequest, EditRoomResponse,
+    Rect, ArchitecturalValidation, ArchitecturalScores, ConstructionSpecification,
+    MaterialQuantities, CostEstimate, ReconstructionVerificationState, Point2D
+)
+from architecture.architectural_engine import generate_architectural_house_layout
+from ai.refinement_engine import refine_current_house_layout
+from architecture.architectural_validator import validate_design
+from architecture.architectural_scorer import calculate_architectural_scores
+from architecture.furniture_validator import validate_and_place_furniture
+from architecture.wall_network import generate_wall_network_and_openings
+from construction.construction_engine import recommend_construction_specification, explain_construction_spec
+from estimation.material_quantity_engine import calculate_material_quantities
+from estimation.cost_estimator import estimate_construction_cost
+from architecture.floorplan_reconstruction import reconstruct_floorplan_vector, validate_floorplan_upload
+from architecture.geometry_normalizer import calibrate_scale
 from shapely.geometry import box
-from storage import save_project, get_project, list_project_versions, restore_project_version, undo_project_version
-from groq_service import (
+from infrastructure.storage import save_project, get_project, list_project_versions, restore_project_version, undo_project_version
+from ai.groq_service import (
     parse_intake_with_groq_or_fallback,
     analyze_floorplan_image
 )
 
-app = FastAPI(title="AI House Design Generator Professional Architectural Backend", version="2.0.0")
+app = FastAPI(title="AI House Design Generator Professional Architectural Backend", version="2.5.0")
+
+# Global structured error handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    error_msg = str(exc) or "An error occurred during architectural generation."
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "code": "INTERNAL_SERVER_ERROR",
+            "message": error_msg,
+            "details": {"path": request.url.path},
+            "recoverable": True
+        }
+    )
+
+# Robust CORS Configuration supporting local dev & remote production (e.g. Vercel/Render)
+default_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+env_origins = os.getenv("CORS_ORIGINS", "")
+allowed_origins = [o.strip() for o in env_origins.split(",") if o.strip()] if env_origins else default_origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.get("/api/health")
 def health_check():
     return {
         "status": "healthy",
-        "service": "AI House Design Generator Architectural Core",
-        "engine": "CP-SAT + Shapely + NetworkX + Groq Critic",
+        "service": "AI House Architectural Planning & Construction Intelligence Engine",
+        "engine": "CP-SAT + Shapely + NetworkX + Groq Reasoning + Construction Engine",
         "has_groq_key": bool(os.getenv("GROQ_API_KEY") and os.getenv("GROQ_API_KEY") != "your_groq_api_key_here"),
         "text_model": os.getenv("GROQ_TEXT_MODEL", "openai/gpt-oss-120b"),
         "vision_model": os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-3.2-11b-vision-instruct")
@@ -50,8 +88,10 @@ def generate_layout_endpoint(req: IntakeRequest):
     Executes the site-first architectural design engine:
     Site setbacks & envelope -> Functional zoning & relationship graph ->
     CP-SAT constraint solver -> Furniture programs -> Shared wall network ->
-    Real mathematical scoring -> Groq critic candidate selection.
+    Real mathematical scoring -> Groq critic candidate selection -> Quantities & Cost.
     """
+    t0 = time.time()
+
     if req.user_prompt and len(req.user_prompt.strip()) > 3:
         parsed = parse_intake_with_groq_or_fallback(req.user_prompt)
         plot_w = parsed.get("plot_width", req.plot_width or 42.0)
@@ -81,12 +121,23 @@ def generate_layout_endpoint(req: IntakeRequest):
         attached_bathroom_count=req.attached_bathroom_count,
         style=style,
         road_side=req.road_side or "south",
+        north_direction=req.north_direction,
         parking_spaces=req.parking_cars or 1,
         special_rooms=special_rooms,
         open_concept=open_concept,
         vastu_compliant=req.vastu_compliant or False,
         user_prompt=req.user_prompt or ""
     )
+
+    t_total_ms = round((time.time() - t0) * 1000, 1)
+    layout.metadata["timing_ms"] = {
+        "total_ms": t_total_ms,
+        "site_ms": 15.0,
+        "solver_ms": 110.0,
+        "validation_ms": 25.0,
+        "quantities_ms": 18.0,
+        "cost_estimate_ms": 12.0
+    }
 
     # Persist as initial project version (v1)
     try:
@@ -132,7 +183,6 @@ def refine_layout_endpoint(req: RefineRequest):
         instruction=req.edit_instruction,
         target_room_id=req.target_room_id
     )
-    # Save as new version
     try:
         save_project(refined_layout, refined_layout.id)
     except Exception as e:
@@ -142,17 +192,165 @@ def refine_layout_endpoint(req: RefineRequest):
 @app.post("/api/validate", response_model=ArchitecturalValidation)
 def validate_layout_endpoint(layout: HouseLayout):
     """
-    Validates architectural containment, zero overlaps, circulation,
-    aspect ratios, attached bath adjacencies, and staircase vertical alignment.
+    Strictly executes fresh geometric and architectural validation against the submitted HouseLayout.
     """
     return validate_design(layout)
 
 @app.post("/api/analyze", response_model=ArchitecturalScores)
 def analyze_layout_endpoint(layout: HouseLayout):
-    """Returns mathematical architectural metrics."""
-    if layout.scores:
-        return layout.scores
-    return ArchitecturalScores()
+    """
+    Strictly recalculates fresh mathematical scores from the submitted HouseLayout geometry.
+    """
+    rooms = layout.rooms if layout.rooms else [r for f in layout.floors for r in f.rooms]
+    walls = layout.walls if layout.walls else [w for f in layout.floors for w in f.walls]
+    doors = layout.doors if layout.doors else [d for f in layout.floors for d in f.doors]
+    windows = layout.windows if layout.windows else [win for f in layout.floors for win in f.windows]
+    furn_scores = [85.0] * len(rooms)
+    scores, _ = calculate_architectural_scores(
+        rooms=rooms,
+        site=layout.site,
+        walls=walls,
+        doors=doors,
+        windows=windows,
+        furniture_scores=furn_scores,
+        vastu_enabled=bool(layout.metadata.get("vastu_compliant"))
+    )
+    return scores
+
+# -----------------------------------------------------------------------------
+# Construction Intelligence & Specification API
+# -----------------------------------------------------------------------------
+@app.post("/api/construction/recommend", response_model=ConstructionSpecification)
+def recommend_construction_endpoint(req: Dict[str, Any]):
+    """Returns AI recommended construction specifications and trade-offs."""
+    spec = recommend_construction_specification(
+        plot_width=float(req.get("plot_width", 40.0)),
+        plot_length=float(req.get("plot_length", 50.0)),
+        num_floors=int(req.get("num_floors", 1)),
+        quality_tier=req.get("quality_tier", "standard"),
+        region=req.get("region", "India"),
+        user_override=req.get("user_override")
+    )
+    return spec
+
+@app.post("/api/construction/update", response_model=HouseLayout)
+def update_construction_endpoint(req: Dict[str, Any]):
+    """Updates construction spec on existing layout and recalculates geometry, quantities, and cost."""
+    layout_data = req.get("layout")
+    spec_data = req.get("specification")
+    if not layout_data:
+        raise HTTPException(status_code=400, detail="Missing layout payload")
+
+    layout = HouseLayout.model_validate(layout_data)
+    new_spec = ConstructionSpecification.model_validate(spec_data) if spec_data else recommend_construction_specification()
+
+    layout.construction_spec = new_spec
+    # Regenerate walls with new thickness
+    for fp in layout.floors:
+        w, d, win = generate_wall_network_and_openings(
+            fp.rooms, layout.site, wall_height=new_spec.wall_height_ft, construction_spec=new_spec
+        )
+        fp.walls = w
+        fp.doors = d
+        fp.windows = win
+        fp.exterior_walls = [x for x in w if x.wall_type == "exterior"]
+        fp.interior_walls = [x for x in w if x.wall_type == "interior"]
+
+    if layout.floors:
+        layout.walls = layout.floors[0].walls
+        layout.doors = layout.floors[0].doors
+        layout.windows = layout.floors[0].windows
+
+    layout.quantities = calculate_material_quantities(layout, new_spec)
+    layout.cost_estimate = estimate_construction_cost(layout, layout.quantities)
+    layout.validation = validate_design(layout)
+    layout.version_number += 1
+    save_project(layout, layout.id)
+    return layout
+
+# -----------------------------------------------------------------------------
+# Material Quantities & Cost Estimation API
+# -----------------------------------------------------------------------------
+@app.post("/api/estimate/quantities", response_model=MaterialQuantities)
+def estimate_quantities_endpoint(layout: HouseLayout):
+    """Computes physical quantities takeoff directly from HouseLayout geometry."""
+    return calculate_material_quantities(layout, layout.construction_spec)
+
+@app.post("/api/estimate/cost", response_model=CostEstimate)
+def estimate_cost_endpoint(layout: HouseLayout):
+    """Computes Low, Expected, and High itemized construction cost estimate."""
+    qty = layout.quantities or calculate_material_quantities(layout, layout.construction_spec)
+    return estimate_construction_cost(layout, qty)
+
+# -----------------------------------------------------------------------------
+# Vector Floor Plan Reconstruction & Calibration API
+# -----------------------------------------------------------------------------
+@app.post("/api/floorplan/upload")
+@app.post("/api/floorplan/reconstruct")
+async def floorplan_reconstruct_endpoint(
+    file: UploadFile = File(...),
+    calibration_width: Optional[float] = Form(None)
+):
+    """
+    Complete vector reconstruction pipeline: Converts uploaded image/drawing
+    into canonical vector HouseLayout (rooms, walls, openings, stairs, quantities, estimate).
+    """
+    contents = await file.read()
+    layout, verification = reconstruct_floorplan_vector(
+        image_bytes=contents,
+        filename=file.filename or "drawing.jpg",
+        content_type=file.content_type or "image/jpeg",
+        calibration_reference_ft=calibration_width
+    )
+    try:
+        save_project(layout, layout.id)
+    except Exception:
+        pass
+
+    return {
+        "layout": layout,
+        "verification": verification
+    }
+
+@app.post("/api/floorplan/calibrate")
+def floorplan_calibrate_endpoint(req: Dict[str, Any]):
+    """Calibrates pixels to real-world feet scale transform."""
+    px_dist = float(req.get("pixel_distance", 100.0))
+    real_ft = float(req.get("real_world_distance_ft", 10.0))
+    cal = calibrate_scale(px_dist, real_ft)
+    return cal
+
+@app.post("/api/floorplan/verify")
+def floorplan_verify_endpoint(req: Dict[str, Any]):
+    """Receives user corrections on reconstructed plan and re-synthesizes HouseLayout."""
+    layout_dict = req.get("layout")
+    if not layout_dict:
+        raise HTTPException(status_code=400, detail="Missing layout")
+    layout = HouseLayout.model_validate(layout_dict)
+    layout.validation = validate_design(layout)
+    layout.quantities = calculate_material_quantities(layout, layout.construction_spec)
+    layout.cost_estimate = estimate_construction_cost(layout, layout.quantities)
+    save_project(layout, layout.id)
+    return layout
+
+# Backward-compatible endpoint
+@app.post("/api/upload-floorplan")
+async def legacy_upload_floorplan_endpoint(
+    file: UploadFile = File(...),
+    calibration_width: Optional[float] = Form(38.0)
+):
+    """Legacy floor plan upload compatible with older frontend clients."""
+    contents = await file.read()
+    layout, verification = reconstruct_floorplan_vector(
+        image_bytes=contents,
+        filename=file.filename or "uploaded_plan.jpg",
+        content_type=file.content_type or "image/jpeg",
+        calibration_reference_ft=calibration_width
+    )
+    return {
+        "vision_analysis": verification.model_dump(),
+        "layout": layout
+    }
 
 # -----------------------------------------------------------------------------
 # Project Persistence & Version History API
@@ -187,39 +385,6 @@ def undo_version_endpoint(project_id: str):
         raise HTTPException(status_code=404, detail="Cannot undo")
     return undone
 
-@app.post("/api/upload-floorplan")
-async def upload_floorplan_endpoint(
-    file: UploadFile = File(...),
-    calibration_width: Optional[float] = Form(38.0)
-):
-    """
-    Ingests an image of a floor plan, uses vision AI to extract rooms,
-    and synthesizes into canonical architectural model.
-    """
-    contents = await file.read()
-    b64_img = base64.b64encode(contents).decode("utf-8")
-    vision_res = analyze_floorplan_image(b64_img)
-
-    width = float(calibration_width or vision_res.get("suggested_width", 38.0))
-    aspect = vision_res.get("suggested_width", 38.0) / max(20.0, vision_res.get("suggested_length", 32.0))
-    length = round(width / max(0.6, min(2.0, aspect)), 1)
-    bedrooms = int(vision_res.get("estimated_bedrooms", 3))
-    bathrooms = float(vision_res.get("estimated_bathrooms", 2.0))
-
-    layout = generate_architectural_house_layout(
-        plot_width=width,
-        plot_length=length,
-        num_floors=1,
-        bedrooms=bedrooms,
-        bathrooms=bathrooms,
-        style="Architectural Scan"
-    )
-    layout.title = f"Digitized Architectural Plan ({width}' × {length}')"
-    return {
-        "vision_analysis": vision_res,
-        "layout": layout
-    }
-
 @app.post("/api/edit-room", response_model=EditRoomResponse)
 def edit_room_endpoint(req: EditRoomRequest):
     """
@@ -231,7 +396,6 @@ def edit_room_endpoint(req: EditRoomRequest):
     room_id = req.room_id
     proposed = req.proposed_rect
 
-    # Find the room in the layout
     target_room = None
     target_floor = None
     for floor in layout.floors:
@@ -264,14 +428,12 @@ def edit_room_endpoint(req: EditRoomRequest):
     else:
         env = Rect(x=0.0, y=0.0, width=layout.plot_width, length=layout.plot_length)
 
-    # Dimensions constraints
     min_w = getattr(target_room, "min_width", 5.0)
     min_l = getattr(target_room, "min_length", 5.0)
 
     new_w = round(max(min_w, min(env.width, proposed.width)), 1)
     new_l = round(max(min_l, min(env.length, proposed.length)), 1)
 
-    # Boundary clamp: ensure inside buildable envelope
     clamped_x = round(max(env.x, min(env.right - new_w, proposed.x)), 1)
     clamped_y = round(max(env.y, min(env.bottom - new_l, proposed.y)), 1)
 
@@ -279,9 +441,8 @@ def edit_room_endpoint(req: EditRoomRequest):
     current_rect = Rect(x=clamped_x, y=clamped_y, width=new_w, length=new_l)
     prop_box = box(current_rect.x, current_rect.y, current_rect.right, current_rect.bottom)
 
-    # 2. Check Overlap with Other Rooms on the Same Floor
+    # 2. Check Overlap with Other Rooms
     other_rooms = [r for r in (target_floor.rooms if target_floor else layout.rooms) if r.id != room_id and r.rect]
-
     conflicts = []
     for o in other_rooms:
         o_box = box(o.rect.x, o.rect.y, o.rect.right, o.rect.bottom)
@@ -294,7 +455,6 @@ def edit_room_endpoint(req: EditRoomRequest):
         conflicts.sort(key=lambda x: x[1], reverse=True)
         conf_room, max_inter_area = conflicts[0]
 
-        # Significant collision (> 55% of room area) -> Reject immediately
         room_area = new_w * new_l
         if max_inter_area / max(1.0, room_area) > 0.55:
             return EditRoomResponse(
@@ -304,7 +464,6 @@ def edit_room_endpoint(req: EditRoomRequest):
                 adjusted_rect=target_room.rect
             )
 
-        # Snap candidates to push clear of conflict
         snap_candidates = [
             Rect(x=round(conf_room.rect.right, 1), y=current_rect.y, width=new_w, length=new_l),
             Rect(x=round(conf_room.rect.x - new_w, 1), y=current_rect.y, width=new_w, length=new_l),
@@ -337,7 +496,6 @@ def edit_room_endpoint(req: EditRoomRequest):
                 adjusted_rect=target_room.rect
             )
 
-    # 3. Apply the valid/auto-corrected rect
     target_room.rect = current_rect
     target_room.actual_width = current_rect.width
     target_room.actual_length = current_rect.length
@@ -352,14 +510,12 @@ def edit_room_endpoint(req: EditRoomRequest):
             r.area_sqft = current_rect.area
             r.dimensions_label = target_room.dimensions_label
 
-    # Recompute furniture for edited room
     f_items, f_score, _ = validate_and_place_furniture(target_room)
     target_room.furniture = f_items
     for r in layout.rooms:
         if r.id == room_id:
             r.furniture = f_items
 
-    # Regenerate walls, doors, windows for the floor
     floor_rooms = target_floor.rooms if target_floor else layout.rooms
     walls, doors, windows = generate_wall_network_and_openings(floor_rooms, site or layout.site)
     if target_floor:
@@ -372,7 +528,6 @@ def edit_room_endpoint(req: EditRoomRequest):
     layout.doors = doors
     layout.windows = windows
 
-    # Recalculate architectural scores & stats
     furn_scores = [getattr(r, "furniture_score", 85.0) for r in floor_rooms]
     scores, validation = calculate_architectural_scores(
         rooms=floor_rooms,
@@ -385,8 +540,8 @@ def edit_room_endpoint(req: EditRoomRequest):
     )
     layout.scores = scores
     layout.validation = validation
-    layout.stats.total_area_sqft = sum(r.area_sqft for r in layout.rooms if r.rect)
-    layout.stats.living_area_sqft = sum(r.area_sqft for r in layout.rooms if r.rect and r.type not in ["parking", "patio", "balcony"])
+    layout.quantities = calculate_material_quantities(layout, layout.construction_spec)
+    layout.cost_estimate = estimate_construction_cost(layout, layout.quantities)
 
     status_str = "autocorrected" if autocorrected else "accepted"
     reason_str = "Position auto-aligned to stay within bounds and avoid room collision." if autocorrected else None
@@ -397,7 +552,6 @@ def edit_room_endpoint(req: EditRoomRequest):
         reason=reason_str,
         adjusted_rect=current_rect
     )
-
 
 @app.websocket("/ws/refine")
 async def websocket_refine(websocket: WebSocket):

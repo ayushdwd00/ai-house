@@ -139,6 +139,7 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
   const [orientation, setOrientation] = useState<"North" | "South" | "East" | "West" | "Doesn't matter">("South");
   const [parking, setParking] = useState<"No parking" | "1 car" | "2 cars">("1 car");
   const [style, setStyle] = useState<"Modern" | "Minimal" | "Traditional" | "Luxury" | "Let AI decide">("Modern");
+  const [isVastuEnabled, setIsVastuEnabled] = useState<boolean>(true);
   const [additionalSpaces, setAdditionalSpaces] = useState<string[]>([
     "Kitchen",
     "Dining",
@@ -260,7 +261,7 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
       style: style === "Let AI decide" ? "Modern Minimalist" : style,
       special_rooms: additionalSpaces,
       open_concept: true,
-      vastu_compliant: orientation === "North" || orientation === "East",
+      vastu_compliant: isVastuEnabled,
     };
 
     onSubmit(intake);
@@ -311,8 +312,8 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
         />
       </div>
 
-      {/* Main Consultation Canvas */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 md:px-12 py-8 max-w-4xl mx-auto w-full">
+      {/* Main Consultation Canvas - scrollable for all questions and final brief */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-start md:justify-center px-6 md:px-12 py-6 max-w-4xl mx-auto w-full overflow-y-auto">
         <AnimatePresence mode="wait">
           {/* QUESTION 1: PLOT SIZE */}
           {step === 1 && (
@@ -770,6 +771,34 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
                 })}
               </div>
 
+              {/* Vastu Shastra Architectural Planning Toggle */}
+              <div className="flex items-center justify-between gap-4 px-5 py-3 rounded-2xl bg-[#12141A]/90 border border-white/10 max-w-md w-full mb-8">
+                <div className="text-left">
+                  <span className="text-xs font-mono text-[#F5F3EF] block">VASTU SHASTRA PLANNING</span>
+                  <span className="text-[10px] text-[#9E9C98]">Apply orientation-aware directional zoning</span>
+                </div>
+                <div className="inline-flex rounded-full p-1 bg-[#0A0B0E] border border-white/10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsVastuEnabled(false)}
+                    className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${
+                      !isVastuEnabled ? "bg-white/20 text-[#F5F3EF] font-bold" : "text-[#9E9C98] hover:text-[#F5F3EF]"
+                    }`}
+                  >
+                    OFF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsVastuEnabled(true)}
+                    className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${
+                      isVastuEnabled ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow-md shadow-[#C48446]/20" : "text-[#9E9C98] hover:text-[#F5F3EF]"
+                    }`}
+                  >
+                    ON
+                  </button>
+                </div>
+              </div>
+
               <button
                 onClick={handleNext}
                 className="px-8 py-3.5 rounded-full bg-[#F5F3EF] text-[#0A0B0E] hover:bg-[#E8E4DC] font-medium text-xs tracking-widest transition-all duration-200 flex items-center gap-2 group"
@@ -1031,6 +1060,35 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
                   <button onClick={() => jumpToStep(10)} className="text-[#C48446] text-xs font-mono flex items-center gap-1 hover:underline">
                     <span>EDIT</span> <Edit3 className="w-3 h-3" />
                   </button>
+                </div>
+
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <span className="text-[10px] font-mono tracking-widest text-[#9E9C98] block">06. VASTU DESIGN</span>
+                    <span className="text-sm font-medium text-[#F5F3EF]">
+                      {isVastuEnabled ? "Vastu-Aware Directional Synthesis" : "Standard Architectural Planning"}
+                    </span>
+                  </div>
+                  <div className="inline-flex rounded-full p-0.5 bg-[#0A0B0E] border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setIsVastuEnabled(false)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono transition-all ${
+                        !isVastuEnabled ? "bg-white/20 text-[#F5F3EF] font-bold" : "text-[#9E9C98]"
+                      }`}
+                    >
+                      OFF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsVastuEnabled(true)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono transition-all ${
+                        isVastuEnabled ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow-sm" : "text-[#9E9C98]"
+                      }`}
+                    >
+                      ON
+                    </button>
+                  </div>
                 </div>
               </div>
 

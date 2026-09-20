@@ -23,6 +23,8 @@ export const HeroHouse3D: React.FC<HeroHouse3DProps> = ({
     const width = mount.clientWidth || window.innerWidth;
     const height = mount.clientHeight || window.innerHeight;
 
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
     // 1. Scene & Architectural Atmosphere
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#0C0E12");
@@ -32,16 +34,18 @@ export const HeroHouse3D: React.FC<HeroHouse3DProps> = ({
     const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 1000);
     camera.position.set(28, 14, 32);
 
-    // 3. High-Performance WebGL Renderer
+    // 3. High-Performance WebGL Renderer with optimized DPR & shadow settings
     const renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !isMobile,
       alpha: true,
       powerPreference: "high-performance",
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.0 : 1.5));
+    renderer.shadowMap.enabled = !isMobile;
+    if (!isMobile) {
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+    }
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.18;
 
@@ -53,17 +57,19 @@ export const HeroHouse3D: React.FC<HeroHouse3DProps> = ({
 
     const sunLight = new THREE.DirectionalLight(0xffb86c, 2.3);
     sunLight.position.set(36, 26, -20);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 5;
-    sunLight.shadow.camera.far = 130;
-    const d = 36;
-    sunLight.shadow.camera.left = -d;
-    sunLight.shadow.camera.right = d;
-    sunLight.shadow.camera.top = d;
-    sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.00025;
+    if (!isMobile) {
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 1024;
+      sunLight.shadow.mapSize.height = 1024;
+      sunLight.shadow.camera.near = 5;
+      sunLight.shadow.camera.far = 130;
+      const d = 36;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d;
+      sunLight.shadow.bias = -0.0003;
+    }
     scene.add(sunLight);
 
     const fillLight = new THREE.DirectionalLight(0x60a5fa, 0.35);
@@ -300,25 +306,39 @@ export const HeroHouse3D: React.FC<HeroHouse3DProps> = ({
     houseGroup.add(carGroup);
 
     // 7. Mouse Parallax & Scroll Listeners
+    let mouseMovePending = false;
     const handleMouseMove = (e: MouseEvent) => {
-      const nx = (e.clientX / window.innerWidth) * 2 - 1;
-      const ny = -(e.clientY / window.innerHeight) * 2 + 1;
-      mouseRef.current.targetX = nx * 3.5;
-      mouseRef.current.targetY = ny * 2.0;
+      if (mouseMovePending) return;
+      mouseMovePending = true;
+      requestAnimationFrame(() => {
+        const nx = (e.clientX / window.innerWidth) * 2 - 1;
+        const ny = -(e.clientY / window.innerHeight) * 2 + 1;
+        mouseRef.current.targetX = nx * 3.5;
+        mouseRef.current.targetY = ny * 2.0;
+        mouseMovePending = false;
+      });
     };
 
     const handleScroll = () => {
-      scrollRef.current = window.scrollY / Math.max(1, window.innerHeight);
+      const scrollEl = mount.closest(".overflow-y-auto") || document.documentElement;
+      const scrollTop = scrollEl ? scrollEl.scrollTop : window.scrollY;
+      scrollRef.current = scrollTop / Math.max(1, window.innerHeight);
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
     window.addEventListener("scroll", handleScroll, { passive: true });
+    const scrollParent = mount.closest(".overflow-y-auto");
+    if (scrollParent) {
+      scrollParent.addEventListener("scroll", handleScroll, { passive: true });
+    }
 
-    // 8. Animation Loop
-    let animId: number;
+    // 8. Animation Loop with IntersectionObserver
+    let animId: number = 0;
+    let isVisible = true;
     const startTime = performance.now();
 
     const animate = () => {
+      if (!isVisible) return;
       animId = requestAnimationFrame(animate);
       const elapsed = (performance.now() - startTime) * 0.001;
 
@@ -326,7 +346,7 @@ export const HeroHouse3D: React.FC<HeroHouse3DProps> = ({
       mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.04;
       mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.04;
 
-      // Scroll-driven camera orbital drift: smoothly moves camera around the house as user scrolls
+      // Scroll-driven camera orbital drift
       const scrollFactor = scrollRef.current;
       const orbitRadius = 40 - Math.min(10, scrollFactor * 12);
       const baseAngle = 0.85 + Math.sin(elapsed * 0.04) * 0.15 + scrollFactor * 0.65;
@@ -343,7 +363,25 @@ export const HeroHouse3D: React.FC<HeroHouse3DProps> = ({
 
       renderer.render(scene, camera);
     };
-    animate();
+
+    // Pause WebGL rendering loop when off-screen to save 100% GPU/CPU
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          if (!isVisible) {
+            isVisible = true;
+            animId = requestAnimationFrame(animate);
+          }
+        } else {
+          isVisible = false;
+          cancelAnimationFrame(animId);
+        }
+      },
+      { threshold: 0.05 }
+    );
+    observer.observe(mount);
+    animId = requestAnimationFrame(animate);
 
     const handleResize = () => {
       if (!mount || !renderer || !camera) return;
@@ -357,9 +395,27 @@ export const HeroHouse3D: React.FC<HeroHouse3DProps> = ({
 
     return () => {
       cancelAnimationFrame(animId);
+      observer.disconnect();
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("scroll", handleScroll);
+      if (scrollParent) {
+        scrollParent.removeEventListener("scroll", handleScroll);
+      }
       window.removeEventListener("resize", handleResize);
+
+      // Comprehensive scene & memory disposal
+      scene.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const mesh = obj as THREE.Mesh;
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => m.dispose());
+          } else if (mesh.material) {
+            mesh.material.dispose();
+          }
+        }
+      });
+
       renderer.dispose();
       if (mount.contains(renderer.domElement)) {
         mount.removeChild(renderer.domElement);

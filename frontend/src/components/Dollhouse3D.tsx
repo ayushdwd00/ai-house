@@ -219,10 +219,10 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     floorGroup.add(slabMesh);
 
     // 2. Room Floor Finishes
-    floor.rooms.forEach((room) => {
-      if (!room.rect) return;
-      const rw = room.rect.width;
-      const rl = room.rect.length;
+    (floor.rooms || []).forEach((room) => {
+      if (!room || !room.rect) return;
+      const rw = Math.max(1, room.rect.width);
+      const rl = Math.max(1, room.rect.length);
       const rx = room.rect.x + rw / 2;
       const rz = room.rect.y + rl / 2;
 
@@ -233,7 +233,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         metalness: isWetZone ? 0.1 : 0.05,
       });
 
-      const floorGeo = new THREE.PlaneGeometry(rw - 0.05, rl - 0.05);
+      const floorGeo = new THREE.PlaneGeometry(Math.max(0.1, rw - 0.05), Math.max(0.1, rl - 0.05));
       const floorMesh = new THREE.Mesh(floorGeo, floorMat);
       floorMesh.rotation.x = -Math.PI / 2;
       floorMesh.position.set(rx, 0.02, rz);
@@ -242,7 +242,6 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
       // Highlight selected room with edge outline
       if (selectedRoomId === room.id) {
-        const highlightGeo = new THREE.RingGeometry(0.1, 0.2, 32);
         const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(rw, 0.05, rl));
         const lineMat = new THREE.LineBasicMaterial({ color: 0xc2410c, linewidth: 3 });
         const wireframe = new THREE.LineSegments(edges, lineMat);
@@ -261,11 +260,12 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       }
 
       // 3. Detailed Procedural Furniture
-      room.furniture.forEach((item) => {
+      (room.furniture || []).forEach((item) => {
+        if (!item) return;
         const fMesh = buildArchitecturalFurniture(item, isDarkMode, selectedFurnitureId === item.id);
         if (fMesh) {
-          fMesh.position.set(item.x, 0, item.y);
-          fMesh.rotation.y = -THREE.MathUtils.degToRad(item.rotation);
+          fMesh.position.set(item.x || rx, 0, item.y || rz);
+          fMesh.rotation.y = -THREE.MathUtils.degToRad(item.rotation || 0);
           fMesh.userData = { furnitureId: item.id, roomId: room.id };
           floorGroup.add(fMesh);
         }
@@ -439,14 +439,15 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     camera.position.set(cx + 42, 38, cz + 42);
     camera.lookAt(cx, 0, cz);
 
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
     const renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !isMobile,
       alpha: true,
-      powerPreference: "high-performance",
+      powerPreference: isMobile ? "default" : "high-performance",
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.0 : 1.5));
+    renderer.shadowMap.enabled = !isMobile;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
@@ -458,9 +459,9 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.target.set(cx, 0, cz);
-    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.04;
     controls.minDistance = 12;
-    controls.maxDistance = 180;
+    controls.maxDistance = 220;
     controlsRef.current = controls;
 
     // Ambient Hemisphere Sky
@@ -471,9 +472,9 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     // Directional Sun with Soft Shadows
     const sunLight = new THREE.DirectionalLight(0xfffaed, 1.4);
     sunLight.position.set(cx + 35, 52, cz - 30);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
+    sunLight.castShadow = !isMobile;
+    sunLight.shadow.mapSize.width = isMobile ? 512 : 1024;
+    sunLight.shadow.mapSize.height = isMobile ? 512 : 1024;
     sunLight.shadow.camera.near = 10;
     sunLight.shadow.camera.far = 160;
     const shadowDist = 55;
@@ -635,7 +636,11 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   // Focus camera when room selection changes
   useEffect(() => {
     if (!selectedRoomId || !cameraRef.current || !controlsRef.current) return;
-    const room = layout.rooms.find((r) => r.id === selectedRoomId);
+    const allRooms = [
+      ...(layout.rooms || []),
+      ...(layout.floors ? layout.floors.flatMap((f) => f.rooms || []) : []),
+    ];
+    const room = allRooms.find((r) => r.id === selectedRoomId);
     if (room && room.rect) {
       const rx = room.rect.x + room.rect.width / 2;
       const rz = room.rect.y + room.rect.length / 2;
@@ -655,13 +660,13 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
   return (
     <div className="relative w-full h-full select-none overflow-hidden bg-[#0A0B0E]">
-      {/* Floating 3D Controls (Top Left) */}
-      <div className="absolute top-20 left-6 z-30 flex flex-wrap items-center gap-2">
+      {/* Floating 3D Controls (Top Left / Responsive) */}
+      <div className="absolute top-16 sm:top-20 left-3 sm:left-6 z-30 flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] pointer-events-auto">
         {/* View Perspective */}
-        <div className="flex items-center p-1 rounded-full bg-[#12141A]/85 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
+        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
           <button
             onClick={() => onChangeCameraPreset?.("isometric")}
-            className={`px-3 py-1 rounded-full transition-all ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
               cameraPreset === "isometric" || cameraPreset === "perspective"
                 ? "bg-[#F5F3EF] text-[#0A0B0E] font-medium shadow-sm"
                 : "hover:text-[#F5F3EF]"
@@ -671,7 +676,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           </button>
           <button
             onClick={() => onChangeCameraPreset?.("interior")}
-            className={`px-3 py-1 rounded-full transition-all ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
               cameraPreset === "interior"
                 ? "bg-[#F5F3EF] text-[#0A0B0E] font-medium shadow-sm"
                 : "hover:text-[#F5F3EF]"
@@ -681,7 +686,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           </button>
           <button
             onClick={onToggleWallHeightMode}
-            className={`px-3 py-1 rounded-full transition-all ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
               wallHeightMode === "cutaway"
                 ? "bg-[#C48446] text-[#0A0B0E] font-medium"
                 : "hover:text-[#F5F3EF]"
@@ -693,20 +698,20 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         </div>
 
         {/* Lighting: Daylight / Sunset */}
-        <div className="flex items-center p-1 rounded-full bg-[#12141A]/85 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
+        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
           <button
             onClick={() => onChangeLightingPreset?.("day")}
-            className={`px-3 py-1 rounded-full transition-all ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
               lightingPreset === "day"
                 ? "bg-[#F5F3EF] text-[#0A0B0E] font-medium shadow-sm"
                 : "hover:text-[#F5F3EF]"
             }`}
           >
-            DAYLIGHT
+            DAY
           </button>
           <button
             onClick={() => onChangeLightingPreset?.("sunset")}
-            className={`px-3 py-1 rounded-full transition-all ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
               lightingPreset === "sunset" || lightingPreset === "night"
                 ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
                 : "hover:text-[#F5F3EF]"
@@ -719,21 +724,21 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         {/* Reset Camera */}
         <button
           onClick={handleResetCamera}
-          className="px-3.5 py-1.5 rounded-full bg-[#12141A]/85 backdrop-blur-md border border-white/10 text-[#9E9C98] hover:text-[#F5F3EF] text-[11px] font-mono shadow-2xl transition-colors"
+          className="hidden sm:inline-flex px-3.5 py-1.5 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 text-[#9E9C98] hover:text-[#F5F3EF] text-[11px] font-mono shadow-2xl transition-colors"
           title="Reset Camera Orientation"
         >
           RESET ORBIT
         </button>
       </div>
 
-      {/* Floor Level Switcher (Top Right) */}
+      {/* Floor Level Switcher (Top Right / Responsive) */}
       {layout.floors && layout.floors.length > 1 && onSelectFloor && (
-        <div className="absolute top-20 right-6 z-30 flex items-center p-1 rounded-full bg-[#12141A]/85 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
+        <div className="absolute top-28 sm:top-20 right-3 sm:right-6 z-30 flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
           {layout.floors.map((fl, idx) => (
             <button
               key={fl.floor_number}
               onClick={() => onSelectFloor(idx)}
-              className={`px-3.5 py-1 rounded-full transition-all ${
+              className={`px-3 py-1 rounded-full transition-all ${
                 activeFloorIndex === idx
                   ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
                   : "hover:text-[#F5F3EF]"
@@ -760,8 +765,8 @@ function buildArchitecturalFurniture(
   isSelected: boolean
 ): THREE.Group | null {
   const group = new THREE.Group();
-  const iw = item.width;
-  const il = item.length;
+  const iw = Math.max(0.5, Number(item.width) || 2.0);
+  const il = Math.max(0.5, Number(item.length) || 2.0);
 
   const oakMat = new THREE.MeshStandardMaterial({
     color: isDark ? "#453325" : "#8A6D4B",
@@ -793,6 +798,24 @@ function buildArchitecturalFurniture(
     roughness: 0.2,
     metalness: 0.1,
   });
+
+  // Wardrobe / Closet
+  if (item.type.includes("wardrobe") || item.type.includes("closet")) {
+    const wardrobe = new THREE.Mesh(new THREE.BoxGeometry(iw, 6.5, il), darkWoodMat);
+    wardrobe.position.y = 3.25;
+    wardrobe.castShadow = true;
+    group.add(wardrobe);
+    return group;
+  }
+
+  // Nightstand / Side Table
+  if (item.type.includes("nightstand") || item.type.includes("side_table")) {
+    const table = new THREE.Mesh(new THREE.BoxGeometry(iw, 1.8, il), oakMat);
+    table.position.y = 0.9;
+    table.castShadow = true;
+    group.add(table);
+    return group;
+  }
 
   // 1. BED / PRIMARY SUITE
   if (item.type.includes("bed")) {

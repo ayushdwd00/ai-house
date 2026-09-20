@@ -1,363 +1,182 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { HouseLayout, IntakeRequest, Room } from "@/types/house";
+import React, { useState } from "react";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { FloatingNav, NavView } from "@/components/FloatingNav";
 import { HomePageView } from "@/components/HomePageView";
-import { FloorPlan2D } from "@/components/FloorPlan2D";
-import { Dollhouse3D } from "@/components/Dollhouse3D";
-import { ArchitecturalConsultation } from "@/components/ArchitecturalConsultation";
-import { FloatingAICommandBar } from "@/components/FloatingAICommandBar";
-import { GenerationProgressModal } from "@/components/GenerationProgressModal";
-import { UploadModal } from "@/components/UploadModal";
+import { CreateChoiceModal } from "@/components/CreateChoiceModal";
+import { ProjectsModal } from "@/components/ProjectsModal";
+import { useProject } from "@/context/ProjectContext";
+import { HouseLayout, IntakeRequest } from "@/types/house";
+import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
+import { generateHouseLayout } from "@/utils/api";
 
-const STORAGE_KEY = "atelier_archai_saved_layout";
+// Code splitting: Heavy modals and consultation loaded on demand only
+const ArchitecturalConsultation = dynamic(
+  () => import("@/components/ArchitecturalConsultation").then((m) => m.ArchitecturalConsultation),
+  { ssr: false }
+);
 
-export default function AppRoot() {
-  // Navigation View: "home" | "plan" | "model" | "create"
-  const [activeView, setActiveView] = useState<NavView>("home");
+const UploadModal = dynamic(
+  () => import("@/components/UploadModal").then((m) => m.UploadModal),
+  { ssr: false }
+);
 
-  // Canonical Architectural Design State
-  const [layout, setLayout] = useState<HouseLayout | null>(null);
+const GenerationProgressModal = dynamic(
+  () => import("@/components/GenerationProgressModal").then((m) => m.GenerationProgressModal),
+  { ssr: false }
+);
 
-  // Active Floor & Selection (Synchronized across 2D & 3D)
-  const [activeFloorIndex, setActiveFloorIndex] = useState(0);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
+export default function HomePage() {
+  const router = useRouter();
+  const { activeProject, projectId, createProject } = useProject();
 
-  // 3D Visualizer Settings
-  const [lightingPreset, setLightingPreset] = useState<"day" | "sunset" | "night" | "studio">("day");
-  const [cameraPreset, setCameraPreset] = useState<"isometric" | "perspective" | "interior" | "top" | "front">("isometric");
-  const [wallHeightMode, setWallHeightMode] = useState<"cutaway" | "full">("cutaway");
-  const [showRoof, setShowRoof] = useState(false);
-
-  // Modals & Async States
+  // Modals & User Flow States
+  const [isCreateChoiceOpen, setIsCreateChoiceOpen] = useState(false);
+  const [isConsultationOpen, setIsConsultationOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+
+  // Synthesis States
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isRefining, setIsRefining] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [lastIntakeRequest, setLastIntakeRequest] = useState<IntakeRequest | null>(null);
 
-  // Initialize layout from localStorage or fallback to default layout
-  useEffect(() => {
-    let mounted = true;
-
-    const init = async () => {
-      try {
-        const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (mounted) {
-            setLayout(parsed);
-          }
-          return;
-        }
-      } catch (e) {
-        console.warn("Could not load saved layout:", e);
-      }
-
-      try {
-        const res = await fetch("http://localhost:8000/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            plot_width: 40,
-            plot_length: 50,
-            num_floors: 1,
-            bedrooms: 3,
-            bathrooms: 2,
-            style: "Modern Scandinavian",
-            road_side: "south",
-            parking_cars: 1,
-          }),
-        });
-        if (res.ok && mounted) {
-          const data: HouseLayout = await res.json();
-          setLayout(data);
-        }
-      } catch (err) {
-        console.warn("Silent default init fallback:", err);
-      }
-    };
-
-    init();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const updateLayout = (newLayout: HouseLayout) => {
-    setLayout(newLayout);
-    setSelectedRoomId(null);
-    setSelectedFurnitureId(null);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newLayout));
-    } catch (e) {
-      console.warn("Failed to persist layout:", e);
+  const handleNavigate = (view: NavView) => {
+    if (view === "create") {
+      setIsCreateChoiceOpen(true);
+    } else if (view === "projects") {
+      setIsProjectsOpen(true);
     }
   };
 
-  // Submit from One-Question-at-a-Time Architectural Consultation
+  // Triggered when user selects "1. DESIGN A NEW HOME"
+  const handleSelectDesignNew = () => {
+    setIsCreateChoiceOpen(false);
+    setIsConsultationOpen(true);
+  };
+
+  // Triggered when user selects "2. I ALREADY HAVE A FLOOR PLAN"
+  const handleSelectUploadPlan = () => {
+    setIsCreateChoiceOpen(false);
+    setIsUploadOpen(true);
+  };
+
+  // Submit intake from step-by-step Architectural Consultation
   const handleStartGeneration = async (req: IntakeRequest) => {
-    setActiveView("model");
+    if (isGenerating) return;
+    setLastIntakeRequest(req);
+    setIsConsultationOpen(false);
     setIsGenerating(true);
+    setGenerationError(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req),
-      });
+      const rawData = await generateHouseLayout(req);
+      const sanitized = validateAndSanitizeHouseLayout(rawData);
+      if (!sanitized) {
+        throw new Error("Received an incomplete or unrenderable architectural layout from the solver.");
+      }
 
-      if (!res.ok) throw new Error("Generation request failed");
-      const data: HouseLayout = await res.json();
-
-      // Cinematic pause so stages are witnessed
       setTimeout(() => {
         setIsGenerating(false);
-        updateLayout(data);
-        setActiveView("model");
-      }, 2400);
+        const newProjectId = createProject(sanitized);
+        router.push(`/project/${newProjectId}/plan`);
+      }, 1200);
     } catch (err) {
-      console.error("Backend generation error:", err);
+      console.error("[GENERATION ERROR]", err);
       setIsGenerating(false);
+      setGenerationError(err instanceof Error ? err.message : "Failed to connect to architectural synthesis backend.");
     }
   };
 
-  // Upload floor plan image callback
+  // Floor plan upload callback
   const handleUploadSuccess = (uploadedLayout: HouseLayout) => {
-    updateLayout(uploadedLayout);
+    const sanitized = validateAndSanitizeHouseLayout(uploadedLayout) || uploadedLayout;
     setIsUploadOpen(false);
-    setActiveView("model");
+    const newProjectId = createProject(sanitized);
+    router.push(`/project/${newProjectId}/plan`);
   };
 
-  // Handle Dragged/Edited Rooms & Regenerate Wall Network via backend
-  const handleRegenerateFromEdit = async (updatedRooms: Room[]) => {
-    if (!layout) return;
-    setIsRefining(true);
-
-    try {
-      let currentLayout = layout;
-
-      // Identify rooms with modified rects
-      const currentFloorRooms =
-        layout.floors && layout.floors[activeFloorIndex]
-          ? layout.floors[activeFloorIndex].rooms
-          : layout.rooms || [];
-
-      const modified = updatedRooms.filter((r) => {
-        const orig = currentFloorRooms.find((o) => o.id === r.id);
-        if (!orig || !orig.rect) return false;
-        return (
-          orig.rect.x !== r.rect.x ||
-          orig.rect.y !== r.rect.y ||
-          orig.rect.width !== r.rect.width ||
-          orig.rect.length !== r.rect.length
-        );
-      });
-
-      // Sequentially apply modifications through /api/edit-room to regenerate walls & openings
-      for (const modRoom of modified) {
-        const res = await fetch("http://localhost:8000/api/edit-room", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            current_layout: currentLayout,
-            room_id: modRoom.id,
-            proposed_rect: modRoom.rect,
-          }),
-        });
-
-        if (res.ok) {
-          const result = await res.json();
-          if (result.layout) {
-            currentLayout = result.layout;
-          }
-        }
-      }
-
-      updateLayout(currentLayout);
-    } catch (err) {
-      console.error("Failed to regenerate layout from edited rooms:", err);
-    } finally {
-      setIsRefining(false);
+  // Explore 3D Model button from Home
+  const handleExplore3D = () => {
+    if (projectId) {
+      router.push(`/project/${projectId}/model`);
+    } else {
+      setIsCreateChoiceOpen(true);
     }
   };
 
-  // Refine design via Floating AI Command Bar
-  const handleRefine = async (instruction: string) => {
-    if (!layout) return;
-    setIsRefining(true);
-    try {
-      const res = await fetch("http://localhost:8000/api/refine", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          current_layout: layout,
-          edit_instruction: instruction,
-          target_room_id: selectedRoomId,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Refinement failed");
-      const data: HouseLayout = await res.json();
-      updateLayout(data);
-    } catch (err) {
-      console.error("Refinement error:", err);
-    } finally {
-      setIsRefining(false);
+  // Explore 2D Blueprint Plan button from Home
+  const handleExplorePlan = () => {
+    if (projectId) {
+      router.push(`/project/${projectId}/plan`);
+    } else {
+      setIsCreateChoiceOpen(true);
     }
   };
-
-  const selectedRoom: Room | undefined = selectedRoomId
-    ? layout?.rooms?.find((r) => r.id === selectedRoomId) ||
-      layout?.floors?.flatMap((f) => f.rooms).find((r) => r.id === selectedRoomId)
-    : undefined;
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
-      {/* MINIMAL FLOATING NAVIGATION (Always present except during full consultation modal) */}
-      {activeView !== "create" && (
+      {/* INITIAL WEBSITE NAVIGATION:
+          When NO project workspace is active, shows strictly:
+          ATELIER | HOME | PROJECTS | CREATE
+          Does NOT show PLAN, MODEL, ESTIMATE. */}
+      {!isConsultationOpen && (
         <FloatingNav
-          currentView={activeView}
-          onNavigate={(view) => setActiveView(view)}
-          hasLayout={Boolean(layout)}
+          currentView="home"
+          onNavigate={handleNavigate}
+          isProjectWorkspace={false}
+          hasProject={Boolean(projectId)}
+          onOpenProjects={() => setIsProjectsOpen(true)}
         />
       )}
 
-      {/* VIEWPORT CANVAS ROUTING */}
-      <main className="w-full h-full relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          {/* 1. HOME VIEW */}
-          {activeView === "home" && (
-            <motion.div
-              key="view-home"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="w-full h-full overflow-y-auto"
-            >
-              <HomePageView
-                onStartDesign={() => setActiveView("create")}
-                onOpenPlanMode={() => setActiveView("plan")}
-                onOpenModelMode={() => setActiveView("model")}
-                onOpenUpload={() => setIsUploadOpen(true)}
-                onSelectPreset={(preset) => {
-                  handleStartGeneration({
-                    plot_width: preset.plot_width,
-                    plot_length: preset.plot_length,
-                    num_floors: preset.num_floors || 1,
-                    bedrooms: preset.bedrooms,
-                    bathrooms: preset.bathrooms,
-                    style: preset.style,
-                    road_side: "south",
-                    parking_cars: 2,
-                  });
-                }}
-              />
-            </motion.div>
-          )}
-
-          {/* 2. DEDICATED FULL-SCREEN 2D BLUEPRINT PLAN (With drag-and-drop room editing & image export) */}
-          {activeView === "plan" && layout && (
-            <motion.div
-              key="view-plan"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="w-full h-full relative"
-            >
-              <FloorPlan2D
-                layout={layout}
-                activeFloorIndex={activeFloorIndex}
-                onSelectFloor={setActiveFloorIndex}
-                selectedRoomId={selectedRoomId}
-                selectedFurnitureId={selectedFurnitureId}
-                onSelectRoom={(id) => {
-                  setSelectedRoomId(id);
-                  if (id) setSelectedFurnitureId(null);
-                }}
-                onSelectFurniture={(id) => setSelectedFurnitureId(id)}
-                onRegenerateLayout={handleRegenerateFromEdit}
-                isRegenerating={isRefining}
-                isDarkMode={true}
-              />
-
-              {/* Floating AI Command Bar */}
-              <FloatingAICommandBar
-                onApplyInstruction={handleRefine}
-                isLoading={isRefining}
-                selectedRoomName={selectedRoom?.name}
-              />
-            </motion.div>
-          )}
-
-          {/* 3. DEDICATED IMMERSIVE 3D MODEL VIEWER (Strictly 3D only) */}
-          {activeView === "model" && layout && (
-            <motion.div
-              key="view-model"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="w-full h-full relative"
-            >
-              <Dollhouse3D
-                layout={layout}
-                activeFloorIndex={activeFloorIndex}
-                onSelectFloor={setActiveFloorIndex}
-                selectedRoomId={selectedRoomId}
-                selectedFurnitureId={selectedFurnitureId}
-                onSelectRoom={(id) => {
-                  setSelectedRoomId(id);
-                  if (id) setSelectedFurnitureId(null);
-                }}
-                onSelectFurniture={(id) => setSelectedFurnitureId(id)}
-                isDarkMode={true}
-                lightingPreset={lightingPreset}
-                onChangeLightingPreset={setLightingPreset}
-                cameraPreset={cameraPreset}
-                onChangeCameraPreset={setCameraPreset}
-                wallHeightMode={wallHeightMode}
-                onToggleWallHeightMode={() =>
-                  setWallHeightMode((m) => (m === "cutaway" ? "full" : "cutaway"))
-                }
-                showRoof={showRoof}
-                onToggleRoof={() => setShowRoof((r) => !r)}
-              />
-
-              {/* Floating AI Command Bar */}
-              <FloatingAICommandBar
-                onApplyInstruction={handleRefine}
-                isLoading={isRefining}
-                selectedRoomName={selectedRoom?.name}
-              />
-            </motion.div>
-          )}
-
-          {/* 4. CREATE YOUR HOME: ONE-QUESTION-AT-A-TIME ARCHITECTURAL CONSULTATION */}
-          {activeView === "create" && (
-            <motion.div
-              key="view-create"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.3 }}
-              className="w-full h-full relative"
-            >
-              <ArchitecturalConsultation
-                onClose={() => setActiveView("home")}
-                onSubmit={handleStartGeneration}
-                initialPlotWidth={layout?.plot_width || 40}
-                initialPlotLength={layout?.plot_length || 50}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* FULL-PAGE CINEMATIC HOME VIEW */}
+      <main className="w-full h-full relative overflow-y-auto">
+        <HomePageView
+          onStartDesign={() => setIsCreateChoiceOpen(true)}
+          onOpenPlanMode={handleExplorePlan}
+          onOpenModelMode={handleExplore3D}
+          onOpenUpload={() => setIsUploadOpen(true)}
+          onSelectPreset={(preset) => {
+            handleStartGeneration({
+              plot_width: preset.plot_width,
+              plot_length: preset.plot_length,
+              num_floors: preset.num_floors || 1,
+              bedrooms: preset.bedrooms,
+              bathrooms: preset.bathrooms,
+              style: preset.style,
+              road_side: "south",
+              parking_cars: 2,
+            });
+          }}
+        />
       </main>
 
-      {/* REQUIRED ENTRY POINT: Upload-to-3D Floor Plan Conversion Modal */}
+      {/* CREATE FLOW CHOICE MODAL:
+          1. DESIGN A NEW HOME
+          2. I ALREADY HAVE A FLOOR PLAN */}
+      <CreateChoiceModal
+        isOpen={isCreateChoiceOpen}
+        onClose={() => setIsCreateChoiceOpen(false)}
+        onSelectDesignNew={handleSelectDesignNew}
+        onSelectUploadPlan={handleSelectUploadPlan}
+      />
+
+      {/* FLOW 1: ONE-QUESTION-AT-A-TIME ARCHITECTURAL CONSULTATION */}
+      {isConsultationOpen && (
+        <div className="fixed inset-0 z-50 bg-[#0A0B0E]">
+          <ArchitecturalConsultation
+            onClose={() => setIsConsultationOpen(false)}
+            onSubmit={handleStartGeneration}
+            initialPlotWidth={activeProject?.plot_width || 40}
+            initialPlotLength={activeProject?.plot_length || 50}
+          />
+        </div>
+      )}
+
+      {/* FLOW 2: FLOOR PLAN BLUEPRINT UPLOAD TO 3D MODAL */}
       <UploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
@@ -365,8 +184,60 @@ export default function AppRoot() {
         isDarkMode={true}
       />
 
-      {/* Generation Progress Modal */}
+      {/* RECENT PROJECTS ARCHIVE MODAL */}
+      <ProjectsModal
+        isOpen={isProjectsOpen}
+        onClose={() => setIsProjectsOpen(false)}
+        onSelectProject={(pid) => {
+          router.push(`/project/${pid}/plan`);
+        }}
+        onStartNew={() => {
+          setIsProjectsOpen(false);
+          setIsCreateChoiceOpen(true);
+        }}
+      />
+
+      {/* GENERATION PROGRESS MODAL */}
       <GenerationProgressModal key={isGenerating ? "generating" : "idle"} isOpen={isGenerating} />
+
+      {/* ERROR NOTICE MODAL */}
+      {generationError && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+          <div className="bg-[#14161C] border border-red-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-semibold text-white">Generation Notice</h3>
+            <p className="text-xs text-[#A0A5B5] leading-relaxed">{generationError}</p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setGenerationError(null)}
+                className="px-4 py-2 text-xs uppercase tracking-wider text-[#F5F3EF]/70 hover:text-white border border-white/10 rounded-lg"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setGenerationError(null);
+                  setIsConsultationOpen(true);
+                }}
+                className="px-4 py-2 text-xs uppercase tracking-wider border border-[#C48446]/40 text-[#C48446] hover:bg-[#C48446]/10 rounded-lg"
+              >
+                Open Brief
+              </button>
+              {lastIntakeRequest && (
+                <button
+                  onClick={() => {
+                    const req = lastIntakeRequest;
+                    setGenerationError(null);
+                    handleStartGeneration(req);
+                  }}
+                  className="px-4 py-2 text-xs uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg shadow-md transition-colors"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

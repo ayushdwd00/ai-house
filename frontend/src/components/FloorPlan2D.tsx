@@ -426,12 +426,12 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
       {/* --------------------------------------------------------------------- */}
       {/* 1. TOP FLOATING ACTION BAR: VIEW CONTROLS, EDIT MODE & EXPORT */}
       {/* --------------------------------------------------------------------- */}
-      <div className="absolute top-20 left-6 z-30 flex flex-wrap items-center gap-2.5">
+      <div className="absolute top-16 sm:top-20 left-3 sm:left-6 z-30 flex flex-wrap items-center gap-1.5 sm:gap-2.5 max-w-[calc(100vw-24px)] pointer-events-auto">
         {/* Navigation Tools */}
-        <div className="flex items-center p-1 rounded-full bg-[#12141A]/85 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
+        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
           <button
             onClick={() => setActiveTool("select")}
-            className={`px-3 py-1 rounded-full transition-all ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
               activeTool === "select" && !isEditMode
                 ? "bg-[#F5F3EF] text-[#0A0B0E] font-medium shadow-sm"
                 : "hover:text-[#F5F3EF]"
@@ -441,7 +441,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
           </button>
           <button
             onClick={() => setActiveTool("measure")}
-            className={`px-3 py-1 rounded-full transition-all ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
               activeTool === "measure"
                 ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
                 : "hover:text-[#F5F3EF]"
@@ -450,28 +450,28 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
             MEASURE
           </button>
 
-          <div className="h-4 w-px bg-white/10 mx-1.5" />
+          <div className="h-4 w-px bg-white/10 mx-1 sm:mx-1.5" />
 
           <button
             onClick={() => setZoom((z) => Math.min(3.5, z * 1.15))}
-            className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
+            className="p-1 sm:p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-3.5 h-3.5" />
+            <ZoomIn className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
           </button>
           <button
             onClick={() => setZoom((z) => Math.max(0.4, z * 0.85))}
-            className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
+            className="p-1 sm:p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-3.5 h-3.5" />
+            <ZoomOut className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
           </button>
           <button
             onClick={handleResetView}
-            className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
+            className="p-1 sm:p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
             title="Reset View"
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            <Maximize2 className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
           </button>
         </div>
 
@@ -484,40 +484,40 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
             }
             setIsEditMode((prev) => !prev);
           }}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] font-mono tracking-wider transition-all shadow-2xl ${
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-[11px] font-mono tracking-wider transition-all shadow-2xl ${
             isEditMode
               ? "bg-[#C48446] text-[#0A0B0E] font-semibold ring-2 ring-[#C48446]/40"
-              : "bg-[#12141A]/85 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 hover:border-[#C48446]/40"
+              : "bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 hover:border-[#C48446]/40"
           }`}
         >
-          <Move className="w-3.5 h-3.5" />
-          <span>{isEditMode ? "EDITING ACTIVE" : "EDIT ROOMS (DRAG)"}</span>
+          <Move className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+          <span>{isEditMode ? "EDITING" : "DRAG ROOMS"}</span>
         </button>
 
         {/* EXPORT 2D MAP AS IMAGE BUTTON */}
         <button
           onClick={handleExportPNG}
           disabled={isExporting}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#12141A]/85 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 hover:border-white/20 text-[11px] font-mono tracking-wider shadow-2xl transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 hover:border-white/20 text-[10px] sm:text-[11px] font-mono tracking-wider shadow-2xl transition-all disabled:opacity-50"
           title="Export 2D architectural blueprint map as PNG image"
         >
           {isExporting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="w-3 sm:w-3.5 h-3 sm:h-3.5 animate-spin" />
           ) : (
-            <Download className="w-3.5 h-3.5 text-[#C48446]" />
+            <Download className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#C48446]" />
           )}
-          <span>EXPORT MAP (IMAGE)</span>
+          <span>EXPORT MAP</span>
         </button>
       </div>
 
-      {/* Floor Level Switcher (Top Right) */}
+      {/* Floor Level Switcher (Top Right / Responsive) */}
       {layout.floors && layout.floors.length > 1 && onSelectFloor && (
-        <div className="absolute top-20 right-6 z-30 flex items-center p-1 rounded-full bg-[#12141A]/85 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
+        <div className="absolute top-28 sm:top-20 right-3 sm:right-6 z-30 flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
           {layout.floors.map((fl, idx) => (
             <button
               key={fl.floor_number}
               onClick={() => onSelectFloor(idx)}
-              className={`px-3.5 py-1 rounded-full transition-all ${
+              className={`px-3 py-1 rounded-full transition-all ${
                 activeFloorIndex === idx
                   ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
                   : "hover:text-[#F5F3EF]"
@@ -840,14 +840,19 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
               );
             })}
 
-            {/* North Arrow Drafting Symbol */}
+            {/* North Arrow Drafting Symbol & Vastu Rose */}
             <g transform={`translate(${svgWidth - 25}, -35)`} pointerEvents="none">
-              <circle cx={0} cy={0} r={14} fill="#24211D" stroke="#68615A" strokeWidth={1.5} />
-              <polygon points="0,-10 4,2 0,0 -4,2" fill="#C48446" />
-              <polygon points="0,0 4,2 0,8 -4,2" fill="#575149" />
-              <text x={0} y={-14} textAnchor="middle" fill="#C48446" className="font-mono font-bold text-[10px]">
+              <circle cx={0} cy={0} r={16} fill="#24211D" stroke="#68615A" strokeWidth={1.5} />
+              <polygon points="0,-12 4,2 0,0 -4,2" fill="#C48446" />
+              <polygon points="0,0 4,2 0,10 -4,2" fill="#575149" />
+              <text x={0} y={-16} textAnchor="middle" fill="#C48446" className="font-mono font-bold text-[10px]">
                 N
               </text>
+              {layout.vastu_result && (
+                <text x={0} y={22} textAnchor="middle" fill="#C48446" className="font-mono text-[7px] tracking-wider font-semibold">
+                  VASTU
+                </text>
+              )}
             </g>
 
             {/* Graphic Scale Bar */}

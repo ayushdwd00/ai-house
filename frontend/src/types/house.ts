@@ -68,6 +68,7 @@ export interface Site {
   parking?: ParkingSpace;
   pedestrian_path?: Point2D[];
   driveway?: Rect;
+  north_direction?: number;
 }
 
 export interface FurnitureItem {
@@ -189,6 +190,30 @@ export interface FloorPlan {
   floor_slab_area?: number;
 }
 
+export interface VastuRuleEvaluation {
+  rule_id: string;
+  room_id: string;
+  room_name: string;
+  category: string;
+  severity: "mandatory" | "preferred" | "neutral" | "avoid";
+  expected_zone: string;
+  actual_zone: string;
+  status: "satisfied" | "partially_satisfied" | "violated";
+  explanation: string;
+  score_contribution: number;
+}
+
+export interface VastuResult {
+  overall_score: number;
+  orientation_interpreted: string;
+  rule_results: VastuRuleEvaluation[];
+  satisfied_rules: string[];
+  violated_rules: string[];
+  warnings: string[];
+  recommendations: string[];
+  zone_occupancy: Record<string, string[]>;
+}
+
 export interface ArchitecturalScores {
   overall_score: number;
   room_program_score: number;
@@ -202,6 +227,7 @@ export interface ArchitecturalScores {
   ventilation_score: number;
   space_efficiency_score: number;
   vastu_score?: number;
+  vastu_result?: VastuResult;
   score_breakdown?: Record<string, string>;
 }
 
@@ -238,6 +264,7 @@ export interface HouseLayout {
   floors: FloorPlan[];
   scores?: ArchitecturalScores;
   validation?: ArchitecturalValidation;
+  vastu_result?: VastuResult;
   critic_notes?: string[];
   metadata?: Record<string, unknown>;
   rooms: Room[];
@@ -258,6 +285,7 @@ export interface IntakeRequest {
   bathrooms?: number;
   attached_bathroom_count?: number;
   road_side?: "north" | "south" | "east" | "west";
+  north_direction?: number;
   parking_cars?: number;
   style?: string;
   special_rooms?: string[];

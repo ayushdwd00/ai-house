@@ -12,7 +12,19 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { HeroHouse3D } from "./HeroHouse3D";
+import dynamic from "next/dynamic";
+
+const HeroHouse3D = dynamic(
+  () => import("./HeroHouse3D").then((m) => m.HeroHouse3D),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-[#0C0E12] flex items-center justify-center">
+        <div className="w-2 h-2 rounded-full bg-[#C48446] animate-pulse" />
+      </div>
+    ),
+  }
+);
 
 interface HomePageViewProps {
   onStartDesign: () => void;
@@ -164,6 +176,8 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             <img
               src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"
               alt="Architectural Craftsmanship"
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover grayscale contrast-125 hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B0E] via-transparent to-transparent" />
@@ -229,6 +243,8 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             <img
               src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop"
               alt="Floor plan geometry"
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover contrast-110"
             />
             <div className="absolute inset-0 bg-[#0A0B0E]/30" />
@@ -286,6 +302,8 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             <img
               src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1600&auto=format&fit=crop"
               alt="3D Architectural Dollhouse View"
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
@@ -381,6 +399,8 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   <img
                     src={p.img}
                     alt={p.title}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">

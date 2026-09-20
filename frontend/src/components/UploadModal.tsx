@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { UploadCloud, ArrowRight, X, Image as ImageIcon, Ruler } from "lucide-react";
 import { HouseLayout } from "@/types/house";
+import { uploadFloorPlanImage, generateHouseLayout } from "@/utils/api";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -52,39 +53,27 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setStatusMessage("Analyzing architectural boundaries with Groq Vision...");
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("calibration_width", String(widthFt));
-
-      const res = await fetch("http://localhost:8000/api/upload-floorplan", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("Failed to process floor plan");
-
+      const data = await uploadFloorPlanImage(selectedFile, widthFt);
       setStatusMessage("Synthesizing 2D and 3D dollhouse model...");
-      const data = await res.json();
       onSuccess(data.layout);
       onClose();
     } catch (err) {
-      console.error(err);
+      console.error("[UPLOAD ERROR]", err);
       // Fallback generation via standard API
-      const fallbackRes = await fetch("http://localhost:8000/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      try {
+        const layout = await generateHouseLayout({
           plot_width: widthFt,
           plot_length: Math.round(widthFt * 0.85),
           num_floors: 1,
           bedrooms: 3,
           bathrooms: 2.0,
           style: "Architectural Digitization",
-        }),
-      });
-      const layout = await fallbackRes.json();
-      onSuccess(layout);
-      onClose();
+        });
+        onSuccess(layout);
+        onClose();
+      } catch (fallbackErr) {
+        alert(err instanceof Error ? err.message : "Failed to process floor plan upload.");
+      }
     } finally {
       setStep("drop");
       setSelectedFile(null);

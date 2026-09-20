@@ -1,0 +1,332 @@
+"""
+Global Wall Network, Door & Window Planner Module
+Constructs a unified, deduplicated global wall network with shared boundary tracking.
+Consumes ConstructionSpecification for real geometric wall thicknesses (external & internal),
+heights, opening cutouts, surface areas, and 3D volumes.
+Generates architectural doors (hinges, swings, clearance zones, circulation connectivity)
+and exterior daylight/ventilation windows with verified orientation and wall hosting.
+"""
+
+from typing import List, Dict, Tuple, Optional, Set
+import math
+from models import Room, Wall, Door, Window, Rect, Point2D, Site, ConstructionSpecification
+
+
+def generate_wall_network_and_openings(
+    rooms: List[Room],
+    site: Site,
+    wall_height: float = 10.0,
+    construction_spec: Optional[ConstructionSpecification] = None
+) -> Tuple[List[Wall], List[Door], List[Window]]:
+    """
+    Generates single shared walls for adjacent rooms, external perimeter walls,
+    circulation-driven doors, and exterior daylight windows.
+    Wall thicknesses and heights derive from ConstructionSpecification when supplied.
+    Computes net surface areas and volumes deducting door/window openings.
+    """
+    walls: List[Wall] = []
+    doors: List[Door] = []
+    windows: List[Window] = []
+    
+    wall_counter = 1
+    door_counter = 1
+    win_counter = 1
+
+    # Resolve wall thickness and height from ConstructionSpecification if available
+    if construction_spec:
+        ext_thickness = construction_spec.external_wall_thickness_ft
+        int_thickness = construction_spec.internal_wall_thickness_ft
+        active_wall_height = construction_spec.wall_height_ft
+    else:
+        ext_thickness = 0.75  # standard 9-inch masonry
+        int_thickness = 0.375 # standard 4.5-inch masonry (or 0.5ft baseline)
+        active_wall_height = wall_height
+
+    # Map of room_id to Room
+    room_map = {r.id: r for r in rooms if r.rect}
+
+    # Extract all horizontal and vertical segment slices from rooms
+    h_lines: Dict[float, List[Tuple[float, float, str, str]]] = {}
+    v_lines: Dict[float, List[Tuple[float, float, str, str]]] = {}
+
+    def snap_coord(val: float) -> float:
+        return round(val * 2.0) / 2.0
+
+    for r in rooms:
+        if not r.rect:
+            continue
+        rx, ry = snap_coord(r.rect.x), snap_coord(r.rect.y)
+        rw, rl = snap_coord(r.rect.width), snap_coord(r.rect.length)
+        rx2, ry2 = rx + rw, ry + rl
+
+        # Top edge
+        h_lines.setdefault(ry, []).append((rx, rx2, r.id, "top"))
+        # Bottom edge
+        h_lines.setdefault(ry2, []).append((rx, rx2, r.id, "bottom"))
+        # Left edge
+        v_lines.setdefault(rx, []).append((ry, ry2, r.id, "left"))
+        # Right edge
+        v_lines.setdefault(rx2, []).append((ry, ry2, r.id, "right"))
+
+    # Helper to resolve 1D overlapping segments on a single line
+    def resolve_segments_on_line(line_val: float, raw_segs: List[Tuple[float, float, str, str]], is_horizontal: bool):
+        nonlocal wall_counter
+        # Collect critical split points
+        points = set()
+        for s, e, _, _ in raw_segs:
+            points.add(round(s, 2))
+            points.add(round(e, 2))
+        sorted_pts = sorted(list(points))
+
+        for i in range(len(sorted_pts) - 1):
+            p1, p2 = sorted_pts[i], sorted_pts[i + 1]
+            if p2 - p1 < 0.2:  # Ignore microscopic slivers
+                continue
+            mid = (p1 + p2) / 2.0
+
+            # Find which rooms overlap this sub-segment
+            touching_rooms = set()
+            for s, e, rid, orient in raw_segs:
+                if s <= mid <= e:
+                    touching_rooms.add(rid)
+
+            if not touching_rooms:
+                continue
+
+            r_ids = sorted(list(touching_rooms))
+            is_interior = len(r_ids) >= 2
+            wall_type = "interior" if is_interior else "exterior"
+            thickness = int_thickness if is_interior else ext_thickness
+
+            if is_horizontal:
+                start_pt = Point2D(x=p1, y=line_val)
+                end_pt = Point2D(x=p2, y=line_val)
+            else:
+                start_pt = Point2D(x=line_val, y=p1)
+                end_pt = Point2D(x=line_val, y=p2)
+
+            w_id = f"wall_{wall_counter:03d}"
+            wall_counter += 1
+
+            # Gross surface area and volume placeholder (refined after openings)
+            w_len = round(p2 - p1, 2)
+            gross_area = round(w_len * active_wall_height, 2)
+
+            walls.append(Wall(
+                id=w_id,
+                wall_id=w_id,
+                start=start_pt,
+                end=end_pt,
+                thickness=thickness,
+                height=active_wall_height,
+                wall_type=wall_type,
+                is_exterior=(not is_interior),
+                adjacent_room_ids=r_ids,
+                openings=[],
+                volume_cuft=round(gross_area * thickness, 2),
+                net_surface_area_sqft=gross_area
+            ))
+
+    for y_coord, segs in h_lines.items():
+        resolve_segments_on_line(y_coord, segs, is_horizontal=True)
+
+    for x_coord, segs in v_lines.items():
+        resolve_segments_on_line(x_coord, segs, is_horizontal=False)
+
+    # -------------------------------------------------------------------------
+    # Generate Doors
+    # -------------------------------------------------------------------------
+    # 1. Main Entrance Door on exterior wall of foyer or living room
+    entry_candidates = [r for r in rooms if r.type in ["entry_foyer", "living_room"] and r.rect]
+    entry_room = entry_candidates[0] if entry_candidates else (rooms[0] if rooms else None)
+
+    if entry_room:
+        road = site.road_side if site and hasattr(site, "road_side") and site.road_side else "south"
+        entry_walls = [
+            w for w in walls
+            if w.wall_type == "exterior" and entry_room.id in w.adjacent_room_ids
+        ]
+        
+        chosen_entry_wall = None
+        for w in entry_walls:
+            w_len = math.hypot(w.end.x - w.start.x, w.end.y - w.start.y)
+            if w_len >= 3.5:
+                chosen_entry_wall = w
+                break
+        if not chosen_entry_wall and entry_walls:
+            chosen_entry_wall = entry_walls[0]
+
+        if chosen_entry_wall:
+            d_id = f"door_{door_counter:03d}"
+            door_counter += 1
+            d_pos = Point2D(
+                x=round((chosen_entry_wall.start.x + chosen_entry_wall.end.x) / 2.0, 2),
+                y=round((chosen_entry_wall.start.y + chosen_entry_wall.end.y) / 2.0, 2)
+            )
+            # 3ft clear swing zone in front of entrance
+            cz_x = max(0.0, d_pos.x - 1.75)
+            cz_y = max(0.0, d_pos.y - 1.75)
+            d_entry = Door(
+                id=d_id,
+                door_id=d_id,
+                host_wall_id=chosen_entry_wall.id,
+                from_room="outdoor",
+                to_room=entry_room.id,
+                position=d_pos,
+                width=3.5,
+                height=7.0,
+                hinge_side="left",
+                swing_direction="inward",
+                door_type="entrance",
+                clearance_zone=Rect(x=cz_x, y=cz_y, width=3.5, length=3.0)
+            )
+            doors.append(d_entry)
+            chosen_entry_wall.openings.append(d_id)
+
+    # 2. Interior doors connecting rooms to circulation or attached rooms
+    for r in rooms:
+        if r.type in ["hallway", "parking"]:
+            continue
+
+        target_connector_id = r.attached_room_id
+        if not target_connector_id:
+            hallways = [h for h in rooms if h.type == "hallway"]
+            target_connector_id = hallways[0].id if hallways else "living_room"
+
+        shared_walls = [
+            w for w in walls
+            if w.wall_type == "interior"
+            and r.id in w.adjacent_room_ids
+            and (target_connector_id in w.adjacent_room_ids or any(h.id in w.adjacent_room_ids for h in rooms if h.type in ["hallway", "living_room"]))
+        ]
+
+        if shared_walls:
+            host = shared_walls[0]
+            w_len = math.hypot(host.end.x - host.start.x, host.end.y - host.start.y)
+            if w_len >= 2.5:
+                d_id = f"door_{door_counter:03d}"
+                door_counter += 1
+                
+                t = min(0.8, max(0.2, 1.2 / max(0.1, w_len)))
+                dx = host.start.x + t * (host.end.x - host.start.x)
+                dy = host.start.y + t * (host.end.y - host.start.y)
+
+                door_w = 2.5 if r.type in ["bathroom", "powder_room", "utility"] else 3.0
+                door_type = "pocket" if r.type == "bathroom" and w_len < 3.5 else "single_swing"
+
+                d_int = Door(
+                    id=d_id,
+                    door_id=d_id,
+                    host_wall_id=host.id,
+                    from_room=host.adjacent_room_ids[0],
+                    to_room=host.adjacent_room_ids[1] if len(host.adjacent_room_ids) > 1 else r.id,
+                    position=Point2D(x=round(dx, 2), y=round(dy, 2)),
+                    width=door_w,
+                    height=7.0,
+                    hinge_side="left",
+                    swing_direction="inward",
+                    door_type=door_type,
+                    clearance_zone=Rect(x=round(dx - door_w/2.0, 2), y=round(dy, 2), width=door_w, length=3.0)
+                )
+                doors.append(d_int)
+                host.openings.append(d_id)
+
+    # -------------------------------------------------------------------------
+    # Generate Windows
+    # -------------------------------------------------------------------------
+    env = getattr(site, "buildable_envelope", None)
+
+    for r in rooms:
+        if r.type in ["hallway", "parking"]:
+            continue
+        ext_walls = [
+            w for w in walls
+            if w.wall_type == "exterior" and r.id in w.adjacent_room_ids
+        ]
+        if not ext_walls:
+            continue
+
+        for ext_w in ext_walls:
+            w_len = math.hypot(ext_w.end.x - ext_w.start.x, ext_w.end.y - ext_w.start.y)
+            if w_len < 3.5:
+                continue
+
+            # Determine window sizing
+            if r.type in ["living_room", "family_lounge"]:
+                win_w = min(6.0, w_len - 1.5)
+                win_h = 5.0
+                sill = 2.5
+                w_type = "picture" if win_w >= 5.0 else "casement"
+            elif r.type in ["master_bedroom", "bedroom", "guest_bedroom"]:
+                win_w = min(4.5, w_len - 1.5)
+                win_h = 4.5
+                sill = 3.0
+                w_type = "casement"
+            elif r.type == "kitchen":
+                win_w = min(3.5, w_len - 1.0)
+                win_h = 3.5
+                sill = 3.5
+                w_type = "sliding"
+            elif r.type in ["bathroom", "powder_room", "utility"]:
+                win_w = 2.0
+                win_h = 1.5
+                sill = 6.0
+                w_type = "ventilator"
+            else:
+                win_w = 3.0
+                win_h = 4.0
+                sill = 3.0
+                w_type = "casement"
+
+            mid_x = (ext_w.start.x + ext_w.end.x) / 2.0
+            mid_y = (ext_w.start.y + ext_w.end.y) / 2.0
+
+            # Orientation calculation
+            is_horiz = abs(ext_w.start.y - ext_w.end.y) < 0.1
+            if is_horiz:
+                orient = "north" if mid_y < (env.y + env.length / 2.0 if env else 25.0) else "south"
+            else:
+                orient = "west" if mid_x < (env.x + env.width / 2.0 if env else 20.0) else "east"
+
+            win_id = f"win_{win_counter:03d}"
+            win_counter += 1
+
+            win = Window(
+                id=win_id,
+                window_id=win_id,
+                host_wall_id=ext_w.id,
+                room_id=r.id,
+                position=Point2D(x=round(mid_x, 2), y=round(mid_y, 2)),
+                width=round(win_w, 2),
+                height=win_h,
+                sill_height=sill,
+                head_height=round(sill + win_h, 2),
+                window_type=w_type,
+                orientation=orient
+            )
+            windows.append(win)
+            ext_w.openings.append(win_id)
+            break
+
+    # -------------------------------------------------------------------------
+    # Recalculate Net Wall Surface Area & Volume deducting openings
+    # -------------------------------------------------------------------------
+    door_area_by_wall: Dict[str, float] = {}
+    for d in doors:
+        if d.host_wall_id:
+            door_area_by_wall[d.host_wall_id] = door_area_by_wall.get(d.host_wall_id, 0.0) + (d.width * d.height)
+
+    win_area_by_wall: Dict[str, float] = {}
+    for w in windows:
+        if w.host_wall_id:
+            win_area_by_wall[w.host_wall_id] = win_area_by_wall.get(w.host_wall_id, 0.0) + (w.width * w.height)
+
+    for w in walls:
+        w_len = math.hypot(w.end.x - w.start.x, w.end.y - w.start.y)
+        gross_area = round(w_len * w.height, 2)
+        openings_area = round(door_area_by_wall.get(w.id, 0.0) + win_area_by_wall.get(w.id, 0.0), 2)
+        net_area = max(0.0, round(gross_area - openings_area, 2))
+        w.net_surface_area_sqft = net_area
+        w.volume_cuft = round(net_area * w.thickness, 2)
+
+    return walls, doors, windows

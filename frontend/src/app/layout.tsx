@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
+import { ProjectProvider } from "@/context/ProjectContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,9 +28,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${cormorant.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#0A0B0E] text-[#F5F3EF] font-sans selection:bg-[#C48446]/30 selection:text-[#F7DCB9]">
-        {children}
+    <html lang="en" className={`${inter.variable} ${cormorant.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-[#0A0B0E] text-[#F5F3EF] font-sans selection:bg-[#C48446]/30 selection:text-[#F7DCB9]" suppressHydrationWarning>
+        <ProjectProvider>
+          {children}
+        </ProjectProvider>
       </body>
     </html>
   );
