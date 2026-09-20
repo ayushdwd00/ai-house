@@ -1,0 +1,7024 @@
+{
+  "id": "layout_b09face3",
+  "title": "3 Bed \u00b7 2.0 Bath Single-Story Modern Scandinavian Residence",
+  "designer_rationale": "Scheme 'Central Circulation Spine' demonstrated superior spatial efficiency (98.0%), optimal circulation (80.0%), and high bedroom acoustic privacy (100.0%). Site-first planning with South frontage, 5.0ft front setback, and 3 bedrooms across 1126.0 sq ft.",
+  "plot_width": 40.0,
+  "plot_length": 50.0,
+  "num_floors": 1,
+  "site": {
+    "plot_width": 40.0,
+    "plot_length": 50.0,
+    "total_plot_area": 2000.0,
+    "road_side": "south",
+    "frontage_ft": 40.0,
+    "setbacks": {
+      "front": 5.0,
+      "rear": 4.0,
+      "left": 3.0,
+      "right": 3.0
+    },
+    "buildable_envelope": {
+      "x": 3.0,
+      "y": 4.0,
+      "width": 34.0,
+      "length": 41.0
+    },
+    "parking": {
+      "id": "parking_01",
+      "capacity": 1,
+      "is_covered": true,
+      "rect": {
+        "x": 3.0,
+        "y": 33.0,
+        "width": 10.0,
+        "length": 16.0
+      },
+      "vehicle_type": "car",
+      "access_side": "front"
+    },
+    "pedestrian_path": [
+      {
+        "x": 16.0,
+        "y": 50.0
+      },
+      {
+        "x": 16.0,
+        "y": 45.0
+      },
+      {
+        "x": 17.0,
+        "y": 43.0
+      }
+    ],
+    "driveway": {
+      "x": 3.0,
+      "y": 49.0,
+      "width": 10.0,
+      "length": 1.0
+    }
+  },
+  "stats": {
+    "total_area_sqft": 1126.0,
+    "living_area_sqft": 1126.0,
+    "width_ft": 40.0,
+    "length_ft": 50.0,
+    "num_floors": 1,
+    "bedroom_count": 3,
+    "bathroom_count": 2.0,
+    "aspect_ratio": 0.8,
+    "coverage_percentage": 56.3,
+    "circulation_area_sqft": 0.0
+  },
+  "floors": [
+    {
+      "floor_number": 1,
+      "floor_name": "Ground Floor",
+      "rooms": [
+        {
+          "id": "f1_entry_foyer",
+          "name": "Entry Foyer",
+          "type": "entry_foyer",
+          "zone": "public",
+          "floor": 1,
+          "rect": {
+            "x": 17.5,
+            "y": 37.0,
+            "width": 7.5,
+            "length": 8.0
+          },
+          "color": "#F1EDE6",
+          "floor_material": "hardwood_oak",
+          "furniture": [],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 5.5,
+          "min_length": 6.0,
+          "preferred_width": 7.5,
+          "preferred_length": 8.0,
+          "max_width": 12.0,
+          "max_length": 12.0,
+          "actual_width": 7.5,
+          "actual_length": 0.0,
+          "area_sqft": 60.0,
+          "privacy_level": "public",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "7.5' \u00d7 8.0'",
+          "rationale": "Transitional airlock providing privacy buffer and welcoming arrival."
+        },
+        {
+          "id": "f1_living_room",
+          "name": "Living Room",
+          "type": "living_room",
+          "zone": "public",
+          "floor": 1,
+          "rect": {
+            "x": 3.0,
+            "y": 28.0,
+            "width": 14.5,
+            "length": 17.0
+          },
+          "color": "#F8F4EE",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_living_room_sofa",
+              "type": "sofa",
+              "room_id": "f1_living_room",
+              "x": 6.75,
+              "y": 30.0,
+              "width": 7.0,
+              "length": 3.0,
+              "position": {
+                "x": 6.75,
+                "y": 30.0
+              },
+              "dimensions": {
+                "x": 7.0,
+                "y": 3.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 2.0
+              }
+            },
+            {
+              "id": "f1_living_room_coffee_table",
+              "type": "coffee_table",
+              "room_id": "f1_living_room",
+              "x": 8.25,
+              "y": 34.0,
+              "width": 4.0,
+              "length": 2.0,
+              "position": {
+                "x": 8.25,
+                "y": 34.0
+              },
+              "dimensions": {
+                "x": 4.0,
+                "y": 2.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_living_room_tv_console",
+              "type": "tv_unit",
+              "room_id": "f1_living_room",
+              "x": 6.25,
+              "y": 43.2,
+              "width": 8.0,
+              "length": 1.5,
+              "position": {
+                "x": 6.25,
+                "y": 43.2
+              },
+              "dimensions": {
+                "x": 8.0,
+                "y": 1.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            }
+          ],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 12.0,
+          "min_length": 13.0,
+          "preferred_width": 14.5,
+          "preferred_length": 17.0,
+          "max_width": 22.0,
+          "max_length": 24.0,
+          "actual_width": 14.5,
+          "actual_length": 0.0,
+          "area_sqft": 246.5,
+          "privacy_level": "public",
+          "daylight_requirement": "high",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": true,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [
+            "f1_entry_foyer",
+            "f1_dining"
+          ],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "14.5' \u00d7 17.0'",
+          "rationale": "Primary public living sanctuary with direct exterior daylight."
+        },
+        {
+          "id": "f1_dining",
+          "name": "Dining Room",
+          "type": "dining",
+          "zone": "public",
+          "floor": 1,
+          "rect": {
+            "x": 25.0,
+            "y": 22.0,
+            "width": 12.0,
+            "length": 10.5
+          },
+          "color": "#F5EFE6",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_dining_table",
+              "type": "dining_table",
+              "room_id": "f1_dining",
+              "x": 28.25,
+              "y": 25.65,
+              "width": 5.5,
+              "length": 3.2,
+              "position": {
+                "x": 28.25,
+                "y": 25.65
+              },
+              "dimensions": {
+                "x": 5.5,
+                "y": 3.2
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "all_around": 3.0
+              }
+            }
+          ],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 9.5,
+          "min_length": 10.5,
+          "preferred_width": 12.0,
+          "preferred_length": 13.5,
+          "max_width": 16.0,
+          "max_length": 18.0,
+          "actual_width": 12.0,
+          "actual_length": 0.0,
+          "area_sqft": 126.0,
+          "privacy_level": "semi_private",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [
+            "f1_kitchen"
+          ],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "12.0' \u00d7 10.5'",
+          "rationale": "Dining hub connecting culinary service with entertaining spaces."
+        },
+        {
+          "id": "f1_kitchen",
+          "name": "Kitchen",
+          "type": "kitchen",
+          "zone": "service",
+          "floor": 1,
+          "rect": {
+            "x": 25.0,
+            "y": 32.5,
+            "width": 12.0,
+            "length": 9.5
+          },
+          "color": "#F1EBE1",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_kitchen_counter",
+              "type": "kitchen_counter",
+              "room_id": "f1_kitchen",
+              "x": 25.5,
+              "y": 33.0,
+              "width": 11.0,
+              "length": 2.0,
+              "position": {
+                "x": 25.5,
+                "y": 33.0
+              },
+              "dimensions": {
+                "x": 11.0,
+                "y": 2.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_kitchen_hob",
+              "type": "cooktop",
+              "room_id": "f1_kitchen",
+              "x": 26.5,
+              "y": 33.1,
+              "width": 2.5,
+              "length": 1.8,
+              "position": {
+                "x": 26.5,
+                "y": 33.1
+              },
+              "dimensions": {
+                "x": 2.5,
+                "y": 1.8
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_kitchen_sink",
+              "type": "kitchen_sink",
+              "room_id": "f1_kitchen",
+              "x": 32.8,
+              "y": 33.1,
+              "width": 2.5,
+              "length": 1.8,
+              "position": {
+                "x": 32.8,
+                "y": 33.1
+              },
+              "dimensions": {
+                "x": 2.5,
+                "y": 1.8
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_kitchen_fridge",
+              "type": "refrigerator",
+              "room_id": "f1_kitchen",
+              "x": 33.8,
+              "y": 38.8,
+              "width": 2.8,
+              "length": 2.8,
+              "position": {
+                "x": 33.8,
+                "y": 38.8
+              },
+              "dimensions": {
+                "x": 2.8,
+                "y": 2.8
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 3.0
+              }
+            }
+          ],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 8.0,
+          "min_length": 9.5,
+          "preferred_width": 10.0,
+          "preferred_length": 12.0,
+          "max_width": 15.0,
+          "max_length": 16.0,
+          "actual_width": 12.0,
+          "actual_length": 0.0,
+          "area_sqft": 114.0,
+          "privacy_level": "semi_private",
+          "daylight_requirement": "high",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": true,
+          "required_adjacencies": [
+            "f1_dining"
+          ],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "12.0' \u00d7 9.5'",
+          "rationale": "Culinary work triangle with exterior ventilation."
+        },
+        {
+          "id": "f1_hallway",
+          "name": "Circulation Hall",
+          "type": "hallway",
+          "zone": "circulation",
+          "floor": 1,
+          "rect": {
+            "x": 17.5,
+            "y": 22.0,
+            "width": 5.0,
+            "length": 12.0
+          },
+          "color": "#FAF7F2",
+          "floor_material": "hardwood_oak",
+          "furniture": [],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 4.0,
+          "min_length": 8.0,
+          "preferred_width": 5.0,
+          "preferred_length": 12.0,
+          "max_width": 7.0,
+          "max_length": 24.0,
+          "actual_width": 5.0,
+          "actual_length": 0.0,
+          "area_sqft": 60.0,
+          "privacy_level": "semi_private",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "5.0' \u00d7 12.0'",
+          "rationale": "Acoustic buffer corridor linking living zones to quiet quarters."
+        },
+        {
+          "id": "f1_master_bed",
+          "name": "Primary Suite",
+          "type": "master_bedroom",
+          "zone": "private",
+          "floor": 1,
+          "rect": {
+            "x": 3.0,
+            "y": 10.5,
+            "width": 11.5,
+            "length": 15.5
+          },
+          "color": "#E9EFEA",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_master_bed_bed",
+              "type": "king_bed",
+              "room_id": "f1_master_bed",
+              "x": 5.5,
+              "y": 12.0,
+              "width": 6.5,
+              "length": 6.5,
+              "position": {
+                "x": 5.5,
+                "y": 12.0
+              },
+              "dimensions": {
+                "x": 6.5,
+                "y": 6.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 3.0,
+                "sides": 2.0
+              }
+            },
+            {
+              "id": "f1_master_bed_nightstand_1",
+              "type": "side_table",
+              "room_id": "f1_master_bed",
+              "x": 3.7,
+              "y": 12.0,
+              "width": 1.5,
+              "length": 1.5,
+              "position": {
+                "x": 3.7,
+                "y": 12.0
+              },
+              "dimensions": {
+                "x": 1.5,
+                "y": 1.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_master_bed_nightstand_2",
+              "type": "side_table",
+              "room_id": "f1_master_bed",
+              "x": 12.3,
+              "y": 12.0,
+              "width": 1.5,
+              "length": 1.5,
+              "position": {
+                "x": 12.3,
+                "y": 12.0
+              },
+              "dimensions": {
+                "x": 1.5,
+                "y": 1.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_master_bed_wardrobe",
+              "type": "wardrobe",
+              "room_id": "f1_master_bed",
+              "x": 4.0,
+              "y": 23.8,
+              "width": 8.0,
+              "length": 2.0,
+              "position": {
+                "x": 4.0,
+                "y": 23.8
+              },
+              "dimensions": {
+                "x": 8.0,
+                "y": 2.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 3.0
+              }
+            }
+          ],
+          "parent_room_id": null,
+          "attached_room_id": "f1_master_bath",
+          "min_width": 11.5,
+          "min_length": 13.0,
+          "preferred_width": 13.5,
+          "preferred_length": 15.5,
+          "max_width": 18.0,
+          "max_length": 20.0,
+          "actual_width": 11.5,
+          "actual_length": 0.0,
+          "area_sqft": 178.2,
+          "privacy_level": "intimate",
+          "daylight_requirement": "high",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": true,
+          "required_adjacencies": [
+            "f1_master_bath"
+          ],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "11.5' \u00d7 15.5'",
+          "rationale": "Secluded primary retreat with attached en-suite bathroom."
+        },
+        {
+          "id": "f1_master_bath",
+          "name": "Primary Bath",
+          "type": "bathroom",
+          "zone": "private",
+          "floor": 1,
+          "rect": {
+            "x": 14.5,
+            "y": 15.0,
+            "width": 5.0,
+            "length": 7.0
+          },
+          "color": "#E5EDEF",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_master_bath_basin",
+              "type": "basin",
+              "room_id": "f1_master_bath",
+              "x": 15.0,
+              "y": 15.5,
+              "width": 2.2,
+              "length": 1.8,
+              "position": {
+                "x": 15.0,
+                "y": 15.5
+              },
+              "dimensions": {
+                "x": 2.2,
+                "y": 1.8
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_master_bath_wc",
+              "type": "toilet",
+              "room_id": "f1_master_bath",
+              "x": 15.0,
+              "y": 19.2,
+              "width": 1.8,
+              "length": 2.2,
+              "position": {
+                "x": 15.0,
+                "y": 19.2
+              },
+              "dimensions": {
+                "x": 1.8,
+                "y": 2.2
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 2.0
+              }
+            },
+            {
+              "id": "f1_master_bath_shower",
+              "type": "shower",
+              "room_id": "f1_master_bath",
+              "x": 16.3,
+              "y": 15.5,
+              "width": 3.0,
+              "length": 3.0,
+              "position": {
+                "x": 16.3,
+                "y": 15.5
+              },
+              "dimensions": {
+                "x": 3.0,
+                "y": 3.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            }
+          ],
+          "parent_room_id": "f1_master_bed",
+          "attached_room_id": "f1_master_bed",
+          "min_width": 5.0,
+          "min_length": 7.0,
+          "preferred_width": 6.0,
+          "preferred_length": 8.5,
+          "max_width": 8.5,
+          "max_length": 10.0,
+          "actual_width": 5.0,
+          "actual_length": 0.0,
+          "area_sqft": 35.0,
+          "privacy_level": "intimate",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [
+            "f1_master_bed"
+          ],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "5.0' \u00d7 7.0'",
+          "rationale": "Attached en-suite bathroom with shower stall, vanity, and WC."
+        },
+        {
+          "id": "f1_bedroom_2",
+          "name": "Bedroom 2",
+          "type": "bedroom",
+          "zone": "private",
+          "floor": 1,
+          "rect": {
+            "x": 14.5,
+            "y": 4.0,
+            "width": 11.0,
+            "length": 11.0
+          },
+          "color": "#EBF1F6",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_bedroom_2_bed",
+              "type": "queen_bed",
+              "room_id": "f1_bedroom_2",
+              "x": 16.0,
+              "y": 5.5,
+              "width": 5.0,
+              "length": 6.5,
+              "position": {
+                "x": 16.0,
+                "y": 5.5
+              },
+              "dimensions": {
+                "x": 5.0,
+                "y": 6.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 2.5,
+                "sides": 1.5
+              }
+            },
+            {
+              "id": "f1_bedroom_2_nightstand",
+              "type": "side_table",
+              "room_id": "f1_bedroom_2",
+              "x": 21.3,
+              "y": 5.5,
+              "width": 1.5,
+              "length": 1.5,
+              "position": {
+                "x": 21.3,
+                "y": 5.5
+              },
+              "dimensions": {
+                "x": 1.5,
+                "y": 1.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_bedroom_2_wardrobe",
+              "type": "wardrobe",
+              "room_id": "f1_bedroom_2",
+              "x": 23.3,
+              "y": 5.5,
+              "width": 2.0,
+              "length": 6.0,
+              "position": {
+                "x": 23.3,
+                "y": 5.5
+              },
+              "dimensions": {
+                "x": 2.0,
+                "y": 6.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 2.5
+              }
+            }
+          ],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 10.0,
+          "min_length": 11.0,
+          "preferred_width": 11.5,
+          "preferred_length": 13.0,
+          "max_width": 15.0,
+          "max_length": 16.0,
+          "actual_width": 11.0,
+          "actual_length": 0.0,
+          "area_sqft": 121.0,
+          "privacy_level": "private",
+          "daylight_requirement": "high",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": true,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "11.0' \u00d7 11.0'",
+          "rationale": "Comfortable quiet bedroom with natural daylight and wardrobe clearance."
+        },
+        {
+          "id": "f1_bedroom_3",
+          "name": "Bedroom 3",
+          "type": "bedroom",
+          "zone": "private",
+          "floor": 1,
+          "rect": {
+            "x": 25.5,
+            "y": 4.0,
+            "width": 11.5,
+            "length": 13.0
+          },
+          "color": "#EBF1F6",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_bedroom_3_bed",
+              "type": "queen_bed",
+              "room_id": "f1_bedroom_3",
+              "x": 27.0,
+              "y": 5.5,
+              "width": 5.0,
+              "length": 6.5,
+              "position": {
+                "x": 27.0,
+                "y": 5.5
+              },
+              "dimensions": {
+                "x": 5.0,
+                "y": 6.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 2.5,
+                "sides": 1.5
+              }
+            },
+            {
+              "id": "f1_bedroom_3_nightstand",
+              "type": "side_table",
+              "room_id": "f1_bedroom_3",
+              "x": 32.3,
+              "y": 5.5,
+              "width": 1.5,
+              "length": 1.5,
+              "position": {
+                "x": 32.3,
+                "y": 5.5
+              },
+              "dimensions": {
+                "x": 1.5,
+                "y": 1.5
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_bedroom_3_wardrobe",
+              "type": "wardrobe",
+              "room_id": "f1_bedroom_3",
+              "x": 34.8,
+              "y": 5.5,
+              "width": 2.0,
+              "length": 6.0,
+              "position": {
+                "x": 34.8,
+                "y": 5.5
+              },
+              "dimensions": {
+                "x": 2.0,
+                "y": 6.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 2.5
+              }
+            }
+          ],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 10.0,
+          "min_length": 11.0,
+          "preferred_width": 11.5,
+          "preferred_length": 13.0,
+          "max_width": 15.0,
+          "max_length": 16.0,
+          "actual_width": 11.5,
+          "actual_length": 0.0,
+          "area_sqft": 149.5,
+          "privacy_level": "private",
+          "daylight_requirement": "high",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": true,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "11.5' \u00d7 13.0'",
+          "rationale": "Comfortable quiet bedroom with natural daylight and wardrobe clearance."
+        },
+        {
+          "id": "f1_common_bath",
+          "name": "Common Bath",
+          "type": "bathroom",
+          "zone": "service",
+          "floor": 1,
+          "rect": {
+            "x": 3.0,
+            "y": 4.0,
+            "width": 5.5,
+            "length": 6.5
+          },
+          "color": "#E5EDEF",
+          "floor_material": "hardwood_oak",
+          "furniture": [
+            {
+              "id": "f1_common_bath_basin",
+              "type": "basin",
+              "room_id": "f1_common_bath",
+              "x": 3.5,
+              "y": 4.5,
+              "width": 2.2,
+              "length": 1.8,
+              "position": {
+                "x": 3.5,
+                "y": 4.5
+              },
+              "dimensions": {
+                "x": 2.2,
+                "y": 1.8
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            },
+            {
+              "id": "f1_common_bath_wc",
+              "type": "toilet",
+              "room_id": "f1_common_bath",
+              "x": 3.5,
+              "y": 7.7,
+              "width": 1.8,
+              "length": 2.2,
+              "position": {
+                "x": 3.5,
+                "y": 7.7
+              },
+              "dimensions": {
+                "x": 1.8,
+                "y": 2.2
+              },
+              "rotation": 0.0,
+              "clearance_requirements": {
+                "front": 2.0
+              }
+            },
+            {
+              "id": "f1_common_bath_shower",
+              "type": "shower",
+              "room_id": "f1_common_bath",
+              "x": 5.3,
+              "y": 4.5,
+              "width": 3.0,
+              "length": 3.0,
+              "position": {
+                "x": 5.3,
+                "y": 4.5
+              },
+              "dimensions": {
+                "x": 3.0,
+                "y": 3.0
+              },
+              "rotation": 0.0,
+              "clearance_requirements": null
+            }
+          ],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 4.5,
+          "min_length": 6.5,
+          "preferred_width": 5.5,
+          "preferred_length": 7.5,
+          "max_width": 7.5,
+          "max_length": 9.0,
+          "actual_width": 5.5,
+          "actual_length": 0.0,
+          "area_sqft": 35.8,
+          "privacy_level": "intimate",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "5.5' \u00d7 6.5'",
+          "rationale": "Centrally accessible bathroom serving guest and secondary bedrooms."
+        }
+      ],
+      "walls": [
+        {
+          "id": "wall_001",
+          "start": {
+            "x": 17.5,
+            "y": 37.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 37.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_entry_foyer"
+          ],
+          "openings": [
+            "door_001",
+            "win_001"
+          ],
+          "x1": 17.5,
+          "y1": 37.0,
+          "x2": 25.0,
+          "y2": 37.0,
+          "connected_room_ids": [
+            "f1_entry_foyer"
+          ]
+        },
+        {
+          "id": "wall_002",
+          "start": {
+            "x": 3.0,
+            "y": 45.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [
+            "win_002"
+          ],
+          "x1": 3.0,
+          "y1": 45.0,
+          "x2": 17.5,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_003",
+          "start": {
+            "x": 17.5,
+            "y": 45.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_entry_foyer"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 45.0,
+          "x2": 25.0,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_entry_foyer"
+          ]
+        },
+        {
+          "id": "wall_004",
+          "start": {
+            "x": 3.0,
+            "y": 28.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 28.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 28.0,
+          "x2": 17.5,
+          "y2": 28.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_005",
+          "start": {
+            "x": 14.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bath"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 22.0,
+          "x2": 17.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_006",
+          "start": {
+            "x": 17.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 19.5,
+            "y": 22.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_hallway",
+            "f1_master_bath"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 22.0,
+          "x2": 19.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_hallway",
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_007",
+          "start": {
+            "x": 19.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 22.5,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 19.5,
+          "y1": 22.0,
+          "x2": 22.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_008",
+          "start": {
+            "x": 25.0,
+            "y": 22.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_dining"
+          ],
+          "openings": [
+            "win_003"
+          ],
+          "x1": 25.0,
+          "y1": 22.0,
+          "x2": 37.0,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_dining"
+          ]
+        },
+        {
+          "id": "wall_009",
+          "start": {
+            "x": 25.0,
+            "y": 32.5
+          },
+          "end": {
+            "x": 37.0,
+            "y": 32.5
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_dining",
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 32.5,
+          "x2": 37.0,
+          "y2": 32.5,
+          "connected_room_ids": [
+            "f1_dining",
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_010",
+          "start": {
+            "x": 25.0,
+            "y": 42.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 42.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_kitchen"
+          ],
+          "openings": [
+            "win_004"
+          ],
+          "x1": 25.0,
+          "y1": 42.0,
+          "x2": 37.0,
+          "y2": 42.0,
+          "connected_room_ids": [
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_011",
+          "start": {
+            "x": 17.5,
+            "y": 34.0
+          },
+          "end": {
+            "x": 22.5,
+            "y": 34.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 34.0,
+          "x2": 22.5,
+          "y2": 34.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_012",
+          "start": {
+            "x": 3.0,
+            "y": 10.5
+          },
+          "end": {
+            "x": 8.5,
+            "y": 10.5
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_common_bath",
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 10.5,
+          "x2": 8.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_common_bath",
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_013",
+          "start": {
+            "x": 8.5,
+            "y": 10.5
+          },
+          "end": {
+            "x": 14.5,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [
+            "win_005"
+          ],
+          "x1": 8.5,
+          "y1": 10.5,
+          "x2": 14.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_014",
+          "start": {
+            "x": 3.0,
+            "y": 26.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 26.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 26.0,
+          "x2": 14.5,
+          "y2": 26.0,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_015",
+          "start": {
+            "x": 14.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 19.5,
+            "y": 15.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bath"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 15.0,
+          "x2": 19.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_016",
+          "start": {
+            "x": 19.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 15.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_2"
+          ],
+          "openings": [
+            "win_007"
+          ],
+          "x1": 19.5,
+          "y1": 15.0,
+          "x2": 25.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2"
+          ]
+        },
+        {
+          "id": "wall_017",
+          "start": {
+            "x": 3.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 8.5,
+            "y": 4.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_common_bath"
+          ],
+          "openings": [
+            "win_009"
+          ],
+          "x1": 3.0,
+          "y1": 4.0,
+          "x2": 8.5,
+          "y2": 4.0,
+          "connected_room_ids": [
+            "f1_common_bath"
+          ]
+        },
+        {
+          "id": "wall_018",
+          "start": {
+            "x": 14.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 4.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_2"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 4.0,
+          "x2": 25.5,
+          "y2": 4.0,
+          "connected_room_ids": [
+            "f1_bedroom_2"
+          ]
+        },
+        {
+          "id": "wall_019",
+          "start": {
+            "x": 25.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 4.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [
+            "win_008"
+          ],
+          "x1": 25.5,
+          "y1": 4.0,
+          "x2": 37.0,
+          "y2": 4.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_020",
+          "start": {
+            "x": 25.5,
+            "y": 17.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 17.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 25.5,
+          "y1": 17.0,
+          "x2": 37.0,
+          "y2": 17.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_021",
+          "start": {
+            "x": 17.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 28.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 22.0,
+          "x2": 17.5,
+          "y2": 28.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_022",
+          "start": {
+            "x": 17.5,
+            "y": 28.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 34.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_hallway",
+            "f1_living_room"
+          ],
+          "openings": [
+            "door_003"
+          ],
+          "x1": 17.5,
+          "y1": 28.0,
+          "x2": 17.5,
+          "y2": 34.0,
+          "connected_room_ids": [
+            "f1_hallway",
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_023",
+          "start": {
+            "x": 17.5,
+            "y": 34.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 37.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 34.0,
+          "x2": 17.5,
+          "y2": 37.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_024",
+          "start": {
+            "x": 17.5,
+            "y": 37.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 45.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_entry_foyer",
+            "f1_living_room"
+          ],
+          "openings": [
+            "door_002"
+          ],
+          "x1": 17.5,
+          "y1": 37.0,
+          "x2": 17.5,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_entry_foyer",
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_025",
+          "start": {
+            "x": 25.0,
+            "y": 22.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 32.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_dining"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 22.0,
+          "x2": 25.0,
+          "y2": 32.5,
+          "connected_room_ids": [
+            "f1_dining"
+          ]
+        },
+        {
+          "id": "wall_026",
+          "start": {
+            "x": 25.0,
+            "y": 32.5
+          },
+          "end": {
+            "x": 25.0,
+            "y": 37.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 32.5,
+          "x2": 25.0,
+          "y2": 37.0,
+          "connected_room_ids": [
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_027",
+          "start": {
+            "x": 25.0,
+            "y": 37.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 42.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_entry_foyer",
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 37.0,
+          "x2": 25.0,
+          "y2": 42.0,
+          "connected_room_ids": [
+            "f1_entry_foyer",
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_028",
+          "start": {
+            "x": 25.0,
+            "y": 42.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_entry_foyer"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 42.0,
+          "x2": 25.0,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_entry_foyer"
+          ]
+        },
+        {
+          "id": "wall_029",
+          "start": {
+            "x": 3.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 3.0,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_common_bath"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 4.0,
+          "x2": 3.0,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_common_bath"
+          ]
+        },
+        {
+          "id": "wall_030",
+          "start": {
+            "x": 3.0,
+            "y": 10.5
+          },
+          "end": {
+            "x": 3.0,
+            "y": 26.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 10.5,
+          "x2": 3.0,
+          "y2": 26.0,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_031",
+          "start": {
+            "x": 3.0,
+            "y": 28.0
+          },
+          "end": {
+            "x": 3.0,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 28.0,
+          "x2": 3.0,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_032",
+          "start": {
+            "x": 37.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 17.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 37.0,
+          "y1": 4.0,
+          "x2": 37.0,
+          "y2": 17.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_033",
+          "start": {
+            "x": 37.0,
+            "y": 22.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 32.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_dining"
+          ],
+          "openings": [],
+          "x1": 37.0,
+          "y1": 22.0,
+          "x2": 37.0,
+          "y2": 32.5,
+          "connected_room_ids": [
+            "f1_dining"
+          ]
+        },
+        {
+          "id": "wall_034",
+          "start": {
+            "x": 37.0,
+            "y": 32.5
+          },
+          "end": {
+            "x": 37.0,
+            "y": 42.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 37.0,
+          "y1": 32.5,
+          "x2": 37.0,
+          "y2": 42.0,
+          "connected_room_ids": [
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_035",
+          "start": {
+            "x": 22.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 22.5,
+            "y": 34.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 22.5,
+          "y1": 22.0,
+          "x2": 22.5,
+          "y2": 34.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_036",
+          "start": {
+            "x": 14.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_2"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 4.0,
+          "x2": 14.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_bedroom_2"
+          ]
+        },
+        {
+          "id": "wall_037",
+          "start": {
+            "x": 14.5,
+            "y": 10.5
+          },
+          "end": {
+            "x": 14.5,
+            "y": 15.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 10.5,
+          "x2": 14.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_038",
+          "start": {
+            "x": 14.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 22.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_master_bath",
+            "f1_master_bed"
+          ],
+          "openings": [
+            "door_004"
+          ],
+          "x1": 14.5,
+          "y1": 15.0,
+          "x2": 14.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_master_bath",
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_039",
+          "start": {
+            "x": 14.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 26.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 22.0,
+          "x2": 14.5,
+          "y2": 26.0,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_040",
+          "start": {
+            "x": 19.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 19.5,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bath"
+          ],
+          "openings": [
+            "win_006"
+          ],
+          "x1": 19.5,
+          "y1": 15.0,
+          "x2": 19.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_041",
+          "start": {
+            "x": 25.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 15.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_bedroom_2",
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 25.5,
+          "y1": 4.0,
+          "x2": 25.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2",
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_042",
+          "start": {
+            "x": 25.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 17.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 25.5,
+          "y1": 15.0,
+          "x2": 25.5,
+          "y2": 17.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_043",
+          "start": {
+            "x": 8.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 8.5,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_common_bath"
+          ],
+          "openings": [],
+          "x1": 8.5,
+          "y1": 4.0,
+          "x2": 8.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_common_bath"
+          ]
+        }
+      ],
+      "exterior_walls": [
+        {
+          "id": "wall_001",
+          "start": {
+            "x": 17.5,
+            "y": 37.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 37.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_entry_foyer"
+          ],
+          "openings": [
+            "door_001",
+            "win_001"
+          ],
+          "x1": 17.5,
+          "y1": 37.0,
+          "x2": 25.0,
+          "y2": 37.0,
+          "connected_room_ids": [
+            "f1_entry_foyer"
+          ]
+        },
+        {
+          "id": "wall_002",
+          "start": {
+            "x": 3.0,
+            "y": 45.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [
+            "win_002"
+          ],
+          "x1": 3.0,
+          "y1": 45.0,
+          "x2": 17.5,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_003",
+          "start": {
+            "x": 17.5,
+            "y": 45.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_entry_foyer"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 45.0,
+          "x2": 25.0,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_entry_foyer"
+          ]
+        },
+        {
+          "id": "wall_004",
+          "start": {
+            "x": 3.0,
+            "y": 28.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 28.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 28.0,
+          "x2": 17.5,
+          "y2": 28.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_005",
+          "start": {
+            "x": 14.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bath"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 22.0,
+          "x2": 17.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_007",
+          "start": {
+            "x": 19.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 22.5,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 19.5,
+          "y1": 22.0,
+          "x2": 22.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_008",
+          "start": {
+            "x": 25.0,
+            "y": 22.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_dining"
+          ],
+          "openings": [
+            "win_003"
+          ],
+          "x1": 25.0,
+          "y1": 22.0,
+          "x2": 37.0,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_dining"
+          ]
+        },
+        {
+          "id": "wall_010",
+          "start": {
+            "x": 25.0,
+            "y": 42.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 42.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_kitchen"
+          ],
+          "openings": [
+            "win_004"
+          ],
+          "x1": 25.0,
+          "y1": 42.0,
+          "x2": 37.0,
+          "y2": 42.0,
+          "connected_room_ids": [
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_011",
+          "start": {
+            "x": 17.5,
+            "y": 34.0
+          },
+          "end": {
+            "x": 22.5,
+            "y": 34.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 34.0,
+          "x2": 22.5,
+          "y2": 34.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_013",
+          "start": {
+            "x": 8.5,
+            "y": 10.5
+          },
+          "end": {
+            "x": 14.5,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [
+            "win_005"
+          ],
+          "x1": 8.5,
+          "y1": 10.5,
+          "x2": 14.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_014",
+          "start": {
+            "x": 3.0,
+            "y": 26.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 26.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 26.0,
+          "x2": 14.5,
+          "y2": 26.0,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_016",
+          "start": {
+            "x": 19.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 15.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_2"
+          ],
+          "openings": [
+            "win_007"
+          ],
+          "x1": 19.5,
+          "y1": 15.0,
+          "x2": 25.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2"
+          ]
+        },
+        {
+          "id": "wall_017",
+          "start": {
+            "x": 3.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 8.5,
+            "y": 4.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_common_bath"
+          ],
+          "openings": [
+            "win_009"
+          ],
+          "x1": 3.0,
+          "y1": 4.0,
+          "x2": 8.5,
+          "y2": 4.0,
+          "connected_room_ids": [
+            "f1_common_bath"
+          ]
+        },
+        {
+          "id": "wall_018",
+          "start": {
+            "x": 14.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 4.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_2"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 4.0,
+          "x2": 25.5,
+          "y2": 4.0,
+          "connected_room_ids": [
+            "f1_bedroom_2"
+          ]
+        },
+        {
+          "id": "wall_019",
+          "start": {
+            "x": 25.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 4.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [
+            "win_008"
+          ],
+          "x1": 25.5,
+          "y1": 4.0,
+          "x2": 37.0,
+          "y2": 4.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_020",
+          "start": {
+            "x": 25.5,
+            "y": 17.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 17.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 25.5,
+          "y1": 17.0,
+          "x2": 37.0,
+          "y2": 17.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_021",
+          "start": {
+            "x": 17.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 28.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 22.0,
+          "x2": 17.5,
+          "y2": 28.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_023",
+          "start": {
+            "x": 17.5,
+            "y": 34.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 37.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 34.0,
+          "x2": 17.5,
+          "y2": 37.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_025",
+          "start": {
+            "x": 25.0,
+            "y": 22.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 32.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_dining"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 22.0,
+          "x2": 25.0,
+          "y2": 32.5,
+          "connected_room_ids": [
+            "f1_dining"
+          ]
+        },
+        {
+          "id": "wall_026",
+          "start": {
+            "x": 25.0,
+            "y": 32.5
+          },
+          "end": {
+            "x": 25.0,
+            "y": 37.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 32.5,
+          "x2": 25.0,
+          "y2": 37.0,
+          "connected_room_ids": [
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_028",
+          "start": {
+            "x": 25.0,
+            "y": 42.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_entry_foyer"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 42.0,
+          "x2": 25.0,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_entry_foyer"
+          ]
+        },
+        {
+          "id": "wall_029",
+          "start": {
+            "x": 3.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 3.0,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_common_bath"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 4.0,
+          "x2": 3.0,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_common_bath"
+          ]
+        },
+        {
+          "id": "wall_030",
+          "start": {
+            "x": 3.0,
+            "y": 10.5
+          },
+          "end": {
+            "x": 3.0,
+            "y": 26.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 10.5,
+          "x2": 3.0,
+          "y2": 26.0,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_031",
+          "start": {
+            "x": 3.0,
+            "y": 28.0
+          },
+          "end": {
+            "x": 3.0,
+            "y": 45.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_living_room"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 28.0,
+          "x2": 3.0,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_032",
+          "start": {
+            "x": 37.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 17.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 37.0,
+          "y1": 4.0,
+          "x2": 37.0,
+          "y2": 17.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_033",
+          "start": {
+            "x": 37.0,
+            "y": 22.0
+          },
+          "end": {
+            "x": 37.0,
+            "y": 32.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_dining"
+          ],
+          "openings": [],
+          "x1": 37.0,
+          "y1": 22.0,
+          "x2": 37.0,
+          "y2": 32.5,
+          "connected_room_ids": [
+            "f1_dining"
+          ]
+        },
+        {
+          "id": "wall_034",
+          "start": {
+            "x": 37.0,
+            "y": 32.5
+          },
+          "end": {
+            "x": 37.0,
+            "y": 42.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 37.0,
+          "y1": 32.5,
+          "x2": 37.0,
+          "y2": 42.0,
+          "connected_room_ids": [
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_035",
+          "start": {
+            "x": 22.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 22.5,
+            "y": 34.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_hallway"
+          ],
+          "openings": [],
+          "x1": 22.5,
+          "y1": 22.0,
+          "x2": 22.5,
+          "y2": 34.0,
+          "connected_room_ids": [
+            "f1_hallway"
+          ]
+        },
+        {
+          "id": "wall_036",
+          "start": {
+            "x": 14.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_2"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 4.0,
+          "x2": 14.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_bedroom_2"
+          ]
+        },
+        {
+          "id": "wall_039",
+          "start": {
+            "x": 14.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 26.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 22.0,
+          "x2": 14.5,
+          "y2": 26.0,
+          "connected_room_ids": [
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_040",
+          "start": {
+            "x": 19.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 19.5,
+            "y": 22.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_master_bath"
+          ],
+          "openings": [
+            "win_006"
+          ],
+          "x1": 19.5,
+          "y1": 15.0,
+          "x2": 19.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_042",
+          "start": {
+            "x": 25.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 17.0
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 25.5,
+          "y1": 15.0,
+          "x2": 25.5,
+          "y2": 17.0,
+          "connected_room_ids": [
+            "f1_bedroom_3"
+          ]
+        },
+        {
+          "id": "wall_043",
+          "start": {
+            "x": 8.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 8.5,
+            "y": 10.5
+          },
+          "thickness": 0.75,
+          "height": 10.0,
+          "wall_type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "f1_common_bath"
+          ],
+          "openings": [],
+          "x1": 8.5,
+          "y1": 4.0,
+          "x2": 8.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_common_bath"
+          ]
+        }
+      ],
+      "interior_walls": [
+        {
+          "id": "wall_006",
+          "start": {
+            "x": 17.5,
+            "y": 22.0
+          },
+          "end": {
+            "x": 19.5,
+            "y": 22.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_hallway",
+            "f1_master_bath"
+          ],
+          "openings": [],
+          "x1": 17.5,
+          "y1": 22.0,
+          "x2": 19.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_hallway",
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_009",
+          "start": {
+            "x": 25.0,
+            "y": 32.5
+          },
+          "end": {
+            "x": 37.0,
+            "y": 32.5
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_dining",
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 32.5,
+          "x2": 37.0,
+          "y2": 32.5,
+          "connected_room_ids": [
+            "f1_dining",
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_012",
+          "start": {
+            "x": 3.0,
+            "y": 10.5
+          },
+          "end": {
+            "x": 8.5,
+            "y": 10.5
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_common_bath",
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 3.0,
+          "y1": 10.5,
+          "x2": 8.5,
+          "y2": 10.5,
+          "connected_room_ids": [
+            "f1_common_bath",
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_015",
+          "start": {
+            "x": 14.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 19.5,
+            "y": 15.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bath"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 15.0,
+          "x2": 19.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bath"
+          ]
+        },
+        {
+          "id": "wall_022",
+          "start": {
+            "x": 17.5,
+            "y": 28.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 34.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_hallway",
+            "f1_living_room"
+          ],
+          "openings": [
+            "door_003"
+          ],
+          "x1": 17.5,
+          "y1": 28.0,
+          "x2": 17.5,
+          "y2": 34.0,
+          "connected_room_ids": [
+            "f1_hallway",
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_024",
+          "start": {
+            "x": 17.5,
+            "y": 37.0
+          },
+          "end": {
+            "x": 17.5,
+            "y": 45.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_entry_foyer",
+            "f1_living_room"
+          ],
+          "openings": [
+            "door_002"
+          ],
+          "x1": 17.5,
+          "y1": 37.0,
+          "x2": 17.5,
+          "y2": 45.0,
+          "connected_room_ids": [
+            "f1_entry_foyer",
+            "f1_living_room"
+          ]
+        },
+        {
+          "id": "wall_027",
+          "start": {
+            "x": 25.0,
+            "y": 37.0
+          },
+          "end": {
+            "x": 25.0,
+            "y": 42.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_entry_foyer",
+            "f1_kitchen"
+          ],
+          "openings": [],
+          "x1": 25.0,
+          "y1": 37.0,
+          "x2": 25.0,
+          "y2": 42.0,
+          "connected_room_ids": [
+            "f1_entry_foyer",
+            "f1_kitchen"
+          ]
+        },
+        {
+          "id": "wall_037",
+          "start": {
+            "x": 14.5,
+            "y": 10.5
+          },
+          "end": {
+            "x": 14.5,
+            "y": 15.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bed"
+          ],
+          "openings": [],
+          "x1": 14.5,
+          "y1": 10.5,
+          "x2": 14.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2",
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_038",
+          "start": {
+            "x": 14.5,
+            "y": 15.0
+          },
+          "end": {
+            "x": 14.5,
+            "y": 22.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_master_bath",
+            "f1_master_bed"
+          ],
+          "openings": [
+            "door_004"
+          ],
+          "x1": 14.5,
+          "y1": 15.0,
+          "x2": 14.5,
+          "y2": 22.0,
+          "connected_room_ids": [
+            "f1_master_bath",
+            "f1_master_bed"
+          ]
+        },
+        {
+          "id": "wall_041",
+          "start": {
+            "x": 25.5,
+            "y": 4.0
+          },
+          "end": {
+            "x": 25.5,
+            "y": 15.0
+          },
+          "thickness": 0.5,
+          "height": 10.0,
+          "wall_type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "f1_bedroom_2",
+            "f1_bedroom_3"
+          ],
+          "openings": [],
+          "x1": 25.5,
+          "y1": 4.0,
+          "x2": 25.5,
+          "y2": 15.0,
+          "connected_room_ids": [
+            "f1_bedroom_2",
+            "f1_bedroom_3"
+          ]
+        }
+      ],
+      "doors": [
+        {
+          "id": "door_001",
+          "host_wall_id": "wall_001",
+          "from_room_id": "outdoor",
+          "to_room_id": "f1_entry_foyer",
+          "from_room": "outdoor",
+          "to_room": "f1_entry_foyer",
+          "position": {
+            "x": 21.25,
+            "y": 37.0
+          },
+          "x1": 19.5,
+          "y1": 37.0,
+          "x2": 23.0,
+          "y2": 37.0,
+          "width": 3.5,
+          "height": 7.0,
+          "hinge_side": "left",
+          "swing_direction": "inward",
+          "door_type": "entrance",
+          "swing": "inward_left",
+          "connects_room_ids": []
+        },
+        {
+          "id": "door_002",
+          "host_wall_id": "wall_024",
+          "from_room_id": "f1_entry_foyer",
+          "to_room_id": "f1_living_room",
+          "from_room": "f1_entry_foyer",
+          "to_room": "f1_living_room",
+          "position": {
+            "x": 17.5,
+            "y": 38.6
+          },
+          "x1": 16.0,
+          "y1": 38.6,
+          "x2": 19.0,
+          "y2": 38.6,
+          "width": 3.0,
+          "height": 7.0,
+          "hinge_side": "left",
+          "swing_direction": "inward",
+          "door_type": "single_swing",
+          "swing": "inward_left",
+          "connects_room_ids": []
+        },
+        {
+          "id": "door_003",
+          "host_wall_id": "wall_022",
+          "from_room_id": "f1_hallway",
+          "to_room_id": "f1_living_room",
+          "from_room": "f1_hallway",
+          "to_room": "f1_living_room",
+          "position": {
+            "x": 17.5,
+            "y": 29.2
+          },
+          "x1": 16.0,
+          "y1": 29.2,
+          "x2": 19.0,
+          "y2": 29.2,
+          "width": 3.0,
+          "height": 7.0,
+          "hinge_side": "left",
+          "swing_direction": "inward",
+          "door_type": "single_swing",
+          "swing": "inward_left",
+          "connects_room_ids": []
+        },
+        {
+          "id": "door_004",
+          "host_wall_id": "wall_038",
+          "from_room_id": "f1_master_bath",
+          "to_room_id": "f1_master_bed",
+          "from_room": "f1_master_bath",
+          "to_room": "f1_master_bed",
+          "position": {
+            "x": 14.5,
+            "y": 16.4
+          },
+          "x1": 13.0,
+          "y1": 16.4,
+          "x2": 16.0,
+          "y2": 16.4,
+          "width": 3.0,
+          "height": 7.0,
+          "hinge_side": "left",
+          "swing_direction": "inward",
+          "door_type": "single_swing",
+          "swing": "inward_left",
+          "connects_room_ids": []
+        }
+      ],
+      "windows": [
+        {
+          "id": "win_001",
+          "host_wall_id": "wall_001",
+          "room_id": "f1_entry_foyer",
+          "position": {
+            "x": 21.25,
+            "y": 37.0
+          },
+          "x1": 19.75,
+          "y1": 37.0,
+          "x2": 22.75,
+          "y2": 37.0,
+          "width": 3.0,
+          "height": 4.0,
+          "sill_height": 3.0,
+          "window_type": "casement"
+        },
+        {
+          "id": "win_002",
+          "host_wall_id": "wall_002",
+          "room_id": "f1_living_room",
+          "position": {
+            "x": 10.25,
+            "y": 45.0
+          },
+          "x1": 7.25,
+          "y1": 45.0,
+          "x2": 13.25,
+          "y2": 45.0,
+          "width": 6.0,
+          "height": 5.0,
+          "sill_height": 2.5,
+          "window_type": "picture"
+        },
+        {
+          "id": "win_003",
+          "host_wall_id": "wall_008",
+          "room_id": "f1_dining",
+          "position": {
+            "x": 31.0,
+            "y": 22.0
+          },
+          "x1": 29.5,
+          "y1": 22.0,
+          "x2": 32.5,
+          "y2": 22.0,
+          "width": 3.0,
+          "height": 4.0,
+          "sill_height": 3.0,
+          "window_type": "casement"
+        },
+        {
+          "id": "win_004",
+          "host_wall_id": "wall_010",
+          "room_id": "f1_kitchen",
+          "position": {
+            "x": 31.0,
+            "y": 42.0
+          },
+          "x1": 29.25,
+          "y1": 42.0,
+          "x2": 32.75,
+          "y2": 42.0,
+          "width": 3.5,
+          "height": 3.5,
+          "sill_height": 3.5,
+          "window_type": "sliding"
+        },
+        {
+          "id": "win_005",
+          "host_wall_id": "wall_013",
+          "room_id": "f1_master_bed",
+          "position": {
+            "x": 11.5,
+            "y": 10.5
+          },
+          "x1": 9.25,
+          "y1": 10.5,
+          "x2": 13.75,
+          "y2": 10.5,
+          "width": 4.5,
+          "height": 4.5,
+          "sill_height": 3.0,
+          "window_type": "casement"
+        },
+        {
+          "id": "win_006",
+          "host_wall_id": "wall_040",
+          "room_id": "f1_master_bath",
+          "position": {
+            "x": 19.5,
+            "y": 18.5
+          },
+          "x1": 18.5,
+          "y1": 18.5,
+          "x2": 20.5,
+          "y2": 18.5,
+          "width": 2.0,
+          "height": 1.5,
+          "sill_height": 6.0,
+          "window_type": "ventilator"
+        },
+        {
+          "id": "win_007",
+          "host_wall_id": "wall_016",
+          "room_id": "f1_bedroom_2",
+          "position": {
+            "x": 22.5,
+            "y": 15.0
+          },
+          "x1": 20.25,
+          "y1": 15.0,
+          "x2": 24.75,
+          "y2": 15.0,
+          "width": 4.5,
+          "height": 4.5,
+          "sill_height": 3.0,
+          "window_type": "casement"
+        },
+        {
+          "id": "win_008",
+          "host_wall_id": "wall_019",
+          "room_id": "f1_bedroom_3",
+          "position": {
+            "x": 31.25,
+            "y": 4.0
+          },
+          "x1": 29.0,
+          "y1": 4.0,
+          "x2": 33.5,
+          "y2": 4.0,
+          "width": 4.5,
+          "height": 4.5,
+          "sill_height": 3.0,
+          "window_type": "casement"
+        },
+        {
+          "id": "win_009",
+          "host_wall_id": "wall_017",
+          "room_id": "f1_common_bath",
+          "position": {
+            "x": 5.75,
+            "y": 4.0
+          },
+          "x1": 4.75,
+          "y1": 4.0,
+          "x2": 6.75,
+          "y2": 4.0,
+          "width": 2.0,
+          "height": 1.5,
+          "sill_height": 6.0,
+          "window_type": "ventilator"
+        }
+      ],
+      "staircase": null,
+      "circulation": null,
+      "floor_slab_area": 0.0
+    }
+  ],
+  "scores": {
+    "overall_score": 89.3,
+    "room_program_score": 100.0,
+    "size_conformance_score": 88.0,
+    "adjacency_score": 53.1,
+    "privacy_score": 100.0,
+    "circulation_score": 80.0,
+    "furniture_fit_score": 97.0,
+    "parking_access_score": 85.0,
+    "daylight_score": 100.0,
+    "ventilation_score": 100.0,
+    "space_efficiency_score": 98.0,
+    "vastu_score": null,
+    "score_breakdown": {}
+  },
+  "validation": {
+    "is_valid": true,
+    "passed_checks": [
+      "Buildable envelope containment",
+      "Zero room overlap",
+      "Circulation connectivity"
+    ],
+    "hard_failures": [],
+    "errors": [],
+    "warnings": [],
+    "recommendations": [],
+    "issues": []
+  },
+  "critic_notes": [],
+  "metadata": {
+    "groq_critique": {
+      "selected_candidate": "scheme_central_circulation",
+      "reasoning": "Scheme 'Central Circulation Spine' demonstrated superior spatial efficiency (98.0%), optimal circulation (80.0%), and high bedroom acoustic privacy (100.0%).",
+      "strengths": [
+        "Strong circulation efficiency (80.0%)",
+        "Bedroom acoustic buffer and privacy (100.0%)",
+        "Effective daylight opening exposure (100.0%)"
+      ],
+      "weaknesses": [],
+      "suggestions": [
+        "Consider sliding glazed doors between dining and patio for expanded entertaining.",
+        "Utility sector can integrate stacked laundry and recessed pantry storage."
+      ],
+      "local_reoptimization_target": null,
+      "local_reoptimization_operation": null,
+      "architectural_coherence_score": 89.3
+    },
+    "style": "Modern Scandinavian",
+    "vastu_compliant": false,
+    "road_side": "south"
+  },
+  "rooms": [
+    {
+      "id": "f1_entry_foyer",
+      "name": "Entry Foyer",
+      "type": "entry_foyer",
+      "zone": "public",
+      "floor": 1,
+      "rect": {
+        "x": 17.5,
+        "y": 37.0,
+        "width": 7.5,
+        "length": 8.0
+      },
+      "color": "#F1EDE6",
+      "floor_material": "hardwood_oak",
+      "furniture": [],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 5.5,
+      "min_length": 6.0,
+      "preferred_width": 7.5,
+      "preferred_length": 8.0,
+      "max_width": 12.0,
+      "max_length": 12.0,
+      "actual_width": 7.5,
+      "actual_length": 0.0,
+      "area_sqft": 60.0,
+      "privacy_level": "public",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "7.5' \u00d7 8.0'",
+      "rationale": "Transitional airlock providing privacy buffer and welcoming arrival."
+    },
+    {
+      "id": "f1_living_room",
+      "name": "Living Room",
+      "type": "living_room",
+      "zone": "public",
+      "floor": 1,
+      "rect": {
+        "x": 3.0,
+        "y": 28.0,
+        "width": 14.5,
+        "length": 17.0
+      },
+      "color": "#F8F4EE",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_living_room_sofa",
+          "type": "sofa",
+          "room_id": "f1_living_room",
+          "x": 6.75,
+          "y": 30.0,
+          "width": 7.0,
+          "length": 3.0,
+          "position": {
+            "x": 6.75,
+            "y": 30.0
+          },
+          "dimensions": {
+            "x": 7.0,
+            "y": 3.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 2.0
+          }
+        },
+        {
+          "id": "f1_living_room_coffee_table",
+          "type": "coffee_table",
+          "room_id": "f1_living_room",
+          "x": 8.25,
+          "y": 34.0,
+          "width": 4.0,
+          "length": 2.0,
+          "position": {
+            "x": 8.25,
+            "y": 34.0
+          },
+          "dimensions": {
+            "x": 4.0,
+            "y": 2.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_living_room_tv_console",
+          "type": "tv_unit",
+          "room_id": "f1_living_room",
+          "x": 6.25,
+          "y": 43.2,
+          "width": 8.0,
+          "length": 1.5,
+          "position": {
+            "x": 6.25,
+            "y": 43.2
+          },
+          "dimensions": {
+            "x": 8.0,
+            "y": 1.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        }
+      ],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 12.0,
+      "min_length": 13.0,
+      "preferred_width": 14.5,
+      "preferred_length": 17.0,
+      "max_width": 22.0,
+      "max_length": 24.0,
+      "actual_width": 14.5,
+      "actual_length": 0.0,
+      "area_sqft": 246.5,
+      "privacy_level": "public",
+      "daylight_requirement": "high",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": true,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [
+        "f1_entry_foyer",
+        "f1_dining"
+      ],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "14.5' \u00d7 17.0'",
+      "rationale": "Primary public living sanctuary with direct exterior daylight."
+    },
+    {
+      "id": "f1_dining",
+      "name": "Dining Room",
+      "type": "dining",
+      "zone": "public",
+      "floor": 1,
+      "rect": {
+        "x": 25.0,
+        "y": 22.0,
+        "width": 12.0,
+        "length": 10.5
+      },
+      "color": "#F5EFE6",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_dining_table",
+          "type": "dining_table",
+          "room_id": "f1_dining",
+          "x": 28.25,
+          "y": 25.65,
+          "width": 5.5,
+          "length": 3.2,
+          "position": {
+            "x": 28.25,
+            "y": 25.65
+          },
+          "dimensions": {
+            "x": 5.5,
+            "y": 3.2
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "all_around": 3.0
+          }
+        }
+      ],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 9.5,
+      "min_length": 10.5,
+      "preferred_width": 12.0,
+      "preferred_length": 13.5,
+      "max_width": 16.0,
+      "max_length": 18.0,
+      "actual_width": 12.0,
+      "actual_length": 0.0,
+      "area_sqft": 126.0,
+      "privacy_level": "semi_private",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [
+        "f1_kitchen"
+      ],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "12.0' \u00d7 10.5'",
+      "rationale": "Dining hub connecting culinary service with entertaining spaces."
+    },
+    {
+      "id": "f1_kitchen",
+      "name": "Kitchen",
+      "type": "kitchen",
+      "zone": "service",
+      "floor": 1,
+      "rect": {
+        "x": 25.0,
+        "y": 32.5,
+        "width": 12.0,
+        "length": 9.5
+      },
+      "color": "#F1EBE1",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_kitchen_counter",
+          "type": "kitchen_counter",
+          "room_id": "f1_kitchen",
+          "x": 25.5,
+          "y": 33.0,
+          "width": 11.0,
+          "length": 2.0,
+          "position": {
+            "x": 25.5,
+            "y": 33.0
+          },
+          "dimensions": {
+            "x": 11.0,
+            "y": 2.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_kitchen_hob",
+          "type": "cooktop",
+          "room_id": "f1_kitchen",
+          "x": 26.5,
+          "y": 33.1,
+          "width": 2.5,
+          "length": 1.8,
+          "position": {
+            "x": 26.5,
+            "y": 33.1
+          },
+          "dimensions": {
+            "x": 2.5,
+            "y": 1.8
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_kitchen_sink",
+          "type": "kitchen_sink",
+          "room_id": "f1_kitchen",
+          "x": 32.8,
+          "y": 33.1,
+          "width": 2.5,
+          "length": 1.8,
+          "position": {
+            "x": 32.8,
+            "y": 33.1
+          },
+          "dimensions": {
+            "x": 2.5,
+            "y": 1.8
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_kitchen_fridge",
+          "type": "refrigerator",
+          "room_id": "f1_kitchen",
+          "x": 33.8,
+          "y": 38.8,
+          "width": 2.8,
+          "length": 2.8,
+          "position": {
+            "x": 33.8,
+            "y": 38.8
+          },
+          "dimensions": {
+            "x": 2.8,
+            "y": 2.8
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 3.0
+          }
+        }
+      ],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 8.0,
+      "min_length": 9.5,
+      "preferred_width": 10.0,
+      "preferred_length": 12.0,
+      "max_width": 15.0,
+      "max_length": 16.0,
+      "actual_width": 12.0,
+      "actual_length": 0.0,
+      "area_sqft": 114.0,
+      "privacy_level": "semi_private",
+      "daylight_requirement": "high",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": true,
+      "required_adjacencies": [
+        "f1_dining"
+      ],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "12.0' \u00d7 9.5'",
+      "rationale": "Culinary work triangle with exterior ventilation."
+    },
+    {
+      "id": "f1_hallway",
+      "name": "Circulation Hall",
+      "type": "hallway",
+      "zone": "circulation",
+      "floor": 1,
+      "rect": {
+        "x": 17.5,
+        "y": 22.0,
+        "width": 5.0,
+        "length": 12.0
+      },
+      "color": "#FAF7F2",
+      "floor_material": "hardwood_oak",
+      "furniture": [],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 4.0,
+      "min_length": 8.0,
+      "preferred_width": 5.0,
+      "preferred_length": 12.0,
+      "max_width": 7.0,
+      "max_length": 24.0,
+      "actual_width": 5.0,
+      "actual_length": 0.0,
+      "area_sqft": 60.0,
+      "privacy_level": "semi_private",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "5.0' \u00d7 12.0'",
+      "rationale": "Acoustic buffer corridor linking living zones to quiet quarters."
+    },
+    {
+      "id": "f1_master_bed",
+      "name": "Primary Suite",
+      "type": "master_bedroom",
+      "zone": "private",
+      "floor": 1,
+      "rect": {
+        "x": 3.0,
+        "y": 10.5,
+        "width": 11.5,
+        "length": 15.5
+      },
+      "color": "#E9EFEA",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_master_bed_bed",
+          "type": "king_bed",
+          "room_id": "f1_master_bed",
+          "x": 5.5,
+          "y": 12.0,
+          "width": 6.5,
+          "length": 6.5,
+          "position": {
+            "x": 5.5,
+            "y": 12.0
+          },
+          "dimensions": {
+            "x": 6.5,
+            "y": 6.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 3.0,
+            "sides": 2.0
+          }
+        },
+        {
+          "id": "f1_master_bed_nightstand_1",
+          "type": "side_table",
+          "room_id": "f1_master_bed",
+          "x": 3.7,
+          "y": 12.0,
+          "width": 1.5,
+          "length": 1.5,
+          "position": {
+            "x": 3.7,
+            "y": 12.0
+          },
+          "dimensions": {
+            "x": 1.5,
+            "y": 1.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_master_bed_nightstand_2",
+          "type": "side_table",
+          "room_id": "f1_master_bed",
+          "x": 12.3,
+          "y": 12.0,
+          "width": 1.5,
+          "length": 1.5,
+          "position": {
+            "x": 12.3,
+            "y": 12.0
+          },
+          "dimensions": {
+            "x": 1.5,
+            "y": 1.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_master_bed_wardrobe",
+          "type": "wardrobe",
+          "room_id": "f1_master_bed",
+          "x": 4.0,
+          "y": 23.8,
+          "width": 8.0,
+          "length": 2.0,
+          "position": {
+            "x": 4.0,
+            "y": 23.8
+          },
+          "dimensions": {
+            "x": 8.0,
+            "y": 2.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 3.0
+          }
+        }
+      ],
+      "parent_room_id": null,
+      "attached_room_id": "f1_master_bath",
+      "min_width": 11.5,
+      "min_length": 13.0,
+      "preferred_width": 13.5,
+      "preferred_length": 15.5,
+      "max_width": 18.0,
+      "max_length": 20.0,
+      "actual_width": 11.5,
+      "actual_length": 0.0,
+      "area_sqft": 178.2,
+      "privacy_level": "intimate",
+      "daylight_requirement": "high",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": true,
+      "required_adjacencies": [
+        "f1_master_bath"
+      ],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "11.5' \u00d7 15.5'",
+      "rationale": "Secluded primary retreat with attached en-suite bathroom."
+    },
+    {
+      "id": "f1_master_bath",
+      "name": "Primary Bath",
+      "type": "bathroom",
+      "zone": "private",
+      "floor": 1,
+      "rect": {
+        "x": 14.5,
+        "y": 15.0,
+        "width": 5.0,
+        "length": 7.0
+      },
+      "color": "#E5EDEF",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_master_bath_basin",
+          "type": "basin",
+          "room_id": "f1_master_bath",
+          "x": 15.0,
+          "y": 15.5,
+          "width": 2.2,
+          "length": 1.8,
+          "position": {
+            "x": 15.0,
+            "y": 15.5
+          },
+          "dimensions": {
+            "x": 2.2,
+            "y": 1.8
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_master_bath_wc",
+          "type": "toilet",
+          "room_id": "f1_master_bath",
+          "x": 15.0,
+          "y": 19.2,
+          "width": 1.8,
+          "length": 2.2,
+          "position": {
+            "x": 15.0,
+            "y": 19.2
+          },
+          "dimensions": {
+            "x": 1.8,
+            "y": 2.2
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 2.0
+          }
+        },
+        {
+          "id": "f1_master_bath_shower",
+          "type": "shower",
+          "room_id": "f1_master_bath",
+          "x": 16.3,
+          "y": 15.5,
+          "width": 3.0,
+          "length": 3.0,
+          "position": {
+            "x": 16.3,
+            "y": 15.5
+          },
+          "dimensions": {
+            "x": 3.0,
+            "y": 3.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        }
+      ],
+      "parent_room_id": "f1_master_bed",
+      "attached_room_id": "f1_master_bed",
+      "min_width": 5.0,
+      "min_length": 7.0,
+      "preferred_width": 6.0,
+      "preferred_length": 8.5,
+      "max_width": 8.5,
+      "max_length": 10.0,
+      "actual_width": 5.0,
+      "actual_length": 0.0,
+      "area_sqft": 35.0,
+      "privacy_level": "intimate",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [
+        "f1_master_bed"
+      ],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "5.0' \u00d7 7.0'",
+      "rationale": "Attached en-suite bathroom with shower stall, vanity, and WC."
+    },
+    {
+      "id": "f1_bedroom_2",
+      "name": "Bedroom 2",
+      "type": "bedroom",
+      "zone": "private",
+      "floor": 1,
+      "rect": {
+        "x": 14.5,
+        "y": 4.0,
+        "width": 11.0,
+        "length": 11.0
+      },
+      "color": "#EBF1F6",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_bedroom_2_bed",
+          "type": "queen_bed",
+          "room_id": "f1_bedroom_2",
+          "x": 16.0,
+          "y": 5.5,
+          "width": 5.0,
+          "length": 6.5,
+          "position": {
+            "x": 16.0,
+            "y": 5.5
+          },
+          "dimensions": {
+            "x": 5.0,
+            "y": 6.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 2.5,
+            "sides": 1.5
+          }
+        },
+        {
+          "id": "f1_bedroom_2_nightstand",
+          "type": "side_table",
+          "room_id": "f1_bedroom_2",
+          "x": 21.3,
+          "y": 5.5,
+          "width": 1.5,
+          "length": 1.5,
+          "position": {
+            "x": 21.3,
+            "y": 5.5
+          },
+          "dimensions": {
+            "x": 1.5,
+            "y": 1.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_bedroom_2_wardrobe",
+          "type": "wardrobe",
+          "room_id": "f1_bedroom_2",
+          "x": 23.3,
+          "y": 5.5,
+          "width": 2.0,
+          "length": 6.0,
+          "position": {
+            "x": 23.3,
+            "y": 5.5
+          },
+          "dimensions": {
+            "x": 2.0,
+            "y": 6.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 2.5
+          }
+        }
+      ],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 10.0,
+      "min_length": 11.0,
+      "preferred_width": 11.5,
+      "preferred_length": 13.0,
+      "max_width": 15.0,
+      "max_length": 16.0,
+      "actual_width": 11.0,
+      "actual_length": 0.0,
+      "area_sqft": 121.0,
+      "privacy_level": "private",
+      "daylight_requirement": "high",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": true,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "11.0' \u00d7 11.0'",
+      "rationale": "Comfortable quiet bedroom with natural daylight and wardrobe clearance."
+    },
+    {
+      "id": "f1_bedroom_3",
+      "name": "Bedroom 3",
+      "type": "bedroom",
+      "zone": "private",
+      "floor": 1,
+      "rect": {
+        "x": 25.5,
+        "y": 4.0,
+        "width": 11.5,
+        "length": 13.0
+      },
+      "color": "#EBF1F6",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_bedroom_3_bed",
+          "type": "queen_bed",
+          "room_id": "f1_bedroom_3",
+          "x": 27.0,
+          "y": 5.5,
+          "width": 5.0,
+          "length": 6.5,
+          "position": {
+            "x": 27.0,
+            "y": 5.5
+          },
+          "dimensions": {
+            "x": 5.0,
+            "y": 6.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 2.5,
+            "sides": 1.5
+          }
+        },
+        {
+          "id": "f1_bedroom_3_nightstand",
+          "type": "side_table",
+          "room_id": "f1_bedroom_3",
+          "x": 32.3,
+          "y": 5.5,
+          "width": 1.5,
+          "length": 1.5,
+          "position": {
+            "x": 32.3,
+            "y": 5.5
+          },
+          "dimensions": {
+            "x": 1.5,
+            "y": 1.5
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_bedroom_3_wardrobe",
+          "type": "wardrobe",
+          "room_id": "f1_bedroom_3",
+          "x": 34.8,
+          "y": 5.5,
+          "width": 2.0,
+          "length": 6.0,
+          "position": {
+            "x": 34.8,
+            "y": 5.5
+          },
+          "dimensions": {
+            "x": 2.0,
+            "y": 6.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 2.5
+          }
+        }
+      ],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 10.0,
+      "min_length": 11.0,
+      "preferred_width": 11.5,
+      "preferred_length": 13.0,
+      "max_width": 15.0,
+      "max_length": 16.0,
+      "actual_width": 11.5,
+      "actual_length": 0.0,
+      "area_sqft": 149.5,
+      "privacy_level": "private",
+      "daylight_requirement": "high",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": true,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "11.5' \u00d7 13.0'",
+      "rationale": "Comfortable quiet bedroom with natural daylight and wardrobe clearance."
+    },
+    {
+      "id": "f1_common_bath",
+      "name": "Common Bath",
+      "type": "bathroom",
+      "zone": "service",
+      "floor": 1,
+      "rect": {
+        "x": 3.0,
+        "y": 4.0,
+        "width": 5.5,
+        "length": 6.5
+      },
+      "color": "#E5EDEF",
+      "floor_material": "hardwood_oak",
+      "furniture": [
+        {
+          "id": "f1_common_bath_basin",
+          "type": "basin",
+          "room_id": "f1_common_bath",
+          "x": 3.5,
+          "y": 4.5,
+          "width": 2.2,
+          "length": 1.8,
+          "position": {
+            "x": 3.5,
+            "y": 4.5
+          },
+          "dimensions": {
+            "x": 2.2,
+            "y": 1.8
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        },
+        {
+          "id": "f1_common_bath_wc",
+          "type": "toilet",
+          "room_id": "f1_common_bath",
+          "x": 3.5,
+          "y": 7.7,
+          "width": 1.8,
+          "length": 2.2,
+          "position": {
+            "x": 3.5,
+            "y": 7.7
+          },
+          "dimensions": {
+            "x": 1.8,
+            "y": 2.2
+          },
+          "rotation": 0.0,
+          "clearance_requirements": {
+            "front": 2.0
+          }
+        },
+        {
+          "id": "f1_common_bath_shower",
+          "type": "shower",
+          "room_id": "f1_common_bath",
+          "x": 5.3,
+          "y": 4.5,
+          "width": 3.0,
+          "length": 3.0,
+          "position": {
+            "x": 5.3,
+            "y": 4.5
+          },
+          "dimensions": {
+            "x": 3.0,
+            "y": 3.0
+          },
+          "rotation": 0.0,
+          "clearance_requirements": null
+        }
+      ],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 4.5,
+      "min_length": 6.5,
+      "preferred_width": 5.5,
+      "preferred_length": 7.5,
+      "max_width": 7.5,
+      "max_length": 9.0,
+      "actual_width": 5.5,
+      "actual_length": 0.0,
+      "area_sqft": 35.8,
+      "privacy_level": "intimate",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "5.5' \u00d7 6.5'",
+      "rationale": "Centrally accessible bathroom serving guest and secondary bedrooms."
+    }
+  ],
+  "walls": [
+    {
+      "id": "wall_001",
+      "start": {
+        "x": 17.5,
+        "y": 37.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 37.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_entry_foyer"
+      ],
+      "openings": [
+        "door_001",
+        "win_001"
+      ],
+      "x1": 17.5,
+      "y1": 37.0,
+      "x2": 25.0,
+      "y2": 37.0,
+      "connected_room_ids": [
+        "f1_entry_foyer"
+      ]
+    },
+    {
+      "id": "wall_002",
+      "start": {
+        "x": 3.0,
+        "y": 45.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [
+        "win_002"
+      ],
+      "x1": 3.0,
+      "y1": 45.0,
+      "x2": 17.5,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_003",
+      "start": {
+        "x": 17.5,
+        "y": 45.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_entry_foyer"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 45.0,
+      "x2": 25.0,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_entry_foyer"
+      ]
+    },
+    {
+      "id": "wall_004",
+      "start": {
+        "x": 3.0,
+        "y": 28.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 28.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 28.0,
+      "x2": 17.5,
+      "y2": 28.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_005",
+      "start": {
+        "x": 14.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bath"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 22.0,
+      "x2": 17.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_006",
+      "start": {
+        "x": 17.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 19.5,
+        "y": 22.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_hallway",
+        "f1_master_bath"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 22.0,
+      "x2": 19.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_hallway",
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_007",
+      "start": {
+        "x": 19.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 22.5,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 19.5,
+      "y1": 22.0,
+      "x2": 22.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_008",
+      "start": {
+        "x": 25.0,
+        "y": 22.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_dining"
+      ],
+      "openings": [
+        "win_003"
+      ],
+      "x1": 25.0,
+      "y1": 22.0,
+      "x2": 37.0,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_dining"
+      ]
+    },
+    {
+      "id": "wall_009",
+      "start": {
+        "x": 25.0,
+        "y": 32.5
+      },
+      "end": {
+        "x": 37.0,
+        "y": 32.5
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_dining",
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 32.5,
+      "x2": 37.0,
+      "y2": 32.5,
+      "connected_room_ids": [
+        "f1_dining",
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_010",
+      "start": {
+        "x": 25.0,
+        "y": 42.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 42.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_kitchen"
+      ],
+      "openings": [
+        "win_004"
+      ],
+      "x1": 25.0,
+      "y1": 42.0,
+      "x2": 37.0,
+      "y2": 42.0,
+      "connected_room_ids": [
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_011",
+      "start": {
+        "x": 17.5,
+        "y": 34.0
+      },
+      "end": {
+        "x": 22.5,
+        "y": 34.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 34.0,
+      "x2": 22.5,
+      "y2": 34.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_012",
+      "start": {
+        "x": 3.0,
+        "y": 10.5
+      },
+      "end": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_common_bath",
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 10.5,
+      "x2": 8.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_common_bath",
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_013",
+      "start": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "end": {
+        "x": 14.5,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [
+        "win_005"
+      ],
+      "x1": 8.5,
+      "y1": 10.5,
+      "x2": 14.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_014",
+      "start": {
+        "x": 3.0,
+        "y": 26.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 26.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 26.0,
+      "x2": 14.5,
+      "y2": 26.0,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_015",
+      "start": {
+        "x": 14.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 19.5,
+        "y": 15.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bath"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 15.0,
+      "x2": 19.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_016",
+      "start": {
+        "x": 19.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 15.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_2"
+      ],
+      "openings": [
+        "win_007"
+      ],
+      "x1": 19.5,
+      "y1": 15.0,
+      "x2": 25.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2"
+      ]
+    },
+    {
+      "id": "wall_017",
+      "start": {
+        "x": 3.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 8.5,
+        "y": 4.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_common_bath"
+      ],
+      "openings": [
+        "win_009"
+      ],
+      "x1": 3.0,
+      "y1": 4.0,
+      "x2": 8.5,
+      "y2": 4.0,
+      "connected_room_ids": [
+        "f1_common_bath"
+      ]
+    },
+    {
+      "id": "wall_018",
+      "start": {
+        "x": 14.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 4.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_2"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 4.0,
+      "x2": 25.5,
+      "y2": 4.0,
+      "connected_room_ids": [
+        "f1_bedroom_2"
+      ]
+    },
+    {
+      "id": "wall_019",
+      "start": {
+        "x": 25.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 4.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [
+        "win_008"
+      ],
+      "x1": 25.5,
+      "y1": 4.0,
+      "x2": 37.0,
+      "y2": 4.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_020",
+      "start": {
+        "x": 25.5,
+        "y": 17.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 17.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 25.5,
+      "y1": 17.0,
+      "x2": 37.0,
+      "y2": 17.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_021",
+      "start": {
+        "x": 17.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 28.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 22.0,
+      "x2": 17.5,
+      "y2": 28.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_022",
+      "start": {
+        "x": 17.5,
+        "y": 28.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 34.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_hallway",
+        "f1_living_room"
+      ],
+      "openings": [
+        "door_003"
+      ],
+      "x1": 17.5,
+      "y1": 28.0,
+      "x2": 17.5,
+      "y2": 34.0,
+      "connected_room_ids": [
+        "f1_hallway",
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_023",
+      "start": {
+        "x": 17.5,
+        "y": 34.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 37.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 34.0,
+      "x2": 17.5,
+      "y2": 37.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_024",
+      "start": {
+        "x": 17.5,
+        "y": 37.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 45.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_entry_foyer",
+        "f1_living_room"
+      ],
+      "openings": [
+        "door_002"
+      ],
+      "x1": 17.5,
+      "y1": 37.0,
+      "x2": 17.5,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_entry_foyer",
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_025",
+      "start": {
+        "x": 25.0,
+        "y": 22.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 32.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_dining"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 22.0,
+      "x2": 25.0,
+      "y2": 32.5,
+      "connected_room_ids": [
+        "f1_dining"
+      ]
+    },
+    {
+      "id": "wall_026",
+      "start": {
+        "x": 25.0,
+        "y": 32.5
+      },
+      "end": {
+        "x": 25.0,
+        "y": 37.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 32.5,
+      "x2": 25.0,
+      "y2": 37.0,
+      "connected_room_ids": [
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_027",
+      "start": {
+        "x": 25.0,
+        "y": 37.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 42.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_entry_foyer",
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 37.0,
+      "x2": 25.0,
+      "y2": 42.0,
+      "connected_room_ids": [
+        "f1_entry_foyer",
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_028",
+      "start": {
+        "x": 25.0,
+        "y": 42.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_entry_foyer"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 42.0,
+      "x2": 25.0,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_entry_foyer"
+      ]
+    },
+    {
+      "id": "wall_029",
+      "start": {
+        "x": 3.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 3.0,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_common_bath"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 4.0,
+      "x2": 3.0,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_common_bath"
+      ]
+    },
+    {
+      "id": "wall_030",
+      "start": {
+        "x": 3.0,
+        "y": 10.5
+      },
+      "end": {
+        "x": 3.0,
+        "y": 26.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 10.5,
+      "x2": 3.0,
+      "y2": 26.0,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_031",
+      "start": {
+        "x": 3.0,
+        "y": 28.0
+      },
+      "end": {
+        "x": 3.0,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 28.0,
+      "x2": 3.0,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_032",
+      "start": {
+        "x": 37.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 17.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 37.0,
+      "y1": 4.0,
+      "x2": 37.0,
+      "y2": 17.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_033",
+      "start": {
+        "x": 37.0,
+        "y": 22.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 32.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_dining"
+      ],
+      "openings": [],
+      "x1": 37.0,
+      "y1": 22.0,
+      "x2": 37.0,
+      "y2": 32.5,
+      "connected_room_ids": [
+        "f1_dining"
+      ]
+    },
+    {
+      "id": "wall_034",
+      "start": {
+        "x": 37.0,
+        "y": 32.5
+      },
+      "end": {
+        "x": 37.0,
+        "y": 42.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 37.0,
+      "y1": 32.5,
+      "x2": 37.0,
+      "y2": 42.0,
+      "connected_room_ids": [
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_035",
+      "start": {
+        "x": 22.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 22.5,
+        "y": 34.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 22.5,
+      "y1": 22.0,
+      "x2": 22.5,
+      "y2": 34.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_036",
+      "start": {
+        "x": 14.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_2"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 4.0,
+      "x2": 14.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_bedroom_2"
+      ]
+    },
+    {
+      "id": "wall_037",
+      "start": {
+        "x": 14.5,
+        "y": 10.5
+      },
+      "end": {
+        "x": 14.5,
+        "y": 15.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 10.5,
+      "x2": 14.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_038",
+      "start": {
+        "x": 14.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 22.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_master_bath",
+        "f1_master_bed"
+      ],
+      "openings": [
+        "door_004"
+      ],
+      "x1": 14.5,
+      "y1": 15.0,
+      "x2": 14.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_master_bath",
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_039",
+      "start": {
+        "x": 14.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 26.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 22.0,
+      "x2": 14.5,
+      "y2": 26.0,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_040",
+      "start": {
+        "x": 19.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 19.5,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bath"
+      ],
+      "openings": [
+        "win_006"
+      ],
+      "x1": 19.5,
+      "y1": 15.0,
+      "x2": 19.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_041",
+      "start": {
+        "x": 25.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 15.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_bedroom_2",
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 25.5,
+      "y1": 4.0,
+      "x2": 25.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2",
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_042",
+      "start": {
+        "x": 25.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 17.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 25.5,
+      "y1": 15.0,
+      "x2": 25.5,
+      "y2": 17.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_043",
+      "start": {
+        "x": 8.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_common_bath"
+      ],
+      "openings": [],
+      "x1": 8.5,
+      "y1": 4.0,
+      "x2": 8.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_common_bath"
+      ]
+    }
+  ],
+  "exterior_walls": [
+    {
+      "id": "wall_001",
+      "start": {
+        "x": 17.5,
+        "y": 37.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 37.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_entry_foyer"
+      ],
+      "openings": [
+        "door_001",
+        "win_001"
+      ],
+      "x1": 17.5,
+      "y1": 37.0,
+      "x2": 25.0,
+      "y2": 37.0,
+      "connected_room_ids": [
+        "f1_entry_foyer"
+      ]
+    },
+    {
+      "id": "wall_002",
+      "start": {
+        "x": 3.0,
+        "y": 45.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [
+        "win_002"
+      ],
+      "x1": 3.0,
+      "y1": 45.0,
+      "x2": 17.5,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_003",
+      "start": {
+        "x": 17.5,
+        "y": 45.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_entry_foyer"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 45.0,
+      "x2": 25.0,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_entry_foyer"
+      ]
+    },
+    {
+      "id": "wall_004",
+      "start": {
+        "x": 3.0,
+        "y": 28.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 28.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 28.0,
+      "x2": 17.5,
+      "y2": 28.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_005",
+      "start": {
+        "x": 14.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bath"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 22.0,
+      "x2": 17.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_007",
+      "start": {
+        "x": 19.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 22.5,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 19.5,
+      "y1": 22.0,
+      "x2": 22.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_008",
+      "start": {
+        "x": 25.0,
+        "y": 22.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_dining"
+      ],
+      "openings": [
+        "win_003"
+      ],
+      "x1": 25.0,
+      "y1": 22.0,
+      "x2": 37.0,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_dining"
+      ]
+    },
+    {
+      "id": "wall_010",
+      "start": {
+        "x": 25.0,
+        "y": 42.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 42.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_kitchen"
+      ],
+      "openings": [
+        "win_004"
+      ],
+      "x1": 25.0,
+      "y1": 42.0,
+      "x2": 37.0,
+      "y2": 42.0,
+      "connected_room_ids": [
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_011",
+      "start": {
+        "x": 17.5,
+        "y": 34.0
+      },
+      "end": {
+        "x": 22.5,
+        "y": 34.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 34.0,
+      "x2": 22.5,
+      "y2": 34.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_013",
+      "start": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "end": {
+        "x": 14.5,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [
+        "win_005"
+      ],
+      "x1": 8.5,
+      "y1": 10.5,
+      "x2": 14.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_014",
+      "start": {
+        "x": 3.0,
+        "y": 26.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 26.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 26.0,
+      "x2": 14.5,
+      "y2": 26.0,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_016",
+      "start": {
+        "x": 19.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 15.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_2"
+      ],
+      "openings": [
+        "win_007"
+      ],
+      "x1": 19.5,
+      "y1": 15.0,
+      "x2": 25.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2"
+      ]
+    },
+    {
+      "id": "wall_017",
+      "start": {
+        "x": 3.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 8.5,
+        "y": 4.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_common_bath"
+      ],
+      "openings": [
+        "win_009"
+      ],
+      "x1": 3.0,
+      "y1": 4.0,
+      "x2": 8.5,
+      "y2": 4.0,
+      "connected_room_ids": [
+        "f1_common_bath"
+      ]
+    },
+    {
+      "id": "wall_018",
+      "start": {
+        "x": 14.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 4.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_2"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 4.0,
+      "x2": 25.5,
+      "y2": 4.0,
+      "connected_room_ids": [
+        "f1_bedroom_2"
+      ]
+    },
+    {
+      "id": "wall_019",
+      "start": {
+        "x": 25.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 4.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [
+        "win_008"
+      ],
+      "x1": 25.5,
+      "y1": 4.0,
+      "x2": 37.0,
+      "y2": 4.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_020",
+      "start": {
+        "x": 25.5,
+        "y": 17.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 17.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 25.5,
+      "y1": 17.0,
+      "x2": 37.0,
+      "y2": 17.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_021",
+      "start": {
+        "x": 17.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 28.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 22.0,
+      "x2": 17.5,
+      "y2": 28.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_023",
+      "start": {
+        "x": 17.5,
+        "y": 34.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 37.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 34.0,
+      "x2": 17.5,
+      "y2": 37.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_025",
+      "start": {
+        "x": 25.0,
+        "y": 22.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 32.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_dining"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 22.0,
+      "x2": 25.0,
+      "y2": 32.5,
+      "connected_room_ids": [
+        "f1_dining"
+      ]
+    },
+    {
+      "id": "wall_026",
+      "start": {
+        "x": 25.0,
+        "y": 32.5
+      },
+      "end": {
+        "x": 25.0,
+        "y": 37.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 32.5,
+      "x2": 25.0,
+      "y2": 37.0,
+      "connected_room_ids": [
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_028",
+      "start": {
+        "x": 25.0,
+        "y": 42.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_entry_foyer"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 42.0,
+      "x2": 25.0,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_entry_foyer"
+      ]
+    },
+    {
+      "id": "wall_029",
+      "start": {
+        "x": 3.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 3.0,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_common_bath"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 4.0,
+      "x2": 3.0,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_common_bath"
+      ]
+    },
+    {
+      "id": "wall_030",
+      "start": {
+        "x": 3.0,
+        "y": 10.5
+      },
+      "end": {
+        "x": 3.0,
+        "y": 26.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 10.5,
+      "x2": 3.0,
+      "y2": 26.0,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_031",
+      "start": {
+        "x": 3.0,
+        "y": 28.0
+      },
+      "end": {
+        "x": 3.0,
+        "y": 45.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_living_room"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 28.0,
+      "x2": 3.0,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_032",
+      "start": {
+        "x": 37.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 17.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 37.0,
+      "y1": 4.0,
+      "x2": 37.0,
+      "y2": 17.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_033",
+      "start": {
+        "x": 37.0,
+        "y": 22.0
+      },
+      "end": {
+        "x": 37.0,
+        "y": 32.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_dining"
+      ],
+      "openings": [],
+      "x1": 37.0,
+      "y1": 22.0,
+      "x2": 37.0,
+      "y2": 32.5,
+      "connected_room_ids": [
+        "f1_dining"
+      ]
+    },
+    {
+      "id": "wall_034",
+      "start": {
+        "x": 37.0,
+        "y": 32.5
+      },
+      "end": {
+        "x": 37.0,
+        "y": 42.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 37.0,
+      "y1": 32.5,
+      "x2": 37.0,
+      "y2": 42.0,
+      "connected_room_ids": [
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_035",
+      "start": {
+        "x": 22.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 22.5,
+        "y": 34.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_hallway"
+      ],
+      "openings": [],
+      "x1": 22.5,
+      "y1": 22.0,
+      "x2": 22.5,
+      "y2": 34.0,
+      "connected_room_ids": [
+        "f1_hallway"
+      ]
+    },
+    {
+      "id": "wall_036",
+      "start": {
+        "x": 14.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_2"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 4.0,
+      "x2": 14.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_bedroom_2"
+      ]
+    },
+    {
+      "id": "wall_039",
+      "start": {
+        "x": 14.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 26.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 22.0,
+      "x2": 14.5,
+      "y2": 26.0,
+      "connected_room_ids": [
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_040",
+      "start": {
+        "x": 19.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 19.5,
+        "y": 22.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_master_bath"
+      ],
+      "openings": [
+        "win_006"
+      ],
+      "x1": 19.5,
+      "y1": 15.0,
+      "x2": 19.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_042",
+      "start": {
+        "x": 25.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 17.0
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 25.5,
+      "y1": 15.0,
+      "x2": 25.5,
+      "y2": 17.0,
+      "connected_room_ids": [
+        "f1_bedroom_3"
+      ]
+    },
+    {
+      "id": "wall_043",
+      "start": {
+        "x": 8.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "thickness": 0.75,
+      "height": 10.0,
+      "wall_type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "f1_common_bath"
+      ],
+      "openings": [],
+      "x1": 8.5,
+      "y1": 4.0,
+      "x2": 8.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_common_bath"
+      ]
+    }
+  ],
+  "interior_walls": [
+    {
+      "id": "wall_006",
+      "start": {
+        "x": 17.5,
+        "y": 22.0
+      },
+      "end": {
+        "x": 19.5,
+        "y": 22.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_hallway",
+        "f1_master_bath"
+      ],
+      "openings": [],
+      "x1": 17.5,
+      "y1": 22.0,
+      "x2": 19.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_hallway",
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_009",
+      "start": {
+        "x": 25.0,
+        "y": 32.5
+      },
+      "end": {
+        "x": 37.0,
+        "y": 32.5
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_dining",
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 32.5,
+      "x2": 37.0,
+      "y2": 32.5,
+      "connected_room_ids": [
+        "f1_dining",
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_012",
+      "start": {
+        "x": 3.0,
+        "y": 10.5
+      },
+      "end": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_common_bath",
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 3.0,
+      "y1": 10.5,
+      "x2": 8.5,
+      "y2": 10.5,
+      "connected_room_ids": [
+        "f1_common_bath",
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_015",
+      "start": {
+        "x": 14.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 19.5,
+        "y": 15.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bath"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 15.0,
+      "x2": 19.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bath"
+      ]
+    },
+    {
+      "id": "wall_022",
+      "start": {
+        "x": 17.5,
+        "y": 28.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 34.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_hallway",
+        "f1_living_room"
+      ],
+      "openings": [
+        "door_003"
+      ],
+      "x1": 17.5,
+      "y1": 28.0,
+      "x2": 17.5,
+      "y2": 34.0,
+      "connected_room_ids": [
+        "f1_hallway",
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_024",
+      "start": {
+        "x": 17.5,
+        "y": 37.0
+      },
+      "end": {
+        "x": 17.5,
+        "y": 45.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_entry_foyer",
+        "f1_living_room"
+      ],
+      "openings": [
+        "door_002"
+      ],
+      "x1": 17.5,
+      "y1": 37.0,
+      "x2": 17.5,
+      "y2": 45.0,
+      "connected_room_ids": [
+        "f1_entry_foyer",
+        "f1_living_room"
+      ]
+    },
+    {
+      "id": "wall_027",
+      "start": {
+        "x": 25.0,
+        "y": 37.0
+      },
+      "end": {
+        "x": 25.0,
+        "y": 42.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_entry_foyer",
+        "f1_kitchen"
+      ],
+      "openings": [],
+      "x1": 25.0,
+      "y1": 37.0,
+      "x2": 25.0,
+      "y2": 42.0,
+      "connected_room_ids": [
+        "f1_entry_foyer",
+        "f1_kitchen"
+      ]
+    },
+    {
+      "id": "wall_037",
+      "start": {
+        "x": 14.5,
+        "y": 10.5
+      },
+      "end": {
+        "x": 14.5,
+        "y": 15.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bed"
+      ],
+      "openings": [],
+      "x1": 14.5,
+      "y1": 10.5,
+      "x2": 14.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2",
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_038",
+      "start": {
+        "x": 14.5,
+        "y": 15.0
+      },
+      "end": {
+        "x": 14.5,
+        "y": 22.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_master_bath",
+        "f1_master_bed"
+      ],
+      "openings": [
+        "door_004"
+      ],
+      "x1": 14.5,
+      "y1": 15.0,
+      "x2": 14.5,
+      "y2": 22.0,
+      "connected_room_ids": [
+        "f1_master_bath",
+        "f1_master_bed"
+      ]
+    },
+    {
+      "id": "wall_041",
+      "start": {
+        "x": 25.5,
+        "y": 4.0
+      },
+      "end": {
+        "x": 25.5,
+        "y": 15.0
+      },
+      "thickness": 0.5,
+      "height": 10.0,
+      "wall_type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "f1_bedroom_2",
+        "f1_bedroom_3"
+      ],
+      "openings": [],
+      "x1": 25.5,
+      "y1": 4.0,
+      "x2": 25.5,
+      "y2": 15.0,
+      "connected_room_ids": [
+        "f1_bedroom_2",
+        "f1_bedroom_3"
+      ]
+    }
+  ],
+  "doors": [
+    {
+      "id": "door_001",
+      "host_wall_id": "wall_001",
+      "from_room_id": "outdoor",
+      "to_room_id": "f1_entry_foyer",
+      "from_room": "outdoor",
+      "to_room": "f1_entry_foyer",
+      "position": {
+        "x": 21.25,
+        "y": 37.0
+      },
+      "x1": 19.5,
+      "y1": 37.0,
+      "x2": 23.0,
+      "y2": 37.0,
+      "width": 3.5,
+      "height": 7.0,
+      "hinge_side": "left",
+      "swing_direction": "inward",
+      "door_type": "entrance",
+      "swing": "inward_left",
+      "connects_room_ids": []
+    },
+    {
+      "id": "door_002",
+      "host_wall_id": "wall_024",
+      "from_room_id": "f1_entry_foyer",
+      "to_room_id": "f1_living_room",
+      "from_room": "f1_entry_foyer",
+      "to_room": "f1_living_room",
+      "position": {
+        "x": 17.5,
+        "y": 38.6
+      },
+      "x1": 16.0,
+      "y1": 38.6,
+      "x2": 19.0,
+      "y2": 38.6,
+      "width": 3.0,
+      "height": 7.0,
+      "hinge_side": "left",
+      "swing_direction": "inward",
+      "door_type": "single_swing",
+      "swing": "inward_left",
+      "connects_room_ids": []
+    },
+    {
+      "id": "door_003",
+      "host_wall_id": "wall_022",
+      "from_room_id": "f1_hallway",
+      "to_room_id": "f1_living_room",
+      "from_room": "f1_hallway",
+      "to_room": "f1_living_room",
+      "position": {
+        "x": 17.5,
+        "y": 29.2
+      },
+      "x1": 16.0,
+      "y1": 29.2,
+      "x2": 19.0,
+      "y2": 29.2,
+      "width": 3.0,
+      "height": 7.0,
+      "hinge_side": "left",
+      "swing_direction": "inward",
+      "door_type": "single_swing",
+      "swing": "inward_left",
+      "connects_room_ids": []
+    },
+    {
+      "id": "door_004",
+      "host_wall_id": "wall_038",
+      "from_room_id": "f1_master_bath",
+      "to_room_id": "f1_master_bed",
+      "from_room": "f1_master_bath",
+      "to_room": "f1_master_bed",
+      "position": {
+        "x": 14.5,
+        "y": 16.4
+      },
+      "x1": 13.0,
+      "y1": 16.4,
+      "x2": 16.0,
+      "y2": 16.4,
+      "width": 3.0,
+      "height": 7.0,
+      "hinge_side": "left",
+      "swing_direction": "inward",
+      "door_type": "single_swing",
+      "swing": "inward_left",
+      "connects_room_ids": []
+    }
+  ],
+  "windows": [
+    {
+      "id": "win_001",
+      "host_wall_id": "wall_001",
+      "room_id": "f1_entry_foyer",
+      "position": {
+        "x": 21.25,
+        "y": 37.0
+      },
+      "x1": 19.75,
+      "y1": 37.0,
+      "x2": 22.75,
+      "y2": 37.0,
+      "width": 3.0,
+      "height": 4.0,
+      "sill_height": 3.0,
+      "window_type": "casement"
+    },
+    {
+      "id": "win_002",
+      "host_wall_id": "wall_002",
+      "room_id": "f1_living_room",
+      "position": {
+        "x": 10.25,
+        "y": 45.0
+      },
+      "x1": 7.25,
+      "y1": 45.0,
+      "x2": 13.25,
+      "y2": 45.0,
+      "width": 6.0,
+      "height": 5.0,
+      "sill_height": 2.5,
+      "window_type": "picture"
+    },
+    {
+      "id": "win_003",
+      "host_wall_id": "wall_008",
+      "room_id": "f1_dining",
+      "position": {
+        "x": 31.0,
+        "y": 22.0
+      },
+      "x1": 29.5,
+      "y1": 22.0,
+      "x2": 32.5,
+      "y2": 22.0,
+      "width": 3.0,
+      "height": 4.0,
+      "sill_height": 3.0,
+      "window_type": "casement"
+    },
+    {
+      "id": "win_004",
+      "host_wall_id": "wall_010",
+      "room_id": "f1_kitchen",
+      "position": {
+        "x": 31.0,
+        "y": 42.0
+      },
+      "x1": 29.25,
+      "y1": 42.0,
+      "x2": 32.75,
+      "y2": 42.0,
+      "width": 3.5,
+      "height": 3.5,
+      "sill_height": 3.5,
+      "window_type": "sliding"
+    },
+    {
+      "id": "win_005",
+      "host_wall_id": "wall_013",
+      "room_id": "f1_master_bed",
+      "position": {
+        "x": 11.5,
+        "y": 10.5
+      },
+      "x1": 9.25,
+      "y1": 10.5,
+      "x2": 13.75,
+      "y2": 10.5,
+      "width": 4.5,
+      "height": 4.5,
+      "sill_height": 3.0,
+      "window_type": "casement"
+    },
+    {
+      "id": "win_006",
+      "host_wall_id": "wall_040",
+      "room_id": "f1_master_bath",
+      "position": {
+        "x": 19.5,
+        "y": 18.5
+      },
+      "x1": 18.5,
+      "y1": 18.5,
+      "x2": 20.5,
+      "y2": 18.5,
+      "width": 2.0,
+      "height": 1.5,
+      "sill_height": 6.0,
+      "window_type": "ventilator"
+    },
+    {
+      "id": "win_007",
+      "host_wall_id": "wall_016",
+      "room_id": "f1_bedroom_2",
+      "position": {
+        "x": 22.5,
+        "y": 15.0
+      },
+      "x1": 20.25,
+      "y1": 15.0,
+      "x2": 24.75,
+      "y2": 15.0,
+      "width": 4.5,
+      "height": 4.5,
+      "sill_height": 3.0,
+      "window_type": "casement"
+    },
+    {
+      "id": "win_008",
+      "host_wall_id": "wall_019",
+      "room_id": "f1_bedroom_3",
+      "position": {
+        "x": 31.25,
+        "y": 4.0
+      },
+      "x1": 29.0,
+      "y1": 4.0,
+      "x2": 33.5,
+      "y2": 4.0,
+      "width": 4.5,
+      "height": 4.5,
+      "sill_height": 3.0,
+      "window_type": "casement"
+    },
+    {
+      "id": "win_009",
+      "host_wall_id": "wall_017",
+      "room_id": "f1_common_bath",
+      "position": {
+        "x": 5.75,
+        "y": 4.0
+      },
+      "x1": 4.75,
+      "y1": 4.0,
+      "x2": 6.75,
+      "y2": 4.0,
+      "width": 2.0,
+      "height": 1.5,
+      "sill_height": 6.0,
+      "window_type": "ventilator"
+    }
+  ],
+  "entry_point": {
+    "x": 20.0,
+    "y": 45.0,
+    "direction": 0.0
+  },
+  "version_number": 1
+}

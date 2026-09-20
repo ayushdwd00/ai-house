@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --font-sans: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-serif), "Newsreader", "Playfair Display", Georgia, serif;
+  
+  --bg-obsidian: #0A0B0E;
+  --bg-charcoal: #12141A;
+  --bg-stone: #1A1D24;
+  --bg-ivory: #FAF8F5;
+  
+  --text-ivory: #F5F3EF;
+  --text-stone: #9E9C98;
+  --text-charcoal: #1A1D24;
+  --text-muted: #6B6964;
+  
+  --accent-ochre: #C48446;
+  --accent-bronze: #8E5D32;
+  --accent-terracotta: #B85D3B;
+  
+  --border-architectural: rgba(255, 255, 255, 0.08);
+  --border-architectural-light: rgba(0, 0, 0, 0.08);
+}
+
+body {
+  background-color: #0A0B0E;
+  color: #F5F3EF;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* Hairline borders */
+.border-atelier {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.border-atelier-light {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Custom refined scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2A2D35;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3F4450;
+}
+
+/* Architectural grain subtle overlay */
+.bg-architectural-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Smooth architectural transitions */
+.transition-studio {
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
