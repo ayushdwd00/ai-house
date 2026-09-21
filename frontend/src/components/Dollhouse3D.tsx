@@ -15,6 +15,7 @@ import {
   LandscapeElement,
 } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
+import { getThreeMaterial } from "@/utils/materials";
 
 interface Dollhouse3DProps {
   layout: HouseLayout;
@@ -167,43 +168,14 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     scene.add(interiorLights);
     interiorLightsGroupRef.current = interiorLights;
 
-    // PBR Shared Architectural Materials
-    const extWallMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#36322E" : "#E8E4DC",
-      roughness: 0.88,
-      metalness: 0.02,
-    });
-    const intWallMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#2A2724" : "#F8F7F4",
-      roughness: 0.92,
-      metalness: 0.01,
-    });
-    const wallTrimMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#1C1917" : "#1E293B",
-      roughness: 0.4,
-      metalness: 0.5,
-    });
-    const glassMat = new THREE.MeshPhysicalMaterial({
-      color: "#E0F2FE",
-      transparent: true,
-      opacity: 0.35,
-      roughness: 0.04,
-      transmission: 0.9,
-      ior: 1.52,
-    });
-    const frameMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#1C1917" : "#1E293B",
-      roughness: 0.3,
-      metalness: 0.8,
-    });
-    const doorLeafMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#4A3525" : "#8B6D52",
-      roughness: 0.65,
-    });
-    const ceilingMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#22201E" : "#FAF8F5",
-      roughness: 0.95,
-    });
+    // PBR Shared Canonical Architectural Materials
+    const extWallMat = getThreeMaterial("cement_plaster_exterior", isDarkMode);
+    const intWallMat = getThreeMaterial("cement_plaster_interior", isDarkMode);
+    const wallTrimMat = getThreeMaterial("granite_counter", isDarkMode);
+    const glassMat = getThreeMaterial("tinted_glazing", isDarkMode);
+    const frameMat = getThreeMaterial("aluminum_frame_window", isDarkMode);
+    const doorLeafMat = getThreeMaterial("teak_wood_door", isDarkMode);
+    const ceilingMat = getThreeMaterial("cement_plaster_interior", isDarkMode);
 
     const woodFloorTex = createWoodTexture(isDarkMode);
     const tileFloorTex = createTileTexture(isDarkMode);
@@ -354,43 +326,161 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       if (wallLen < 0.3) return;
 
       const angle = Math.atan2(dz, dx);
-      const midX = (wall.x1 + wall.x2) / 2;
-      const midZ = (wall.y1 + wall.y2) / 2;
-      const thickness = wall.thickness || 0.45;
+      const ux = dx / wallLen;
+      const uz = dz / wallLen;
+      const thickness = wall.thickness || (wall.is_exterior ? 0.75 : 0.45);
       const isExt = wall.is_exterior;
+      const wallMat = isExt ? extWallMat : intWallMat;
 
-      // Find doors or windows hosted on or intersecting this wall segment
-      const hostedDoors = (floor.doors || []).filter((d) => {
+      // Find hosted openings along this wall
+      type OpeningInterval = {
+        type: "door" | "window";
+        id: string;
+        start: number;
+        end: number;
+        width: number;
+        midX: number;
+        midZ: number;
+      };
+
+      const openings: OpeningInterval[] = [];
+
+      (floor.doors || []).forEach((d) => {
         const dmx = (d.x1 + d.x2) / 2;
-        const dmy = (d.y1 + d.y2) / 2;
-        const distToStart = Math.hypot(dmx - wall.x1, dmy - wall.y1);
-        const distToEnd = Math.hypot(dmx - wall.x2, dmy - wall.y2);
-        return Math.abs(distToStart + distToEnd - wallLen) < 0.8;
+        const dmz = (d.y1 + d.y2) / 2;
+        const distToStart = Math.hypot(dmx - wall.x1, dmz - wall.y1);
+        const distToEnd = Math.hypot(dmx - wall.x2, dmz - wall.y2);
+        if (Math.abs(distToStart + distToEnd - wallLen) < 0.6) {
+          const sMid = (dmx - wall.x1) * ux + (dmz - wall.y1) * uz;
+          const w = Math.max(1.5, d.width || 3.0);
+          openings.push({
+            type: "door",
+            id: d.id,
+            start: Math.max(0, sMid - w / 2),
+            end: Math.min(wallLen, sMid + w / 2),
+            width: w,
+            midX: dmx,
+            midZ: dmz,
+          });
+        }
       });
 
-      const hostedWindows = (floor.windows || []).filter((w) => {
+      (floor.windows || []).forEach((w) => {
         const wmx = (w.x1 + w.x2) / 2;
-        const wmy = (w.y1 + w.y2) / 2;
-        const distToStart = Math.hypot(wmx - wall.x1, wmy - wall.y1);
-        const distToEnd = Math.hypot(wmx - wall.x2, wmy - wall.y2);
-        return Math.abs(distToStart + distToEnd - wallLen) < 0.8;
+        const wmz = (w.y1 + w.y2) / 2;
+        const distToStart = Math.hypot(wmx - wall.x1, wmz - wall.y1);
+        const distToEnd = Math.hypot(wmx - wall.x2, wmz - wall.y2);
+        if (Math.abs(distToStart + distToEnd - wallLen) < 0.6) {
+          const sMid = (wmx - wall.x1) * ux + (wmz - wall.y1) * uz;
+          const winW = Math.max(2.0, w.width || 4.0);
+          openings.push({
+            type: "window",
+            id: w.id,
+            start: Math.max(0, sMid - winW / 2),
+            end: Math.min(wallLen, sMid + winW / 2),
+            width: winW,
+            midX: wmx,
+            midZ: wmz,
+          });
+        }
       });
 
-      if (hostedDoors.length === 0 && hostedWindows.length === 0) {
-        // Solid continuous wall
+      if (openings.length === 0) {
+        // Solid wall without any openings
         const geo = new THREE.BoxGeometry(wallLen, currentWallHeight, thickness);
-        const mesh = new THREE.Mesh(geo, isExt ? extWallMat : intWallMat);
-        mesh.position.set(midX, currentWallHeight / 2, midZ);
+        const mesh = new THREE.Mesh(geo, wallMat);
+        mesh.position.set((wall.x1 + wall.x2) / 2, currentWallHeight / 2, (wall.y1 + wall.y2) / 2);
         mesh.rotation.y = -angle;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         floorGroup.add(mesh);
-      } else {
-        // Subdivided wall around openings
-        // Render base solid portion
-        const geo = new THREE.BoxGeometry(wallLen, currentWallHeight, thickness);
-        const mesh = new THREE.Mesh(geo, isExt ? extWallMat : intWallMat);
-        mesh.position.set(midX, currentWallHeight / 2, midZ);
+        return;
+      }
+
+      // Sort openings along wall length
+      openings.sort((a, b) => a.start - b.start);
+
+      // 1. Solid wall segments between openings
+      let cur = 0;
+      openings.forEach((op) => {
+        if (op.start - cur > 0.2) {
+          const segLen = op.start - cur;
+          const segMid = (cur + op.start) / 2;
+          const sx = wall.x1 + ux * segMid;
+          const sz = wall.y1 + uz * segMid;
+
+          const geo = new THREE.BoxGeometry(segLen, currentWallHeight, thickness);
+          const mesh = new THREE.Mesh(geo, wallMat);
+          mesh.position.set(sx, currentWallHeight / 2, sz);
+          mesh.rotation.y = -angle;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          floorGroup.add(mesh);
+        }
+
+        // 2. Openings: Lintel/Header above door, Sill & Header for window
+        const opLen = op.end - op.start;
+        const opMid = (op.start + op.end) / 2;
+        const ox = wall.x1 + ux * opMid;
+        const oz = wall.y1 + uz * opMid;
+
+        if (op.type === "door") {
+          const doorH = 6.8;
+          // In full height mode, render header lintel above door opening
+          if (currentWallHeight > doorH + 0.3) {
+            const lintelH = currentWallHeight - doorH;
+            const lintelY = doorH + lintelH / 2;
+            const geo = new THREE.BoxGeometry(opLen, lintelH, thickness);
+            const mesh = new THREE.Mesh(geo, wallMat);
+            mesh.position.set(ox, lintelY, oz);
+            mesh.rotation.y = -angle;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            floorGroup.add(mesh);
+          }
+        } else if (op.type === "window") {
+          const sillH = 2.8;
+          const winHeadH = 7.0;
+
+          // Wall sill below window
+          const sH = Math.min(currentWallHeight, sillH);
+          if (sH > 0.2) {
+            const geo = new THREE.BoxGeometry(opLen, sH, thickness);
+            const mesh = new THREE.Mesh(geo, wallMat);
+            mesh.position.set(ox, sH / 2, oz);
+            mesh.rotation.y = -angle;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            floorGroup.add(mesh);
+          }
+
+          // Header lintel above window
+          if (currentWallHeight > winHeadH + 0.3) {
+            const headH = currentWallHeight - winHeadH;
+            const headY = winHeadH + headH / 2;
+            const geo = new THREE.BoxGeometry(opLen, headH, thickness);
+            const mesh = new THREE.Mesh(geo, wallMat);
+            mesh.position.set(ox, headY, oz);
+            mesh.rotation.y = -angle;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            floorGroup.add(mesh);
+          }
+        }
+
+        cur = Math.max(cur, op.end);
+      });
+
+      // Remaining wall segment to end of wall
+      if (wallLen - cur > 0.2) {
+        const segLen = wallLen - cur;
+        const segMid = (cur + wallLen) / 2;
+        const sx = wall.x1 + ux * segMid;
+        const sz = wall.y1 + uz * segMid;
+
+        const geo = new THREE.BoxGeometry(segLen, currentWallHeight, thickness);
+        const mesh = new THREE.Mesh(geo, wallMat);
+        mesh.position.set(sx, currentWallHeight / 2, sz);
         mesh.rotation.y = -angle;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -427,6 +517,47 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       doorGroup.add(frameL, frameR, frameTop, leaf);
       floorGroup.add(doorGroup);
     });
+
+    // 5b. Front Entrance Plinth Transition Steps & Veranda Canopy
+    const mainDoor = (floor.doors || []).find((d) => d.door_type === "entry") || (floor.doors || [])[0];
+    if (mainDoor) {
+      const stepW = (mainDoor.width || 3.2) + 1.2;
+      const stepRun = 0.9;
+      const mdx = (mainDoor.x1 + mainDoor.x2) / 2;
+      const mdz = (mainDoor.y1 + mainDoor.y2) / 2;
+      const dAngle = Math.atan2(mainDoor.y2 - mainDoor.y1, mainDoor.x2 - mainDoor.x1);
+      const nx = -Math.sin(dAngle);
+      const nz = Math.cos(dAngle);
+
+      // 2 architectural stone entry treads
+      for (let sIdx = 0; sIdx < 2; sIdx++) {
+        const treadH = 0.12;
+        const treadGeo = new THREE.BoxGeometry(stepW + sIdx * 0.3, treadH, stepRun);
+        const treadMesh = new THREE.Mesh(treadGeo, wallTrimMat);
+        treadMesh.position.set(
+          mdx + nx * (0.6 + sIdx * stepRun * 0.85),
+          (1 - sIdx) * treadH + treadH / 2,
+          mdz + nz * (0.6 + sIdx * stepRun * 0.85)
+        );
+        treadMesh.rotation.y = -dAngle;
+        treadMesh.receiveShadow = true;
+        floorGroup.add(treadMesh);
+      }
+
+      // Entrance Porch Canopy Overhang with warm downlight
+      if (wallHeightMode === "full" || showRoof) {
+        const canopyGeo = new THREE.BoxGeometry(stepW + 1.4, 0.22, 2.8);
+        const canopyMesh = new THREE.Mesh(canopyGeo, extWallMat);
+        canopyMesh.position.set(mdx + nx * 1.4, 7.5, mdz + nz * 1.4);
+        canopyMesh.rotation.y = -dAngle;
+        canopyMesh.castShadow = true;
+        floorGroup.add(canopyMesh);
+
+        const canopyLight = new THREE.PointLight(0xffecd1, 0.65, 10);
+        canopyLight.position.set(mdx + nx * 1.4, 7.2, mdz + nz * 1.4);
+        floorGroup.add(canopyLight);
+      }
+    }
 
     // 6. Windows: Glazing, Mullions & Sills
     (floor.windows || []).forEach((win) => {

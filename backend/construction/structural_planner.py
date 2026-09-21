@@ -536,6 +536,6 @@ def plan_preliminary_structure(
         slab_assumptions=slab_data,
         disclaimer=(
             "Preliminary structural planning only. Final column sizes, beam sizes, "
-            "reinforcement, foundations and structural safety must be designed and verified by a qualified structural engineer."
+            "reinforcement, foundations and structural safety must be designed and verified by a qualified structural-engineer."
         )
     )

@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { HouseLayout, FloorPlan, Room, FurnitureItem } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
+import {
+  computeCutWalls,
+  computeDoorGeometry,
+  computeWindowGeometry,
+  generateDimensionChains,
+} from "@/utils/blueprint2D";
 import {
   ZoomIn,
   ZoomOut,
@@ -109,6 +115,52 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
       (layout.landscape.zones && layout.landscape.zones.length > 0))
       ? layout.landscape
       : generateFallbackLandscape(layout);
+
+  // Architectural cut walls, doors, windows & dimension chains
+  const cutExteriorWalls = useMemo(
+    () =>
+      computeCutWalls(
+        currentFloor.exterior_walls || [],
+        currentFloor.doors || [],
+        currentFloor.windows || [],
+        SCALE,
+        true
+      ),
+    [currentFloor.exterior_walls, currentFloor.doors, currentFloor.windows, SCALE]
+  );
+
+  const cutInteriorWalls = useMemo(
+    () =>
+      computeCutWalls(
+        currentFloor.interior_walls || [],
+        currentFloor.doors || [],
+        currentFloor.windows || [],
+        SCALE,
+        false
+      ),
+    [currentFloor.interior_walls, currentFloor.doors, currentFloor.windows, SCALE]
+  );
+
+  const doorGeometries = useMemo(
+    () =>
+      (currentFloor.doors || []).map((door, idx) =>
+        computeDoorGeometry(door, idx, SCALE)
+      ),
+    [currentFloor.doors, SCALE]
+  );
+
+  const windowGeometries = useMemo(
+    () =>
+      (currentFloor.windows || []).map((win, idx) =>
+        computeWindowGeometry(win, idx, SCALE)
+      ),
+    [currentFloor.windows, SCALE]
+  );
+
+  const dimensionChains = useMemo(
+    () => generateDimensionChains(layout.plot_width, layout.plot_length, SCALE),
+    [layout.plot_width, layout.plot_length, SCALE]
+  );
 
   // Wheel zoom
   const handleWheel = useCallback(
@@ -307,10 +359,10 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
     const ix = item.x * SCALE;
     const iy = item.y * SCALE;
     const iw = item.width * SCALE;
-    const il = item.length * SCALE;
+    const il = (item.depth || item.length) * SCALE;
     const isSelected = selectedFurnitureId === item.id;
 
-    const strokeCol = isSelected ? "#2563EB" : "#475569";
+    const strokeCol = isSelected ? "#2563EB" : "#334155";
     const strokeW = isSelected ? 2.0 : 1.2;
 
     const handleFurnitureClick = (e: React.MouseEvent) => {
@@ -318,62 +370,477 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
       onSelectFurniture?.(item.id);
     };
 
+    // 1. Bed (King, Queen, Single)
     if (item.type.includes("bed")) {
+      const headH = Math.max(6, il * 0.14);
+      const pillowW = iw * 0.36;
+      const pillowH = Math.min(18, il * 0.22);
+
       return (
         <g
           key={item.id}
-          transform={`rotate(${item.rotation}, ${ix}, ${iy})`}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
           onClick={handleFurnitureClick}
           className="cursor-pointer"
         >
+          {/* Main Mattress & Base */}
           <rect
             x={ix - iw / 2}
             y={iy - il / 2}
             width={iw}
             height={il}
-            rx={2}
-            fill="#F8FAFC"
+            rx={3}
+            fill="#FFFFFF"
             stroke={strokeCol}
             strokeWidth={strokeW}
           />
+          {/* Solid Architectural Headboard */}
           <rect
             x={ix - iw / 2}
             y={iy - il / 2}
             width={iw}
-            height={il * 0.18}
-            fill="#E2E8F0"
-            stroke={strokeCol}
-            strokeWidth={strokeW}
+            height={headH}
+            rx={2}
+            fill="#78350F"
+            stroke="#451A03"
+            strokeWidth={1}
           />
+          {/* Folded Duvet Area */}
+          <path
+            d={`M ${ix - iw / 2 + 2} ${iy - il / 2 + il * 0.42} Q ${ix} ${iy - il / 2 + il * 0.48} ${ix + iw / 2 - 2} ${iy - il / 2 + il * 0.42} L ${ix + iw / 2 - 2} ${iy + il / 2 - 2} L ${ix - iw / 2 + 2} ${iy + il / 2 - 2} Z`}
+            fill="#F1F5F9"
+            stroke="#94A3B8"
+            strokeWidth={1}
+          />
+          {/* Pillows */}
           <rect
             x={ix - iw / 2 + iw * 0.08}
-            y={iy - il / 2 + il * 0.22}
-            width={iw * 0.38}
-            height={il * 0.22}
-            rx={2}
-            fill="#EDF2F7"
-            stroke="#94A3B8"
+            y={iy - il / 2 + headH + 4}
+            width={pillowW}
+            height={pillowH}
+            rx={4}
+            fill="#FFFFFF"
+            stroke="#64748B"
             strokeWidth={1}
           />
           <rect
-            x={ix + iw * 0.04}
-            y={iy - il / 2 + il * 0.22}
-            width={iw * 0.38}
-            height={il * 0.22}
-            rx={2}
-            fill="#EDF2F7"
-            stroke="#94A3B8"
+            x={ix + iw / 2 - iw * 0.08 - pillowW}
+            y={iy - il / 2 + headH + 4}
+            width={pillowW}
+            height={pillowH}
+            rx={4}
+            fill="#FFFFFF"
+            stroke="#64748B"
             strokeWidth={1}
           />
         </g>
       );
     }
 
-    if (item.type.includes("sofa") || item.type.includes("couch")) {
+    // 2. Side Table / Nightstand
+    if (item.type.includes("side_table") || item.type.includes("nightstand")) {
       return (
         <g
           key={item.id}
-          transform={`rotate(${item.rotation}, ${ix}, ${iy})`}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={2}
+            fill="#FAF5EE"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          <line
+            x1={ix - iw / 2 + 3}
+            y1={iy}
+            x2={ix + iw / 2 - 3}
+            y2={iy}
+            stroke="#94A3B8"
+            strokeWidth={0.8}
+          />
+          <circle cx={ix} cy={iy} r={3} fill="#CBD5E1" stroke="#64748B" strokeWidth={0.8} />
+        </g>
+      );
+    }
+
+    // 3. Wardrobe / Closet
+    if (item.type.includes("wardrobe") || item.type.includes("closet")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={1}
+            fill="#F3EFE6"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          {/* Sliding door separation lines */}
+          <line
+            x1={ix}
+            y1={iy - il / 2}
+            x2={ix}
+            y2={iy + il / 2}
+            stroke="#94A3B8"
+            strokeWidth={1.2}
+          />
+          <line
+            x1={ix - iw / 4}
+            y1={iy - il / 2 + 4}
+            x2={ix - iw / 4}
+            y2={iy + il / 2 - 4}
+            stroke="#CBD5E1"
+            strokeWidth={0.8}
+            strokeDasharray="2 2"
+          />
+          <line
+            x1={ix + iw / 4}
+            y1={iy - il / 2 + 4}
+            x2={ix + iw / 4}
+            y2={iy + il / 2 - 4}
+            stroke="#CBD5E1"
+            strokeWidth={0.8}
+            strokeDasharray="2 2"
+          />
+        </g>
+      );
+    }
+
+    // 4. Sofa / Living Couch
+    if (item.type.includes("sofa") || item.type.includes("couch")) {
+      const armW = Math.max(6, iw * 0.12);
+      const backH = Math.max(8, il * 0.28);
+      const seatW = (iw - 2 * armW) / 3;
+
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          {/* Main Frame */}
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={5}
+            fill="#FFFFFF"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          {/* Rear Backrest */}
+          <rect
+            x={ix - iw / 2 + armW}
+            y={iy - il / 2}
+            width={iw - 2 * armW}
+            height={backH}
+            rx={2}
+            fill="#E2E8F0"
+            stroke="#94A3B8"
+            strokeWidth={1}
+          />
+          {/* Left & Right Rounded Armrests */}
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={armW}
+            height={il}
+            rx={3}
+            fill="#E2E8F0"
+            stroke="#94A3B8"
+            strokeWidth={1}
+          />
+          <rect
+            x={ix + iw / 2 - armW}
+            y={iy - il / 2}
+            width={armW}
+            height={il}
+            rx={3}
+            fill="#E2E8F0"
+            stroke="#94A3B8"
+            strokeWidth={1}
+          />
+          {/* 3 Individual Seat Cushions */}
+          {Array.from({ length: 3 }).map((_, cIdx) => (
+            <rect
+              key={`sofa_cushion_${cIdx}`}
+              x={ix - iw / 2 + armW + cIdx * seatW + 1}
+              y={iy - il / 2 + backH + 1}
+              width={seatW - 2}
+              height={il - backH - 2}
+              rx={2}
+              fill="#F8FAFC"
+              stroke="#CBD5E1"
+              strokeWidth={0.8}
+            />
+          ))}
+        </g>
+      );
+    }
+
+    // 5. Coffee Table
+    if (item.type.includes("coffee_table")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={4}
+            fill="#FFFFFF"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          <rect
+            x={ix - iw / 2 + 3}
+            y={iy - il / 2 + 3}
+            width={iw - 6}
+            height={il - 6}
+            rx={2}
+            fill="#F8FAFC"
+            stroke="#CBD5E1"
+            strokeWidth={0.8}
+          />
+        </g>
+      );
+    }
+
+    // 6. TV Unit / Media Console
+    if (item.type.includes("tv")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={1}
+            fill="#F8FAFC"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          {/* TV Screen Profile */}
+          <line
+            x1={ix - iw * 0.38}
+            y1={iy}
+            x2={ix + iw * 0.38}
+            y2={iy}
+            stroke="#0F172A"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+          <text
+            x={ix}
+            y={iy + il / 2 - 3}
+            textAnchor="middle"
+            fill="#64748B"
+            className="font-mono text-[7px] font-bold select-none"
+          >
+            TV
+          </text>
+        </g>
+      );
+    }
+
+    // 7. Dining Table & Individual Chairs
+    if (item.type.includes("dining_table")) {
+      const chairW = Math.min(14, iw * 0.22);
+      const chairD = Math.min(12, il * 0.28);
+
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          {/* Main Table Surface */}
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={3}
+            fill="#FFFFFF"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          {/* Chairs on Top & Bottom */}
+          {[-iw * 0.28, 0, iw * 0.28].map((cxOffset, idx) => (
+            <React.Fragment key={`chair_${idx}`}>
+              {/* Top Chair */}
+              <rect
+                x={ix + cxOffset - chairW / 2}
+                y={iy - il / 2 - chairD - 2}
+                width={chairW}
+                height={chairD}
+                rx={2}
+                fill="#F8FAFC"
+                stroke="#64748B"
+                strokeWidth={1}
+              />
+              <path
+                d={`M ${ix + cxOffset - chairW / 2} ${iy - il / 2 - 2} Q ${ix + cxOffset} ${iy - il / 2 - 5} ${ix + cxOffset + chairW / 2} ${iy - il / 2 - 2}`}
+                fill="none"
+                stroke="#475569"
+                strokeWidth={1.2}
+              />
+              {/* Bottom Chair */}
+              <rect
+                x={ix + cxOffset - chairW / 2}
+                y={iy + il / 2 + 2}
+                width={chairW}
+                height={chairD}
+                rx={2}
+                fill="#F8FAFC"
+                stroke="#64748B"
+                strokeWidth={1}
+              />
+              <path
+                d={`M ${ix + cxOffset - chairW / 2} ${iy + il / 2 + 2} Q ${ix + cxOffset} ${iy + il / 2 + 5} ${ix + cxOffset + chairW / 2} ${iy + il / 2 + 2}`}
+                fill="none"
+                stroke="#475569"
+                strokeWidth={1.2}
+              />
+            </React.Fragment>
+          ))}
+        </g>
+      );
+    }
+
+    // 8. Kitchen Counter, Hob, Sink, Refrigerator
+    if (item.type.includes("kitchen_counter")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            fill="#F8FAFC"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          <line
+            x1={ix - iw / 2}
+            y1={iy + il / 2 - 3}
+            x2={ix + iw / 2}
+            y2={iy + il / 2 - 3}
+            stroke="#CBD5E1"
+            strokeWidth={1}
+          />
+        </g>
+      );
+    }
+
+    if (item.type.includes("hob") || item.type.includes("cooktop")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={2}
+            fill="#1E293B"
+            stroke="#0F172A"
+            strokeWidth={1}
+          />
+          {/* 3 Burners */}
+          <circle cx={ix - iw * 0.25} cy={iy} r={iw * 0.16} fill="#334155" stroke="#E2E8F0" strokeWidth={1} />
+          <circle cx={ix} cy={iy - il * 0.15} r={iw * 0.14} fill="#334155" stroke="#E2E8F0" strokeWidth={1} />
+          <circle cx={ix + iw * 0.25} cy={iy} r={iw * 0.16} fill="#334155" stroke="#E2E8F0" strokeWidth={1} />
+        </g>
+      );
+    }
+
+    if (item.type.includes("sink")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={2}
+            fill="#F1F5F9"
+            stroke="#64748B"
+            strokeWidth={1.2}
+          />
+          {/* Bowl and drainboard */}
+          <rect
+            x={ix - iw / 2 + 3}
+            y={iy - il / 2 + 3}
+            width={iw * 0.55}
+            height={il - 6}
+            rx={2}
+            fill="#E2E8F0"
+            stroke="#94A3B8"
+            strokeWidth={1}
+          />
+          <circle cx={ix - iw * 0.22} cy={iy} r={3} fill="#64748B" />
+          {/* Drainboard grooves */}
+          {[-il * 0.2, 0, il * 0.2].map((dy, idx) => (
+            <line
+              key={`drain_${idx}`}
+              x1={ix + iw * 0.15}
+              y1={iy + dy}
+              x2={ix + iw / 2 - 5}
+              y2={iy + dy}
+              stroke="#94A3B8"
+              strokeWidth={1}
+            />
+          ))}
+        </g>
+      );
+    }
+
+    if (item.type.includes("fridge") || item.type.includes("refrigerator")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
           onClick={handleFurnitureClick}
           className="cursor-pointer"
         >
@@ -387,24 +854,77 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
             stroke={strokeCol}
             strokeWidth={strokeW}
           />
+          <line
+            x1={ix - iw / 2}
+            y1={iy - il / 2 + il * 0.32}
+            x2={ix + iw / 2}
+            y2={iy - il / 2 + il * 0.32}
+            stroke="#64748B"
+            strokeWidth={1.5}
+          />
+          <text
+            x={ix}
+            y={iy + il * 0.2}
+            textAnchor="middle"
+            fill="#64748B"
+            className="font-mono text-[8px] font-bold select-none"
+          >
+            FRIDGE
+          </text>
+        </g>
+      );
+    }
+
+    // 9. Bathroom WC / Toilet
+    if (item.type.includes("toilet") || item.type.includes("wc")) {
+      const tankH = Math.max(6, il * 0.3);
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          {/* Cistern Tank */}
           <rect
             x={ix - iw / 2}
             y={iy - il / 2}
             width={iw}
-            height={il * 0.28}
-            fill="#E2E8F0"
+            height={tankH}
+            rx={2}
+            fill="#FFFFFF"
             stroke={strokeCol}
             strokeWidth={strokeW}
+          />
+          {/* Oval Toilet Bowl */}
+          <ellipse
+            cx={ix}
+            cy={iy - il / 2 + tankH + (il - tankH) / 2}
+            rx={iw * 0.42}
+            ry={(il - tankH) * 0.45}
+            fill="#FFFFFF"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          <ellipse
+            cx={ix}
+            cy={iy - il / 2 + tankH + (il - tankH) / 2}
+            rx={iw * 0.26}
+            ry={(il - tankH) * 0.28}
+            fill="#F1F5F9"
+            stroke="#94A3B8"
+            strokeWidth={1}
           />
         </g>
       );
     }
 
-    if (item.type.includes("dining_table")) {
+    // 10. Bathroom Basin / Vanity
+    if (item.type.includes("basin") || item.type.includes("sink")) {
       return (
         <g
           key={item.id}
-          transform={`rotate(${item.rotation}, ${ix}, ${iy})`}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
           onClick={handleFurnitureClick}
           className="cursor-pointer"
         >
@@ -414,14 +934,70 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
             width={iw}
             height={il}
             rx={3}
-            fill="#F8FAFC"
+            fill="#FFFFFF"
             stroke={strokeCol}
             strokeWidth={strokeW}
           />
+          <ellipse
+            cx={ix}
+            cy={iy + 2}
+            rx={iw * 0.38}
+            ry={il * 0.35}
+            fill="#F8FAFC"
+            stroke="#64748B"
+            strokeWidth={1}
+          />
+          <circle cx={ix} cy={iy + 2} r={2.5} fill="#475569" />
+          <line x1={ix} y1={iy - il / 2 + 2} x2={ix} y2={iy - 2} stroke="#334155" strokeWidth={2} />
         </g>
       );
     }
 
+    // 11. Bathroom Shower Stall
+    if (item.type.includes("shower")) {
+      return (
+        <g
+          key={item.id}
+          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
+          onClick={handleFurnitureClick}
+          className="cursor-pointer"
+        >
+          <rect
+            x={ix - iw / 2}
+            y={iy - il / 2}
+            width={iw}
+            height={il}
+            rx={2}
+            fill="#F1F5F9"
+            stroke={strokeCol}
+            strokeWidth={strokeW}
+          />
+          {/* Diagonal Drain Pitch Lines */}
+          <line
+            x1={ix - iw / 2 + 3}
+            y1={iy - il / 2 + 3}
+            x2={ix + iw / 2 - 3}
+            y2={iy + il / 2 - 3}
+            stroke="#CBD5E1"
+            strokeWidth={0.8}
+            strokeDasharray="3 3"
+          />
+          <line
+            x1={ix + iw / 2 - 3}
+            y1={iy - il / 2 + 3}
+            x2={ix - iw / 2 + 3}
+            y2={iy + il / 2 - 3}
+            stroke="#CBD5E1"
+            strokeWidth={0.8}
+            strokeDasharray="3 3"
+          />
+          {/* Circular Drain */}
+          <circle cx={ix} cy={iy} r={5} fill="#FFFFFF" stroke="#64748B" strokeWidth={1} />
+        </g>
+      );
+    }
+
+    // Default Fallback
     return (
       <rect
         key={item.id}
@@ -728,6 +1304,134 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
               {(layout.plot_width * layout.plot_length).toLocaleString()} SQ FT)
             </text>
 
+            {/* Architectural Plot Boundary Dimension Chains */}
+            <g id="dimension-chains" pointerEvents="none">
+              {/* Top Dimension String */}
+              <line
+                x1={dimensionChains.top.ext1.x1}
+                y1={dimensionChains.top.ext1.y1}
+                x2={dimensionChains.top.ext1.x2}
+                y2={dimensionChains.top.ext1.y2}
+                stroke="#94A3B8"
+                strokeWidth={0.8}
+              />
+              <line
+                x1={dimensionChains.top.ext2.x1}
+                y1={dimensionChains.top.ext2.y1}
+                x2={dimensionChains.top.ext2.x2}
+                y2={dimensionChains.top.ext2.y2}
+                stroke="#94A3B8"
+                strokeWidth={0.8}
+              />
+              <line
+                x1={dimensionChains.top.x1}
+                y1={dimensionChains.top.y1}
+                x2={dimensionChains.top.x2}
+                y2={dimensionChains.top.y2}
+                stroke="#334155"
+                strokeWidth={1.2}
+              />
+              {/* 45-degree architectural tick marks */}
+              <line
+                x1={dimensionChains.top.tick1.x1}
+                y1={dimensionChains.top.tick1.y1}
+                x2={dimensionChains.top.tick1.x2}
+                y2={dimensionChains.top.tick1.y2}
+                stroke="#0F172A"
+                strokeWidth={1.8}
+              />
+              <line
+                x1={dimensionChains.top.tick2.x1}
+                y1={dimensionChains.top.tick2.y1}
+                x2={dimensionChains.top.tick2.x2}
+                y2={dimensionChains.top.tick2.y2}
+                stroke="#0F172A"
+                strokeWidth={1.8}
+              />
+              <rect
+                x={dimensionChains.top.textX - 55}
+                y={dimensionChains.top.textY - 11}
+                width={110}
+                height={16}
+                fill="#FFFFFF"
+                stroke="#CBD5E1"
+                strokeWidth={0.8}
+                rx={2}
+              />
+              <text
+                x={dimensionChains.top.textX}
+                y={dimensionChains.top.textY + 1}
+                textAnchor="middle"
+                fill="#0F172A"
+                className="font-mono text-[8.5px] font-bold select-none"
+              >
+                {dimensionChains.top.text}
+              </text>
+
+              {/* Left Dimension String */}
+              <line
+                x1={dimensionChains.left.ext1.x1}
+                y1={dimensionChains.left.ext1.y1}
+                x2={dimensionChains.left.ext1.x2}
+                y2={dimensionChains.left.ext1.y2}
+                stroke="#94A3B8"
+                strokeWidth={0.8}
+              />
+              <line
+                x1={dimensionChains.left.ext2.x1}
+                y1={dimensionChains.left.ext2.y1}
+                x2={dimensionChains.left.ext2.x2}
+                y2={dimensionChains.left.ext2.y2}
+                stroke="#94A3B8"
+                strokeWidth={0.8}
+              />
+              <line
+                x1={dimensionChains.left.x1}
+                y1={dimensionChains.left.y1}
+                x2={dimensionChains.left.x2}
+                y2={dimensionChains.left.y2}
+                stroke="#334155"
+                strokeWidth={1.2}
+              />
+              <line
+                x1={dimensionChains.left.tick1.x1}
+                y1={dimensionChains.left.tick1.y1}
+                x2={dimensionChains.left.tick1.x2}
+                y2={dimensionChains.left.tick1.y2}
+                stroke="#0F172A"
+                strokeWidth={1.8}
+              />
+              <line
+                x1={dimensionChains.left.tick2.x1}
+                y1={dimensionChains.left.tick2.y1}
+                x2={dimensionChains.left.tick2.x2}
+                y2={dimensionChains.left.tick2.y2}
+                stroke="#0F172A"
+                strokeWidth={1.8}
+              />
+              <g transform={`rotate(-90, ${dimensionChains.left.textX}, ${dimensionChains.left.textY})`}>
+                <rect
+                  x={dimensionChains.left.textX - 55}
+                  y={dimensionChains.left.textY - 8}
+                  width={110}
+                  height={16}
+                  fill="#FFFFFF"
+                  stroke="#CBD5E1"
+                  strokeWidth={0.8}
+                  rx={2}
+                />
+                <text
+                  x={dimensionChains.left.textX}
+                  y={dimensionChains.left.textY + 4}
+                  textAnchor="middle"
+                  fill="#0F172A"
+                  className="font-mono text-[8.5px] font-bold select-none"
+                >
+                  {dimensionChains.left.text}
+                </text>
+              </g>
+            </g>
+
             {/* 2D ARCHITECTURAL LANDSCAPE BACKGROUND (LAWNS, DRIVEWAY, PATH) */}
             {showLandscape && activeLandscape && (
               <g id="landscape-background-layer">
@@ -972,77 +1676,202 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
             {!isEditMode &&
               displayRooms.flatMap((r) => r.furniture || []).map((item) => renderFurniture(item))}
 
-            {/* Architectural Partition & Exterior Walls */}
-            {(currentFloor.interior_walls || []).map((wall) => (
+            {/* Architectural Cut Walls (Double-face with Real Thickness & Opening Voids) */}
+            {/* 1. Exterior Walls (9" / 18px thickness, rich dark charcoal fill) */}
+            {cutExteriorWalls.segments.map((seg) => (
               <line
-                key={wall.id}
-                x1={wall.x1 * SCALE}
-                y1={wall.y1 * SCALE}
-                x2={wall.x2 * SCALE}
-                y2={wall.y2 * SCALE}
+                key={seg.id}
+                x1={seg.x1}
+                y1={seg.y1}
+                x2={seg.x2}
+                y2={seg.y2}
+                stroke="#1E293B"
+                strokeWidth={seg.thickness}
+                strokeLinecap="square"
+              />
+            ))}
+
+            {/* 2. Interior Partition Walls (4.5" / 10px thickness) */}
+            {cutInteriorWalls.segments.map((seg) => (
+              <line
+                key={seg.id}
+                x1={seg.x1}
+                y1={seg.y1}
+                x2={seg.x2}
+                y2={seg.y2}
                 stroke="#334155"
-                strokeWidth={4}
+                strokeWidth={seg.thickness}
                 strokeLinecap="square"
               />
             ))}
 
-            {(currentFloor.exterior_walls || []).map((wall) => (
+            {/* 3. Opening Jamb End-Caps (Returns across wall thickness) */}
+            {[...cutExteriorWalls.jambs, ...cutInteriorWalls.jambs].map((jamb, jIdx) => (
               <line
-                key={wall.id}
-                x1={wall.x1 * SCALE}
-                y1={wall.y1 * SCALE}
-                x2={wall.x2 * SCALE}
-                y2={wall.y2 * SCALE}
+                key={`jamb_${jIdx}`}
+                x1={jamb.x - jamb.nx * jamb.halfThick}
+                y1={jamb.y - jamb.ny * jamb.halfThick}
+                x2={jamb.x + jamb.nx * jamb.halfThick}
+                y2={jamb.y + jamb.ny * jamb.halfThick}
                 stroke="#0F172A"
-                strokeWidth={7}
-                strokeLinecap="square"
+                strokeWidth={1.5}
               />
             ))}
 
-            {/* Windows */}
-            {(currentFloor.windows || []).map((win) => {
-              const wx1 = win.x1 * SCALE;
-              const wy1 = win.y1 * SCALE;
-              const wx2 = win.x2 * SCALE;
-              const wy2 = win.y2 * SCALE;
-              return (
-                <g key={win.id} pointerEvents="none">
-                  <line x1={wx1} y1={wy1} x2={wx2} y2={wy2} stroke="#FFFFFF" strokeWidth={8} strokeLinecap="square" />
-                  <line x1={wx1} y1={wy1} x2={wx2} y2={wy2} stroke="#38BDF8" strokeWidth={2.5} />
-                  <line x1={wx1} y1={wy1} x2={wx2} y2={wy2} stroke="#475569" strokeWidth={1} strokeDasharray="4 4" />
-                </g>
-              );
-            })}
+            {/* 4. Windows with Glass Glazing, Frame, Chajja Overhang, and Direction Badge */}
+            {windowGeometries.map((wGeom) => (
+              <g key={wGeom.id} pointerEvents="none">
+                {/* Clear Opening Gap */}
+                <line
+                  x1={wGeom.x1}
+                  y1={wGeom.y1}
+                  x2={wGeom.x2}
+                  y2={wGeom.y2}
+                  stroke="#FFFFFF"
+                  strokeWidth={18}
+                  strokeLinecap="square"
+                />
 
-            {/* Doors */}
-            {(currentFloor.doors || []).map((door) => {
-              const dx1 = door.x1 * SCALE;
-              const dy1 = door.y1 * SCALE;
-              const dx2 = door.x2 * SCALE;
-              const dy2 = door.y2 * SCALE;
-              const radius = 22;
+                {/* Chajja / Sunshade Overhang Projection */}
+                <path
+                  d={wGeom.chajjaPath}
+                  fill="none"
+                  stroke="#64748B"
+                  strokeWidth={1}
+                  strokeDasharray="4 2"
+                />
 
-              return (
-                <g key={door.id} pointerEvents="none">
-                  <line x1={dx1} y1={dy1} x2={dx2} y2={dy2} stroke="#FFFFFF" strokeWidth={7} strokeLinecap="square" />
-                  <line
-                    x1={dx1}
-                    y1={dy1}
-                    x2={dx1 + (dx1 === dx2 ? radius : 0)}
-                    y2={dy1 + (dy1 === dy2 ? radius : 0)}
+                {/* Double Glazing Lines */}
+                <line
+                  x1={wGeom.glaze1.x1}
+                  y1={wGeom.glaze1.y1}
+                  x2={wGeom.glaze1.x2}
+                  y2={wGeom.glaze1.y2}
+                  stroke="#0284C7"
+                  strokeWidth={1.5}
+                />
+                <line
+                  x1={wGeom.glaze2.x1}
+                  y1={wGeom.glaze2.y1}
+                  x2={wGeom.glaze2.x2}
+                  y2={wGeom.glaze2.y2}
+                  stroke="#0284C7"
+                  strokeWidth={1.5}
+                />
+
+                {/* Frame Jamb Caps */}
+                {wGeom.jambs.map((jb, jIdx) => (
+                  <rect
+                    key={`win_jb_${jIdx}`}
+                    x={jb.x - 2}
+                    y={jb.y - 8}
+                    width={4}
+                    height={16}
+                    transform={`rotate(${(jb.angle * 180) / Math.PI}, ${jb.x}, ${jb.y})`}
+                    fill="#334155"
                     stroke="#0F172A"
-                    strokeWidth={2}
+                    strokeWidth={0.8}
                   />
-                  <path
-                    d={`M ${dx1 + (dx1 === dx2 ? radius : 0)} ${dy1 + (dy1 === dy2 ? radius : 0)} A ${radius} ${radius} 0 0 1 ${dx2} ${dy2}`}
-                    fill="none"
-                    stroke="#64748B"
-                    strokeWidth={1}
-                    strokeDasharray="2 2"
+                ))}
+
+                {/* Direction Badge Pill (e.g. W01 · E) */}
+                <g transform={`translate(${wGeom.badgeX}, ${wGeom.badgeY})`}>
+                  <rect
+                    x={-22}
+                    y={-7}
+                    width={44}
+                    height={14}
+                    rx={3}
+                    fill="#0F172A"
+                    stroke="#38BDF8"
+                    strokeWidth={0.8}
                   />
+                  <text
+                    x={0}
+                    y={3}
+                    textAnchor="middle"
+                    fill="#38BDF8"
+                    className="font-mono text-[7.5px] font-bold select-none"
+                  >
+                    {wGeom.label}
+                  </text>
                 </g>
-              );
-            })}
+              </g>
+            ))}
+
+            {/* 5. Doors with Wooden Leaf, Circular Swing Arc, Frame Jambs, and Direction Badge */}
+            {doorGeometries.map((dGeom) => (
+              <g key={dGeom.id} pointerEvents="none">
+                {/* Clear Opening Gap in Wall */}
+                <line
+                  x1={dGeom.hingeX}
+                  y1={dGeom.hingeY}
+                  x2={dGeom.latchX}
+                  y2={dGeom.latchY}
+                  stroke="#FFFFFF"
+                  strokeWidth={18}
+                  strokeLinecap="square"
+                />
+
+                {/* Frame Jamb Blocks */}
+                {dGeom.jambs.map((jb, jIdx) => (
+                  <rect
+                    key={`door_jb_${jIdx}`}
+                    x={jb.x - 3}
+                    y={jb.y - 7}
+                    width={6}
+                    height={14}
+                    transform={`rotate(${(jb.angle * 180) / Math.PI}, ${jb.x}, ${jb.y})`}
+                    fill="#451A03"
+                    stroke="#1E293B"
+                    strokeWidth={0.8}
+                  />
+                ))}
+
+                {/* Dashed Circular Swing Arc */}
+                <path
+                  d={dGeom.arcPath}
+                  fill="none"
+                  stroke="#64748B"
+                  strokeWidth={1.2}
+                  strokeDasharray="3 3"
+                />
+
+                {/* Solid Wood Door Leaf */}
+                <line
+                  x1={dGeom.hingeX}
+                  y1={dGeom.hingeY}
+                  x2={dGeom.leafEndX}
+                  y2={dGeom.leafEndY}
+                  stroke="#78350F"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                />
+
+                {/* Direction Badge Pill (e.g. D01 · S) */}
+                <g transform={`translate(${dGeom.badgeX}, ${dGeom.badgeY})`}>
+                  <rect
+                    x={-22}
+                    y={-7}
+                    width={44}
+                    height={14}
+                    rx={3}
+                    fill="#FFFFFF"
+                    stroke="#78350F"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={0}
+                    y={3}
+                    textAnchor="middle"
+                    fill="#78350F"
+                    className="font-mono text-[7.5px] font-bold select-none"
+                  >
+                    {dGeom.label}
+                  </text>
+                </g>
+              </g>
+            ))}
 
             {/* STRUCTURAL COLUMN PLANNING OVERLAY (TOGGLEABLE) */}
             {showStructure && (
@@ -1295,32 +2124,81 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
               </g>
             )}
 
-            {/* North Arrow Drafting Symbol & Vastu Rose */}
-            <g transform={`translate(${svgWidth - 25}, -35)`} pointerEvents="none">
-              <circle cx={0} cy={0} r={16} fill="#FFFFFF" stroke="#64748B" strokeWidth={1.5} />
-              <polygon points="0,-12 4,2 0,0 -4,2" fill="#DC2626" />
-              <polygon points="0,0 4,2 0,10 -4,2" fill="#0F172A" />
-              <text x={0} y={-16} textAnchor="middle" fill="#DC2626" className="font-mono font-bold text-[10px]">
+            {/* Architectural Compass Rose & Vastu Orientation */}
+            <g transform={`translate(${svgWidth - 45}, -30)`} pointerEvents="none">
+              {/* Outer degree ring */}
+              <circle cx={0} cy={0} r={22} fill="#FFFFFF" stroke="#334155" strokeWidth={1.5} />
+              <circle cx={0} cy={0} r={18} fill="none" stroke="#CBD5E1" strokeWidth={0.8} strokeDasharray="2 2" />
+              {/* Crosshairs */}
+              <line x1={-20} y1={0} x2={20} y2={0} stroke="#94A3B8" strokeWidth={0.8} />
+              <line x1={0} y1={-20} x2={0} y2={20} stroke="#94A3B8" strokeWidth={0.8} />
+              {/* North Pointer Needle */}
+              <polygon points="0,-18 5,0 0,-2 -5,0" fill="#DC2626" />
+              <polygon points="0,0 5,0 0,18 -5,0" fill="#0F172A" />
+              {/* Cardinal Labels */}
+              <text x={0} y={-24} textAnchor="middle" fill="#DC2626" className="font-mono font-bold text-[10px]">
                 N
               </text>
-              {layout.vastu_result && (
-                <text x={0} y={22} textAnchor="middle" fill="#0F172A" className="font-mono text-[7px] tracking-wider font-semibold">
-                  VASTU
-                </text>
-              )}
+              <text x={0} y={30} textAnchor="middle" fill="#64748B" className="font-mono font-semibold text-[8px]">
+                S
+              </text>
+              <text x={28} y={3} textAnchor="middle" fill="#64748B" className="font-mono font-semibold text-[8px]">
+                E
+              </text>
+              <text x={-28} y={3} textAnchor="middle" fill="#64748B" className="font-mono font-semibold text-[8px]">
+                W
+              </text>
             </g>
 
-            {/* Graphic Scale Bar */}
+            {/* Architectural Graphic Scale Bar */}
             <g transform={`translate(10, ${svgHeight + 35})`} pointerEvents="none">
-              <line x1={0} y1={0} x2={SCALE * 20} y2={0} stroke="#334155" strokeWidth={2} />
-              <line x1={0} y1={-4} x2={0} y2={4} stroke="#334155" strokeWidth={1.5} />
-              <line x1={SCALE * 5} y1={-3} x2={SCALE * 5} y2={3} stroke="#334155" strokeWidth={1} />
-              <line x1={SCALE * 10} y1={-4} x2={SCALE * 10} y2={4} stroke="#334155" strokeWidth={1.5} />
-              <line x1={SCALE * 20} y1={-4} x2={SCALE * 20} y2={4} stroke="#334155" strokeWidth={1.5} />
-              <text x={0} y={12} fill="#475569" className="font-mono text-[8px] font-semibold">0&apos;</text>
-              <text x={SCALE * 5} y={12} textAnchor="middle" fill="#475569" className="font-mono text-[8px] font-semibold">5&apos;</text>
-              <text x={SCALE * 10} y={12} textAnchor="middle" fill="#475569" className="font-mono text-[8px] font-semibold">10&apos;</text>
-              <text x={SCALE * 20} y={12} textAnchor="middle" fill="#475569" className="font-mono text-[8px] font-semibold">20&apos;</text>
+              <line x1={0} y1={0} x2={SCALE * 20} y2={0} stroke="#0F172A" strokeWidth={2.5} />
+              <line x1={0} y1={-5} x2={0} y2={5} stroke="#0F172A" strokeWidth={2} />
+              <line x1={SCALE * 5} y1={-3.5} x2={SCALE * 5} y2={3.5} stroke="#0F172A" strokeWidth={1.2} />
+              <line x1={SCALE * 10} y1={-5} x2={SCALE * 10} y2={5} stroke="#0F172A" strokeWidth={2} />
+              <line x1={SCALE * 20} y1={-5} x2={SCALE * 20} y2={5} stroke="#0F172A" strokeWidth={2} />
+              <text x={0} y={14} fill="#0F172A" className="font-mono text-[8px] font-bold">0&apos;</text>
+              <text x={SCALE * 5} y={14} textAnchor="middle" fill="#475569" className="font-mono text-[8px] font-semibold">5&apos;</text>
+              <text x={SCALE * 10} y={14} textAnchor="middle" fill="#475569" className="font-mono text-[8px] font-semibold">10&apos;</text>
+              <text x={SCALE * 20} y={14} textAnchor="middle" fill="#0F172A" className="font-mono text-[8px] font-bold">20&apos; (6.1m)</text>
+              <text x={SCALE * 10} y={26} textAnchor="middle" fill="#64748B" className="font-mono text-[7px] tracking-wider uppercase">GRAPHIC BAR SCALE</text>
+            </g>
+
+            {/* Architectural Master Blueprint Title Block */}
+            <g transform={`translate(${Math.max(0, svgWidth - 280)}, ${svgHeight + 20})`} pointerEvents="none">
+              <rect
+                x={0}
+                y={0}
+                width={280}
+                height={55}
+                fill="#FFFFFF"
+                stroke="#0F172A"
+                strokeWidth={1.5}
+                rx={2}
+              />
+              <line x1={0} y1={20} x2={280} y2={20} stroke="#CBD5E1" strokeWidth={1} />
+              <line x1={175} y1={20} x2={175} y2={55} stroke="#CBD5E1" strokeWidth={1} />
+              {/* Title Header */}
+              <text x={10} y={14} fill="#0F172A" className="font-mono text-[10px] font-extrabold tracking-wider">
+                {currentFloor.floor_name ? currentFloor.floor_name.toUpperCase() : "GROUND FLOOR"} BLUEPRINT
+              </text>
+              <text x={270} y={14} textAnchor="end" fill="#DC2626" className="font-mono text-[8px] font-bold tracking-widest">
+                DK-STYLE ARCH
+              </text>
+              {/* Details Left */}
+              <text x={10} y={32} fill="#64748B" className="font-mono text-[8px]">
+                PLOT: <tspan fill="#0F172A" fontWeight="bold">{layout.plot_width}&apos; × {layout.plot_length}&apos;</tspan> ({layout.plot_width * layout.plot_length} SQ FT)
+              </text>
+              <text x={10} y={46} fill="#64748B" className="font-mono text-[8px]">
+                BUILT-UP: <tspan fill="#0F172A" fontWeight="bold">{layout.total_area_sqft || Math.round(displayRooms.reduce((acc, r) => acc + (r.area_sqft || (r.rect ? r.rect.width * r.rect.length : 0)), 0))} SQ FT</tspan>
+              </text>
+              {/* Details Right */}
+              <text x={185} y={32} fill="#64748B" className="font-mono text-[8px]">
+                FACING: <tspan fill="#0F172A" fontWeight="bold">{layout.facing || "EAST"}</tspan>
+              </text>
+              <text x={185} y={46} fill="#2563EB" className="font-mono text-[8px] font-semibold">
+                SCALE: 1/4&quot; = 1&apos;-0&quot;
+              </text>
             </g>
           </svg>
         </div>

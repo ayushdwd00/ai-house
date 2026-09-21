@@ -71,23 +71,51 @@ export interface Site {
   north_direction?: number;
 }
 
+export interface MaterialDefinition {
+  id: string;
+  category: "structural" | "finish" | "site" | "boundary" | "roof" | string;
+  name: string;
+  base_color: string;
+  roughness: number;
+  metalness: number;
+  texture?: string;
+  texture_scale?: number;
+  usage?: string;
+}
+
 export interface FurnitureItem {
   id: string;
   type: string;
+  floor_id?: string;
   room_id?: string;
   x: number;
   y: number;
   width: number;
   length: number;
+  depth?: number;
+  height?: number;
   rotation: number;
+  orientation?: "north" | "south" | "east" | "west";
   clearance_requirements?: Record<string, number>;
+  clearance?: Record<string, number>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Door {
   id: string;
+  door_id?: string;
+  floor_id?: string;
+  wall_id?: string;
   host_wall_id?: string;
+  room_id?: string;
   from_room_id?: string;
+  connected_room_id?: string;
   to_room_id?: string;
+  from_room?: string;
+  to_room?: string;
+  position_along_wall?: number;
+  x?: number;
+  y?: number;
   x1: number;
   y1: number;
   x2: number;
@@ -96,15 +124,28 @@ export interface Door {
   height?: number;
   hinge_side?: "left" | "right";
   swing_direction?: "inward" | "outward" | "sliding" | "double";
-  door_type?: "entry" | "interior" | "bathroom" | "balcony_slider" | "garage";
+  swing_angle?: number;
+  door_type?: "entry" | "interior" | "bathroom" | "balcony_slider" | "garage" | string;
+  type?: string;
   swing?: string;
+  orientation?: "north" | "south" | "east" | "west";
+  outward_direction?: "north" | "south" | "east" | "west" | string;
+  direction_label?: string;
   connects_room_ids?: string[];
+  clearance_zone?: Rect;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WindowItem {
   id: string;
+  window_id?: string;
+  floor_id?: string;
+  wall_id?: string;
   host_wall_id?: string;
   room_id?: string;
+  position_along_wall?: number;
+  x?: number;
+  y?: number;
   x1: number;
   y1: number;
   x2: number;
@@ -112,49 +153,94 @@ export interface WindowItem {
   width: number;
   height?: number;
   sill_height?: number;
-  window_type?: "casement" | "sliding" | "fixed_picture" | "louver_vent";
+  head_height?: number;
+  window_type?: "casement" | "sliding" | "fixed_picture" | "louver_vent" | string;
+  type?: string;
+  orientation?: "north" | "south" | "east" | "west";
+  outward_direction?: "north" | "south" | "east" | "west" | string;
+  direction_label?: string;
+  metadata?: Record<string, unknown>;
 }
+
+export type Window = WindowItem;
 
 export interface Wall {
   id: string;
+  wall_id?: string;
+  floor_id?: string;
   start?: Point2D;
   end?: Point2D;
+  start_x?: number;
+  start_y?: number;
+  end_x?: number;
+  end_y?: number;
   x1: number;
   y1: number;
   x2: number;
   y2: number;
   thickness: number;
   height?: number;
-  wall_type?: "masonry" | "partition" | "curtain_glass" | "boundary_fence";
+  wall_type?: "masonry" | "partition" | "curtain_glass" | "boundary_fence" | "exterior" | "interior" | string;
+  type?: string;
   is_exterior: boolean;
   adjacent_room_ids?: string[];
+  room_ids?: string[];
   connected_room_ids?: string[];
+  wall_direction?: "horizontal" | "vertical" | string;
+  wall_orientation?: "north" | "south" | "east" | "west";
+  openings?: string[];
+  volume_cuft?: number;
+  net_surface_area_sqft?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Stair {
   id: string;
+  stair_id?: string;
+  floor_id?: string;
   floor_from: number;
   floor_to: number;
   rect: Rect;
+  x?: number;
+  y?: number;
   width: number;
+  length?: number;
   riser_inches: number;
   tread_inches: number;
   num_steps: number;
-  stair_type: "dog_legged" | "straight_run" | "l_shaped" | "open_well";
+  risers?: number;
+  treads?: number;
+  stair_type: "dog_legged" | "straight_run" | "l_shaped" | "open_well" | string;
   has_landing: boolean;
   landing_position?: Point2D;
+  direction?: "up" | "down" | "bidirectional" | string;
+  start_floor?: number;
+  end_floor?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Room {
   id: string;
+  room_id?: string;
+  floor_id?: string;
   name: string;
   type: RoomType;
   zone: ZoneType;
   floor?: number;
   rect: Rect;
+  x?: number;
+  y?: number;
+  width?: number;
+  depth?: number;
+  area?: number;
   color: string;
   floor_material: "hardwood_oak" | "tile_marble" | "stone_slate" | "terrazzo" | "wool_carpet" | "wood_deck";
   furniture: FurnitureItem[];
+  furniture_ids?: string[];
+  door_ids?: string[];
+  window_ids?: string[];
+  adjacency?: string[];
+  circulation?: string[];
   parent_room_id?: string;
   attached_room_id?: string;
   min_width?: number;
@@ -162,11 +248,13 @@ export interface Room {
   preferred_width?: number;
   preferred_length?: number;
   area_sqft: number;
+  orientation?: "north" | "south" | "east" | "west";
   privacy_level?: "public" | "semi_private" | "private" | "intimate";
   daylight_requirement?: "high" | "medium" | "low" | "none";
   ventilation_requirement?: "direct_exterior" | "indirect" | "mechanical";
   dimensions_label?: string;
   rationale?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CirculationNetwork {
@@ -412,6 +500,8 @@ export interface HouseLayout {
   plot_length: number;
   num_floors: number;
   site?: Site;
+  facing?: string;
+  total_area_sqft?: number;
   stats: HouseStats;
   floors: FloorPlan[];
   scores?: ArchitecturalScores;
@@ -425,6 +515,7 @@ export interface HouseLayout {
   construction_spec?: Record<string, unknown>;
   quantities?: Record<string, unknown>;
   cost_estimate?: Record<string, unknown>;
+  materials?: MaterialDefinition[];
   rooms: Room[];
   walls?: Wall[];
   exterior_walls: Wall[];

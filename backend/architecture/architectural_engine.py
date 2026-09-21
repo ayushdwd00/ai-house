@@ -653,13 +653,6 @@ def generate_architectural_house_layout(
                     )
 
             if candidate and candidate.is_valid:
-                # Place furniture and validate
-                furn_scores = []
-                for r in candidate.rooms:
-                    f_items, f_score, _ = validate_and_place_furniture(r)
-                    r.furniture = f_items
-                    furn_scores.append(f_score)
-
                 # Deduplicate walls with real thickness from ConstructionSpecification
                 walls, doors, windows = generate_wall_network_and_openings(
                     candidate.rooms,
@@ -667,6 +660,14 @@ def generate_architectural_house_layout(
                     wall_height=active_spec.wall_height_ft,
                     construction_spec=active_spec
                 )
+
+                # Place furniture aligned with walls and clear of doors/windows
+                furn_scores = []
+                for r in candidate.rooms:
+                    f_items, f_score, _ = validate_and_place_furniture(r, doors=doors, windows=windows)
+                    r.furniture = f_items
+                    r.furniture_ids = [f.id for f in f_items]
+                    furn_scores.append(f_score)
 
                 # Compute real architectural scores
                 scores, validation = calculate_architectural_scores(
