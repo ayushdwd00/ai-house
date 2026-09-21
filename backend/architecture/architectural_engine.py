@@ -86,9 +86,7 @@ def build_room_program(
     else:
         target_attached = min(1, bedrooms)
 
-    # -------------------------------------------------------------------------
     # Single-story OR Ground floor of multi-story
-    # -------------------------------------------------------------------------
     if floor_num == 1:
         # 1. Entry Foyer
         rooms.append(Room(
@@ -351,9 +349,7 @@ def build_room_program(
                 rationale="Guest half-bath located near the entry foyer."
             ))
 
-    # -------------------------------------------------------------------------
     # Level 2 / Upper floor of multi-story
-    # -------------------------------------------------------------------------
     elif floor_num == 2:
         # Staircase landing
         rooms.append(Room(
@@ -838,9 +834,7 @@ def generate_architectural_house_layout(
         floors_list.append(floor_plan)
         all_rooms_combined.extend(champion_rooms)
 
-    # -------------------------------------------------------------------------
     # Synthesize Complete Canonical HouseLayout
-    # -------------------------------------------------------------------------
     ground_floor = floors_list[0]
     total_home_area = round(sum(r.rect.area for r in all_rooms_combined if r.rect), 1)
     living_home_area = round(sum(r.rect.area for r in all_rooms_combined if r.rect and r.type not in ["patio", "parking"]), 1)

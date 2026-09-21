@@ -90,9 +90,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   const currentWallHeight = wallHeightMode === "cutaway" ? cutawayHeight : fullWallHeight;
   const floorElevation = 10.5;
 
-  // ---------------------------------------------------------------------------
   // PBR Texture Generators
-  // ---------------------------------------------------------------------------
   const createWoodTexture = (isDark: boolean) => {
     const canvas = document.createElement("canvas");
     canvas.width = 512;
@@ -149,9 +147,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     return tex;
   };
 
-  // ---------------------------------------------------------------------------
   // Build Architectural Geometry
-  // ---------------------------------------------------------------------------
   const rebuildScene = useCallback(() => {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -563,9 +559,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     landscapeCategory,
   ]);
 
-  // ---------------------------------------------------------------------------
   // Scene Mount & Animation Loop
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
@@ -954,9 +948,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   );
 };
 
-// =============================================================================
 // Procedural Detailed Architectural Furniture Library
-// =============================================================================
 function buildArchitecturalFurniture(
   item: FurnitureItem,
   isDark: boolean,
@@ -1219,9 +1211,7 @@ function buildArchitecturalFurniture(
   return group;
 }
 
-// ---------------------------------------------------------------------------
 // Procedural Architectural 3D Landscaping Engine & Reusable Builders
-// ---------------------------------------------------------------------------
 
 function createLawn(lawn: LandscapeElement, lawnMat: THREE.Material): THREE.Mesh {
   const lw = Math.max(2.0, lawn.width || 8.0);

@@ -98,9 +98,7 @@ def plan_preliminary_structure(
         if p_rooms:
             parking_rect = p_rooms[0].rect
 
-    # =========================================================================
     # 1. Structural Analysis: Identify Candidates
-    # =========================================================================
     raw_candidates: List[Tuple[float, float, str, int]] = []
 
     # A. Room corners (perimeter corners & internal corners)
@@ -168,9 +166,7 @@ def plan_preliminary_structure(
         for px, py in p_corners:
             raw_candidates.append((px, py, "parking_boundary", 4))
 
-    # =========================================================================
     # 2. Structural Grid Analysis & Orthogonal Alignment
-    # =========================================================================
     all_x = sorted(list(set(c[0] for c in raw_candidates)))
     all_y = sorted(list(set(c[1] for c in raw_candidates)))
 
@@ -197,9 +193,7 @@ def plan_preliminary_structure(
         final_y = nearest_gy if abs(nearest_gy - cy) <= snap_dist else cy
         snapped_candidates.append((round(final_x, 1), round(final_y, 1), c_type, prio))
 
-    # =========================================================================
     # 3. Deterministic Filtering & Usability Constraints
-    # =========================================================================
     snapped_candidates.sort(key=lambda item: (-item[3], item[1], item[0]))
 
     filtered_points: List[Tuple[float, float, str]] = []
@@ -213,9 +207,7 @@ def plan_preliminary_structure(
         if not too_close:
             filtered_points.append((cx, cy, ctype))
 
-    # =========================================================================
     # 4. Conflict Avoidance: Door, Staircase, Parking, Room Usability
-    # =========================================================================
     final_columns: List[Tuple[float, float, str]] = []
 
     for cx, cy, ctype in filtered_points:
@@ -269,9 +261,7 @@ def plan_preliminary_structure(
 
         final_columns.append((cx, cy, ctype))
 
-    # =========================================================================
     # 5. Deterministic Column Sorting & ID Assignment
-    # =========================================================================
     final_columns.sort(key=lambda pt: (round(pt[1], 1), round(pt[0], 1)))
 
     col_w = 0.75
@@ -316,9 +306,7 @@ def plan_preliminary_structure(
             "floors": serving_floors
         })
 
-    # =========================================================================
     # 6. Preliminary Beam Layout Generation
-    # =========================================================================
     structural_beams: List[StructuralBeam] = []
     beam_pairs_seen: Set[Tuple[str, str]] = set()
     MAX_BEAM_SPAN = 22.0
@@ -410,9 +398,7 @@ def plan_preliminary_structure(
                             floors=serving_floors
                         ))
 
-    # =========================================================================
     # 7. Structural Validation Report
-    # =========================================================================
     unsupported_spans: List[Dict[str, Any]] = []
     unusually_large_spans: List[Dict[str, Any]] = []
     door_conflicts: List[str] = []

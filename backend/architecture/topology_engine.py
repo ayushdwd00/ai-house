@@ -37,9 +37,7 @@ def generate_architectural_schemes(
     road = site.road_side  # "north", "south", "east", "west"
     schemes: List[ArchitecturalScheme] = []
 
-    # -------------------------------------------------------------------------
     # 1. Translate Groq AI Architectural Concept Strategies if provided
-    # -------------------------------------------------------------------------
     if ai_concepts:
         for idx, concept in enumerate(ai_concepts):
             strategy_id = getattr(concept, "strategy_id", f"scheme_concept_{idx+1}")
@@ -85,9 +83,7 @@ def generate_architectural_schemes(
 
             schemes.append(s)
 
-    # -------------------------------------------------------------------------
     # 2. Add Deterministic Architectural Schemes (ensures >= 3 robust candidates)
-    # -------------------------------------------------------------------------
     # Scheme 1: Central Circulation Spine (Balanced Modern Villa)
     s1 = ArchitecturalScheme(
         scheme_id="scheme_central_circulation",

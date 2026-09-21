@@ -256,9 +256,7 @@ def analyze_layout_endpoint(layout: HouseLayout):
     )
     return scores
 
-# -----------------------------------------------------------------------------
 # Construction Intelligence & Specification API
-# -----------------------------------------------------------------------------
 @app.post("/api/construction/recommend", response_model=ConstructionSpecification)
 def recommend_construction_endpoint(req: Dict[str, Any]):
     """Returns AI recommended construction specifications and trade-offs."""
@@ -307,9 +305,7 @@ def update_construction_endpoint(req: Dict[str, Any]):
     save_project(layout, layout.id)
     return layout
 
-# -----------------------------------------------------------------------------
 # Material Quantities & Cost Estimation API
-# -----------------------------------------------------------------------------
 @app.post("/api/estimate/quantities", response_model=MaterialQuantities)
 def estimate_quantities_endpoint(layout: HouseLayout):
     """Computes physical quantities takeoff directly from HouseLayout geometry."""
@@ -331,9 +327,7 @@ def estimate_advisor_endpoint(layout: HouseLayout):
     cost = layout.cost_estimate or estimate_construction_cost(layout, qty)
     return generate_construction_advice_with_groq(layout, qty, cost)
 
-# -----------------------------------------------------------------------------
 # Vector Floor Plan Reconstruction & Calibration API
-# -----------------------------------------------------------------------------
 @app.post("/api/floorplan/upload")
 @app.post("/api/floorplan/reconstruct")
 async def floorplan_reconstruct_endpoint(
@@ -401,9 +395,7 @@ async def legacy_upload_floorplan_endpoint(
         "layout": layout
     }
 
-# -----------------------------------------------------------------------------
 # Project Persistence & Version History API
-# -----------------------------------------------------------------------------
 @app.get("/api/projects/{project_id}", response_model=HouseLayout)
 def get_project_endpoint(project_id: str):
     proj = get_project(project_id)

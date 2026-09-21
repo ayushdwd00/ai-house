@@ -117,9 +117,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
     return Math.max(...beams.map((b) => b.span_ft));
   }, [beams]);
 
-  // ---------------------------------------------------------------------------
   // 2D Pan & Zoom Handlers
-  // ---------------------------------------------------------------------------
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const container = containerRef.current;
@@ -166,9 +164,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
     setPan({ x: 0, y: 0 });
   };
 
-  // ---------------------------------------------------------------------------
   // Export 2D Technical Drawing (PNG)
-  // ---------------------------------------------------------------------------
   const handleExportDrawing = () => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
@@ -203,9 +199,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
     img.src = url;
   };
 
-  // ---------------------------------------------------------------------------
   // 3D Simplified Technical Visualization (Rule 14)
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (viewMode !== "3d") return;
     const container = mountRef.current;
@@ -420,9 +414,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
 
   return (
     <div className="relative w-full h-full flex flex-col md:flex-row overflow-hidden bg-[#F8FAFC] text-[#0F172A] select-none">
-      {/* ------------------------------------------------------------------- */}
       {/* 1. TOP DRAFTING CONTROLS TOOLBAR */}
-      {/* ------------------------------------------------------------------- */}
       <div className="absolute top-4 left-4 right-4 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         {/* Left: View Mode Toggle & Floor Selector */}
         <div className="pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg shadow-slate-900/5 text-xs font-mono">
@@ -568,9 +560,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------- */}
       {/* 2. MAIN CANVAS VIEWPORT (2D DRAFTING OR 3D STRUCTURE) */}
-      {/* ------------------------------------------------------------------- */}
       <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
@@ -650,9 +640,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
               />
             )}
 
-            {/* ------------------------------------------------------------- */}
             {/* ARCHITECTURAL CONTEXT (ROOMS, WALLS, DOORS, STAIRS, PARKING) */}
-            {/* ------------------------------------------------------------- */}
             {showArchitecture && (
               <g id="architectural-context-layer">
                 {/* 1. Parking Envelope */}
@@ -818,9 +806,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
               </g>
             )}
 
-            {/* ------------------------------------------------------------- */}
             {/* STRUCTURAL GRID (THIN / SUBTLE RED DASHED ORTHOGONAL LINES) */}
-            {/* ------------------------------------------------------------- */}
             {showGrid && grid && (
               <g id="structural-grid-layer" pointerEvents="none" opacity={0.75}>
                 {/* Vertical Grid Lines (Letters A, B, C...) */}
@@ -875,9 +861,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
               </g>
             )}
 
-            {/* ------------------------------------------------------------- */}
             {/* PRELIMINARY BEAMS (CLEAR STRUCTURAL LINE DISTINCT FROM WALLS) */}
-            {/* ------------------------------------------------------------- */}
             {showStructure && showBeams && (
               <g id="preliminary-beams-layer">
                 {beams.map((beam) => {
@@ -935,9 +919,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
               </g>
             )}
 
-            {/* ------------------------------------------------------------- */}
             {/* COLUMNS / PILLARS (DISTINCT ARCHITECTURAL SYMBOLS & IDS) */}
-            {/* ------------------------------------------------------------- */}
             {showStructure && showColumns && (
               <g id="structural-columns-layer">
                 {columns.map((col) => {
@@ -1025,9 +1007,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
               </g>
             )}
 
-            {/* ------------------------------------------------------------- */}
             {/* DIMENSIONS (DARK GRAY ARCHITECTURAL DIMENSION LINES) */}
-            {/* ------------------------------------------------------------- */}
             {showDimensions && (
               <g id="structural-dimensions-layer" pointerEvents="none">
                 {/* Horizontal Top Overall Dimension */}
@@ -1090,9 +1070,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------- */}
       {/* 3. STRUCTURE INFORMATION & COLUMN INSPECTION PANEL (Rules 10, 11, 19) */}
-      {/* ------------------------------------------------------------------- */}
       <aside className="w-full md:w-80 lg:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto max-h-[45vh] md:max-h-full shadow-lg z-20">
         <div className="space-y-4">
           {/* Panel Header */}
@@ -1242,9 +1220,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
           </div>
         </div>
 
-        {/* ----------------------------------------------------------------- */}
         {/* STRUCTURAL DISCLAIMER (Rule 19) */}
-        {/* ----------------------------------------------------------------- */}
         <div className="mt-4 pt-3 border-t border-slate-100">
           <p className="text-[9px] font-mono text-slate-400 leading-relaxed">
             Preliminary structural planning only. Final column sizes, beam sizes, reinforcement, foundations and

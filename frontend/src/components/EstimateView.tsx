@@ -596,9 +596,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
   return (
     <div className="w-full h-full overflow-y-auto bg-[#0A0B0E] p-4 sm:p-8 lg:p-12 text-[#F5F3EF]">
       <div className="max-w-6xl mx-auto space-y-8">
-        {/* ================================================================= */}
         {/* 1. HEADER & INTERACTIVE SPECIFICATION SELECTORS */}
-        {/* ================================================================= */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/10">
           <div>
             <div className="flex items-center gap-2 mb-2 text-[#C48446] text-xs font-mono tracking-widest uppercase font-semibold">
@@ -664,9 +662,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
           </div>
         </div>
 
-        {/* ================================================================= */}
         {/* 2. COST SUMMARY: LOW / EXPECTED / HIGH RANGES & KEY METRICS */}
-        {/* ================================================================= */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* Low Estimate */}
           <div className="p-5 sm:p-6 rounded-3xl bg-[#12141A]/90 border border-white/5 space-y-2">
@@ -747,9 +743,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
           </div>
         </div>
 
-        {/* ================================================================= */}
         {/* 3. AI CONSTRUCTION & VALUE-ENGINEERING ADVISOR */}
-        {/* ================================================================= */}
         <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#151922] to-[#12141A] border border-blue-500/20 shadow-2xl space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -821,9 +815,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
           )}
         </div>
 
-        {/* ================================================================= */}
         {/* 4. PRELIMINARY STRUCTURAL COLUMN & FRAME SCHEDULE */}
-        {/* ================================================================= */}
         <div className="p-6 sm:p-8 rounded-3xl bg-[#12141A] border border-[#C48446]/30 shadow-2xl space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -884,9 +876,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
           </div>
         </div>
 
-        {/* ================================================================= */}
         {/* 5. ITEMIZED CONSTRUCTION CATEGORIES (A to G) */}
-        {/* ================================================================= */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-serif text-[#F5F3EF]">
@@ -990,9 +980,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
           })}
         </div>
 
-        {/* ================================================================= */}
         {/* 6. GENERAL ESTIMATION DISCLAIMER */}
-        {/* ================================================================= */}
         <div className="p-4 sm:p-6 rounded-2xl bg-[#12141A]/60 border border-white/5 text-xs text-[#8A8883] font-light leading-relaxed space-y-2">
           <div className="flex items-center gap-2 text-[#C48446] font-mono text-[10px] uppercase font-semibold">
             <Info className="w-3.5 h-3.5" />

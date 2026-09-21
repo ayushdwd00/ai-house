@@ -53,9 +53,7 @@ def get_groq_client():
 
 from models import ArchitecturalRequirements, DreamHomeStructuredRequirements, LandscapePreferences
 
-# =============================================================================
 # 1. Pydantic Structured Output Models
-# =============================================================================
 
 
 
@@ -99,9 +97,7 @@ class NaturalLanguageModificationCommand(BaseModel):
     architectural_rationale: str = Field(default="", description="Architectural justification for this edit")
 
 
-# =============================================================================
 # 2. Structured Requirement Interpretation
-# =============================================================================
 
 def interpret_requirements_with_groq(prompt: str) -> ArchitecturalRequirements:
     """
@@ -345,7 +341,7 @@ def interpret_dream_home_prompt(
     elif any(k in lower for k in ["g+2", "g + 2", "3-story", "3 story", "three story"]):
         floors = 3
 
-    # Future first floor / staircase logic
+    # Staircase evaluation logic
     has_future_floor = any(k in lower for k in ["future first floor", "future 1st floor", "future floor", "future expansion", "future level"])
     staircase_needed = has_future_floor or floors > 1 or any(k in lower for k in ["staircase", "stairs", "stair"])
 
@@ -517,9 +513,7 @@ def interpret_dream_home_prompt(
     )
 
 
-# =============================================================================
 # 3. Architectural Concept Generation (2-3 Meaningful Layout Strategies)
-# =============================================================================
 
 # In-memory caches for deterministic repeatability and rate-limit mitigation
 _CONCEPTS_CACHE: Dict[str, ArchitecturalConceptsResult] = {}
@@ -649,9 +643,7 @@ def generate_architectural_concepts_with_groq(req: ArchitecturalRequirements) ->
     return res
 
 
-# =============================================================================
 # 4. Architectural Design Critique of Mathematically Solved Layouts
-# =============================================================================
 
 def _safe_str(val: Any) -> str:
     try:
@@ -754,9 +746,7 @@ def critique_architectural_candidates_with_groq(
     return res
 
 
-# =============================================================================
 # 5. Natural-Language Modification Commands
-# =============================================================================
 
 def interpret_modification_with_groq(
     instruction: str,
@@ -915,9 +905,7 @@ def analyze_floorplan_image(image_base64: str) -> Dict[str, Any]:
     }
 
 
-# =============================================================================
 # 7. AI Construction & Value-Engineering Advisor
-# =============================================================================
 def generate_construction_advice_with_groq(
     layout: Any,
     quantities: Any,

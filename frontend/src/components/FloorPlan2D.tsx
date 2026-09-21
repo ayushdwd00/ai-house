@@ -231,9 +231,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
     setHasChanges(true);
   };
 
-  // ---------------------------------------------------------------------------
   // Export 2D Map as Image (High Resolution PNG)
-  // ---------------------------------------------------------------------------
   const handleExportPNG = () => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
@@ -445,9 +443,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
 
   return (
     <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#ECEEF2]">
-      {/* --------------------------------------------------------------------- */}
       {/* 1. TOP FLOATING ACTION BAR: VIEW CONTROLS, EDIT MODE & EXPORT */}
-      {/* --------------------------------------------------------------------- */}
       <div className="absolute top-16 sm:top-20 left-3 sm:left-6 z-30 flex flex-wrap items-center gap-1.5 sm:gap-2.5 max-w-[calc(100vw-24px)] pointer-events-auto">
         {/* Navigation Tools */}
         <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
@@ -582,9 +578,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
         </div>
       )}
 
-      {/* --------------------------------------------------------------------- */}
       {/* 2. EDITING BANNER (Appears when isEditMode is active) */}
-      {/* --------------------------------------------------------------------- */}
       {isEditMode && (
         <div className="absolute top-36 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 px-5 py-2.5 rounded-2xl bg-[#12141A]/95 border border-[#C48446]/40 backdrop-blur-xl shadow-2xl text-xs font-mono">
           <div className="flex items-center gap-2 text-[#C48446]">
@@ -663,9 +657,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
         </div>
       )}
 
-      {/* --------------------------------------------------------------------- */}
       {/* 3. MAIN DRAFTING SVG CANVAS */}
-      {/* --------------------------------------------------------------------- */}
       <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
@@ -736,9 +728,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
               {(layout.plot_width * layout.plot_length).toLocaleString()} SQ FT)
             </text>
 
-            {/* ============================================================= */}
             {/* 2D ARCHITECTURAL LANDSCAPE BACKGROUND (LAWNS, DRIVEWAY, PATH) */}
-            {/* ============================================================= */}
             {showLandscape && activeLandscape && (
               <g id="landscape-background-layer">
                 {/* 1. Lawns & Turf Surfaces */}
@@ -1054,9 +1044,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
               );
             })}
 
-            {/* ============================================================= */}
             {/* STRUCTURAL COLUMN PLANNING OVERLAY (TOGGLEABLE) */}
-            {/* ============================================================= */}
             {showStructure && (
               <g id="structural-overlay">
                 {/* Structural Column Grid Lines */}
@@ -1197,9 +1185,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
               </g>
             )}
 
-            {/* ============================================================= */}
             {/* 2D ARCHITECTURAL LANDSCAPE FOREGROUND (TREES, LIGHTS, WATER) */}
-            {/* ============================================================= */}
             {showLandscape && activeLandscape && (
               <g id="landscape-foreground-layer">
                 {(activeLandscape.elements || [])
@@ -1340,9 +1326,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
         </div>
       </div>
 
-      {/* ===================================================================== */}
       {/* 4. INTERACTIVE COLUMN INFORMATION CARD (WHEN SELECTED) */}
-      {/* ===================================================================== */}
       {showStructure && selectedColumnId && (() => {
         const col = (layout.structural_planning?.columns || []).find((c) => c.column_id === selectedColumnId);
         if (!col) return null;

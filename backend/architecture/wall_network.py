@@ -108,7 +108,7 @@ def generate_wall_network_and_openings(
             w_id = f"wall_{wall_counter:03d}"
             wall_counter += 1
 
-            # Gross surface area and volume placeholder (refined after openings)
+            # Initial gross surface area and volume
             w_len = round(p2 - p1, 2)
             gross_area = round(w_len * active_wall_height, 2)
 
@@ -133,9 +133,7 @@ def generate_wall_network_and_openings(
     for x_coord, segs in v_lines.items():
         resolve_segments_on_line(x_coord, segs, is_horizontal=False)
 
-    # -------------------------------------------------------------------------
     # Generate Doors
-    # -------------------------------------------------------------------------
     # 1. Main Entrance Door on exterior wall of foyer or living room
     entry_candidates = [r for r in rooms if r.type in ["entry_foyer", "living_room"] and r.rect]
     entry_room = entry_candidates[0] if entry_candidates else (rooms[0] if rooms else None)
@@ -231,9 +229,7 @@ def generate_wall_network_and_openings(
                 doors.append(d_int)
                 host.openings.append(d_id)
 
-    # -------------------------------------------------------------------------
     # Generate Windows
-    # -------------------------------------------------------------------------
     env = getattr(site, "buildable_envelope", None)
 
     for r in rooms:
@@ -308,9 +304,7 @@ def generate_wall_network_and_openings(
             ext_w.openings.append(win_id)
             break
 
-    # -------------------------------------------------------------------------
     # Recalculate Net Wall Surface Area & Volume deducting openings
-    # -------------------------------------------------------------------------
     door_area_by_wall: Dict[str, float] = {}
     for d in doors:
         if d.host_wall_id:

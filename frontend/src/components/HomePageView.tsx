@@ -51,9 +51,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 }) => {
   return (
     <div className="w-full min-h-screen bg-[#0A0B0E] text-[#F5F3EF] overflow-x-hidden selection:bg-[#C48446]/30">
-      {/* --------------------------------------------------------------------- */}
       {/* 1. CINEMATIC HERO SECTION */}
-      {/* --------------------------------------------------------------------- */}
       <section className="relative w-full h-screen flex flex-col justify-between overflow-hidden">
         {/* Full-Screen 3D Modern House Canvas */}
         <div className="absolute inset-0 z-0">
@@ -143,9 +141,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </div>
       </section>
 
-      {/* --------------------------------------------------------------------- */}
       {/* 2. STORY SECTION: FROM IDEA TO ARCHITECTURE */}
-      {/* --------------------------------------------------------------------- */}
       <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0A0B0E]">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -189,9 +185,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </div>
       </section>
 
-      {/* --------------------------------------------------------------------- */}
       {/* 3. STORY SECTION: DESIGN EVERY DETAIL */}
-      {/* --------------------------------------------------------------------- */}
       <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0E1015]">
         <div className="max-w-6xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-20">
@@ -234,9 +228,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </div>
       </section>
 
-      {/* --------------------------------------------------------------------- */}
       {/* 4. STORY SECTION: AI-POWERED ARCHITECTURAL PLANNING */}
-      {/* --------------------------------------------------------------------- */}
       <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0A0B0E]">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#12141A] order-2 lg:order-1">
@@ -282,9 +274,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </div>
       </section>
 
-      {/* --------------------------------------------------------------------- */}
       {/* 5. STORY SECTION: EXPLORE YOUR HOME IN 3D */}
-      {/* --------------------------------------------------------------------- */}
       <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0E1015]">
         <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
           <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-3">
@@ -319,9 +309,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </div>
       </section>
 
-      {/* --------------------------------------------------------------------- */}
       {/* 6. STORY SECTION: CURATED ARCHITECTURAL TYPOLOGIES */}
-      {/* --------------------------------------------------------------------- */}
       <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0A0B0E]">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-16 gap-4">
@@ -421,9 +409,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </div>
       </section>
 
-      {/* --------------------------------------------------------------------- */}
       {/* 7. FINAL CALL-TO-ACTION */}
-      {/* --------------------------------------------------------------------- */}
       <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-gradient-to-b from-[#0A0B0E] to-[#12141A] text-center">
         <div className="max-w-3xl mx-auto flex flex-col items-center">
           <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-4">

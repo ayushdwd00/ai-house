@@ -21,9 +21,7 @@ def validate_and_place_furniture(room: Room) -> Tuple[List[FurnitureItem], float
     items: List[FurnitureItem] = []
     warnings: List[str] = []
     
-    # -------------------------------------------------------------------------
     # 1. Master Bedroom Program (King Bed, 2 Side Tables, Wardrobe)
-    # -------------------------------------------------------------------------
     if room.type == "master_bedroom":
         bed_w, bed_l = 6.5, 6.5
         if rw < 10.0 or rl < 11.0:
@@ -68,9 +66,7 @@ def validate_and_place_furniture(room: Room) -> Tuple[List[FurnitureItem], float
             clearance_requirements={"front": 3.0}
         ))
 
-    # -------------------------------------------------------------------------
     # 2. Standard Bedroom Program (Queen Bed, 1 Side Table, Wardrobe)
-    # -------------------------------------------------------------------------
     elif room.type in ["bedroom", "guest_bedroom"]:
         bed_w, bed_l = 5.0, 6.5
         bed_x = rx + 1.5
@@ -99,9 +95,7 @@ def validate_and_place_furniture(room: Room) -> Tuple[List[FurnitureItem], float
             clearance_requirements={"front": 2.5}
         ))
 
-    # -------------------------------------------------------------------------
     # 3. Living Room Program (3-Seater Sofa, Coffee Table, Armchairs, TV Unit)
-    # -------------------------------------------------------------------------
     elif room.type in ["living_room", "family_lounge"]:
         sofa_w, sofa_l = 7.0, 3.0
         sofa_x = rx + (rw - sofa_w) / 2.0
@@ -132,9 +126,7 @@ def validate_and_place_furniture(room: Room) -> Tuple[List[FurnitureItem], float
             dimensions=Point2D(x=round(tv_w, 2), y=1.5)
         ))
 
-    # -------------------------------------------------------------------------
     # 4. Dining Room Program (Dining Table, 6 Chairs, Buffet Counter)
-    # -------------------------------------------------------------------------
     elif room.type == "dining":
         dt_w, dt_l = 5.5, 3.2
         dt_x = rx + (rw - dt_w) / 2.0
@@ -148,9 +140,7 @@ def validate_and_place_furniture(room: Room) -> Tuple[List[FurnitureItem], float
             clearance_requirements={"all_around": 3.0}
         ))
 
-    # -------------------------------------------------------------------------
     # 5. Kitchen Program (Countertop, Hob, Sink, Refrigerator)
-    # -------------------------------------------------------------------------
     elif room.type == "kitchen":
         # Continuous counter along top wall
         counter_len = max(6.0, rw - 1.0)
@@ -187,9 +177,7 @@ def validate_and_place_furniture(room: Room) -> Tuple[List[FurnitureItem], float
             clearance_requirements={"front": 3.0}
         ))
 
-    # -------------------------------------------------------------------------
     # 6. Bathroom Program (WC, Vanity Basin, Shower Enclosure)
-    # -------------------------------------------------------------------------
     elif room.type in ["bathroom", "powder_room"]:
         # Vanity Basin
         items.append(FurnitureItem(
