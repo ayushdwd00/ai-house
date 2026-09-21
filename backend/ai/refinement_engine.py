@@ -94,6 +94,77 @@ def refine_current_house_layout(
     inst_lower = instruction.lower()
     active_spec = current_layout.construction_spec or ConstructionSpecification()
 
+    # 0. Check for Landscape Refinement Commands (e.g., "Add garden", "Remove tree", "Add outdoor lights")
+    landscape_triggers = [
+        "garden", "landscape", "tree", "trees", "greenery", "pathway",
+        "outdoor light", "outdoor lights", "lighting", "plants", "shrub", "hedge", "water feature"
+    ]
+    room_triggers = [
+        "bedroom", "bathroom", "kitchen", "living", "dining", "pooja", "office", "staircase",
+        "foyer", "balcony", "patio", "dressing", "powder"
+    ]
+    is_landscape_cmd = any(t in inst_lower for t in landscape_triggers)
+    if is_landscape_cmd and not any(f"make {r}" in inst_lower or f"enlarge {r}" in inst_lower or f"shrink {r}" in inst_lower for r in room_triggers):
+        try:
+            from landscape.landscape_engine import refine_landscape_layout
+            refined_layout, diff = refine_landscape_layout(current_layout, instruction)
+            diff["architectural_rationale"] = f"Landscape refined according to: '{instruction}'. Structural building geometry preserved."
+            return refined_layout, diff
+        except Exception as e:
+            print(f"[LANDSCAPE REFINE WARNING] Could not refine landscape directly: {e}")
+
+    # 0B. Check for Structural Refinement Commands
+    # e.g., "Keep the parking area column-free", "Move this column away from the entrance",
+    # "Align columns between floors", "Create a more regular structural grid", "Reduce unnecessary columns"
+    structural_triggers = [
+        "column", "columns", "pillar", "pillars", "structural grid", "beam", "beams",
+        "column-free", "column free", "parking column"
+    ]
+    is_structural_cmd = any(st in inst_lower for st in structural_triggers)
+    if is_structural_cmd and not any(f"make {r}" in inst_lower or f"enlarge {r}" in inst_lower or f"shrink {r}" in inst_lower for r in room_triggers):
+        structural_constraints: Dict[str, Any] = {}
+        if "parking" in inst_lower and any(kw in inst_lower for kw in ["free", "clear", "away", "no", "without", "keep"]):
+            structural_constraints["clear_parking"] = True
+            strat_rationale = "Structural re-optimization: cleared parking envelope to ensure zero vehicular column obstruction."
+        elif "entrance" in inst_lower or "door" in inst_lower or "entry" in inst_lower:
+            structural_constraints["door_clearance_bonus"] = 1.2
+            strat_rationale = "Structural re-optimization: increased door and entrance clearance buffers to prevent pillar conflicts."
+        elif any(kw in inst_lower for kw in ["reduce", "fewer", "unnecessary", "prune", "less"]):
+            structural_constraints["min_column_spacing"] = 5.5
+            strat_rationale = "Structural re-optimization: consolidated column density with increased minimum span spacing."
+        elif any(kw in inst_lower for kw in ["regular", "grid", "orthogonal"]):
+            structural_constraints["regular_grid_snap"] = True
+            strat_rationale = "Structural re-optimization: aligned preliminary columns to an orthogonal modular structural grid."
+        elif "align" in inst_lower:
+            structural_constraints["regular_grid_snap"] = True
+            structural_constraints["min_column_spacing"] = 4.2
+            strat_rationale = "Structural re-optimization: synchronized column placement for continuous vertical stacking between floors."
+        else:
+            structural_constraints = {}
+            strat_rationale = f"Structural planning re-evaluated: '{instruction}'."
+
+        new_layout = current_layout.model_copy(deep=True)
+        new_layout.structural_planning = plan_preliminary_structure(
+            new_layout.floors, active_spec, site=new_layout.site,
+            plot_width=new_layout.plot_width, plot_length=new_layout.plot_length, layout=new_layout,
+            structural_constraints=structural_constraints
+        )
+        new_layout.structural_system = new_layout.structural_planning.structural_system
+        new_layout.quantities = calculate_material_quantities(new_layout, active_spec)
+        new_layout.cost_estimate = estimate_construction_cost(new_layout, new_layout.quantities)
+        new_layout.version_number = (current_layout.version_number or 1) + 1
+        new_layout.designer_rationale = strat_rationale
+
+        diff = {
+            "modified_element": "Structural Planning",
+            "instruction": instruction,
+            "column_count": new_layout.structural_planning.column_count,
+            "beam_count": new_layout.structural_planning.beam_count,
+            "architectural_rationale": strat_rationale,
+            "version": new_layout.version_number
+        }
+        return new_layout, diff
+
     # 1. Check for Construction Specification Updates (e.g., "make external walls 9 inches")
     if "wall" in inst_lower and ("thick" in inst_lower or "inch" in inst_lower or "9" in inst_lower or "4.5" in inst_lower):
         new_layout = current_layout.model_copy(deep=True)
@@ -374,7 +445,11 @@ def refine_current_house_layout(
     new_layout.quantities = calculate_material_quantities(new_layout, active_spec)
     new_layout.cost_estimate = estimate_construction_cost(new_layout, new_layout.quantities)
     new_layout.building_services = plan_building_services(new_layout.floors, new_layout.plot_width, new_layout.plot_length)
-    new_layout.structural_planning = plan_preliminary_structure(new_layout.floors, active_spec)
+    new_layout.structural_planning = plan_preliminary_structure(
+        new_layout.floors, active_spec, site=new_layout.site,
+        plot_width=new_layout.plot_width, plot_length=new_layout.plot_length, layout=new_layout
+    )
+    new_layout.structural_system = new_layout.structural_planning.structural_system
     new_layout.version_number = (current_layout.version_number or 1) + 1
 
     diff_summary = {

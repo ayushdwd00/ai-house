@@ -14,7 +14,8 @@ from typing import Optional, List, Dict, Any
 from models import (
     HouseLayout, IntakeRequest, RefineRequest, EditRoomRequest, EditRoomResponse,
     Rect, ArchitecturalValidation, ArchitecturalScores, ConstructionSpecification,
-    MaterialQuantities, CostEstimate, ReconstructionVerificationState, Point2D
+    MaterialQuantities, CostEstimate, ReconstructionVerificationState, Point2D,
+    DreamHomeStructuredRequirements, LandscapePreferences
 )
 from architecture.architectural_engine import generate_architectural_house_layout
 from ai.refinement_engine import refine_current_house_layout
@@ -31,7 +32,9 @@ from shapely.geometry import box
 from infrastructure.storage import save_project, get_project, list_project_versions, restore_project_version, undo_project_version
 from ai.groq_service import (
     parse_intake_with_groq_or_fallback,
-    analyze_floorplan_image
+    interpret_dream_home_prompt,
+    analyze_floorplan_image,
+    generate_construction_advice_with_groq
 )
 
 app = FastAPI(title="AI House Design Generator Professional Architectural Backend", version="2.5.0")
@@ -126,7 +129,8 @@ def generate_layout_endpoint(req: IntakeRequest):
         special_rooms=special_rooms,
         open_concept=open_concept,
         vastu_compliant=req.vastu_compliant or False,
-        user_prompt=req.user_prompt or ""
+        user_prompt=req.user_prompt or "",
+        landscape_preferences=req.landscape_preferences
     )
 
     t_total_ms = round((time.time() - t0) * 1000, 1)
@@ -152,6 +156,12 @@ def intake_flow_endpoint(req: IntakeRequest):
     """Processes natural language free-form intake dialogue."""
     prompt = req.user_prompt or "3 bedroom 2 bath modern home around 1600 sq ft"
     parsed = parse_intake_with_groq_or_fallback(prompt)
+    ls_prefs = req.landscape_preferences
+    if not ls_prefs and parsed.get("landscape_preferences"):
+        try:
+            ls_prefs = LandscapePreferences(**parsed["landscape_preferences"])
+        except Exception:
+            pass
     layout = generate_architectural_house_layout(
         plot_width=parsed.get("plot_width", 42.0),
         plot_length=parsed.get("plot_length", 36.0),
@@ -161,7 +171,8 @@ def intake_flow_endpoint(req: IntakeRequest):
         style=parsed.get("style", "Modern Scandinavian"),
         special_rooms=parsed.get("special_rooms", []),
         open_concept=parsed.get("open_concept", True),
-        user_prompt=prompt
+        user_prompt=prompt,
+        landscape_preferences=ls_prefs
     )
     try:
         save_project(layout, layout.id)
@@ -171,6 +182,34 @@ def intake_flow_endpoint(req: IntakeRequest):
         "parsed_requirements": parsed,
         "layout": layout
     }
+
+@app.post("/api/dream-home/interpret")
+def dream_home_interpret_endpoint(req: Dict[str, Any]):
+    """
+    Parses natural language 'Describe Your Dream Home' prompt into structured requirements.
+    Detects if plot dimensions are missing and returns clarification prompt if needed.
+    """
+    prompt = req.get("prompt", "")
+    context = req.get("context")
+    structured = interpret_dream_home_prompt(prompt, existing_context=context)
+    ready = len(structured.missing_critical_fields) == 0
+    return {
+        "brief": structured.model_dump(),
+        "ready_to_generate": ready,
+        "missing_critical_fields": structured.missing_critical_fields,
+        "clarification_prompt": structured.clarification_prompt
+    }
+
+@app.post("/api/dream-home/generate", response_model=HouseLayout)
+def dream_home_generate_endpoint(brief: DreamHomeStructuredRequirements):
+    """
+    Generates a full HouseLayout from confirmed DreamHomeStructuredRequirements.
+    Executes: Zoning -> Spatial CP-SAT -> Structural Column Planner -> Quantities & Cost.
+    """
+    intake = brief.to_intake_request()
+    layout = generate_layout_endpoint(intake)
+    return layout
+
 
 @app.post("/api/refine", response_model=HouseLayout)
 def refine_layout_endpoint(req: RefineRequest):
@@ -281,6 +320,16 @@ def estimate_cost_endpoint(layout: HouseLayout):
     """Computes Low, Expected, and High itemized construction cost estimate."""
     qty = layout.quantities or calculate_material_quantities(layout, layout.construction_spec)
     return estimate_construction_cost(layout, qty)
+
+@app.post("/api/estimate/advisor")
+def estimate_advisor_endpoint(layout: HouseLayout):
+    """
+    Analyzes calculated geometry, physical quantities takeoff, and cost estimate using Groq
+    to provide value-engineering and construction efficiency recommendations.
+    """
+    qty = layout.quantities or calculate_material_quantities(layout, layout.construction_spec)
+    cost = layout.cost_estimate or estimate_construction_cost(layout, qty)
+    return generate_construction_advice_with_groq(layout, qty, cost)
 
 # -----------------------------------------------------------------------------
 # Vector Floor Plan Reconstruction & Calibration API

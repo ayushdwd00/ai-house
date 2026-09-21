@@ -11,7 +11,10 @@ import {
   Wall,
   Door,
   WindowItem,
+  LandscapePlan,
+  LandscapeElement,
 } from "@/types/house";
+import { generateFallbackLandscape } from "@/utils/landscapeFallback";
 
 interface Dollhouse3DProps {
   layout: HouseLayout;
@@ -30,6 +33,10 @@ interface Dollhouse3DProps {
   onToggleWallHeightMode?: () => void;
   showRoof?: boolean;
   onToggleRoof?: () => void;
+  showStructure?: boolean;
+  onToggleStructure?: () => void;
+  showLandscape?: boolean;
+  onToggleLandscape?: () => void;
 }
 
 export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
@@ -40,7 +47,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   selectedFurnitureId,
   onSelectRoom,
   onSelectFurniture,
-  isDarkMode = true,
+  isDarkMode = false,
   lightingPreset = "day",
   onChangeLightingPreset,
   cameraPreset = "isometric",
@@ -49,8 +56,20 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   onToggleWallHeightMode,
   showRoof = false,
   onToggleRoof,
+  showStructure,
+  onToggleStructure,
+  showLandscape,
+  onToggleLandscape,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const [internalShowStructure, setInternalShowStructure] = useState(false);
+  const effectiveShowStructure = showStructure !== undefined ? showStructure : internalShowStructure;
+
+  // 3D Landscape Visibility & Category Filter
+  const [internalShowLandscape, setInternalShowLandscape] = useState(true);
+  const effectiveShowLandscape = showLandscape !== undefined ? showLandscape : internalShowLandscape;
+  const [landscapeCategory, setLandscapeCategory] = useState<"all" | "vegetation" | "paths" | "lighting" | "furniture">("all");
+  const landscapeGroupRef = useRef<THREE.Group | null>(null);
 
   // References to Three.js core objects
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -154,36 +173,36 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
     // PBR Shared Architectural Materials
     const extWallMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#36322E" : "#ECE8E1",
-      roughness: 0.85,
-      metalness: 0.05,
-    });
-    const intWallMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#2A2724" : "#F7F5F0",
-      roughness: 0.9,
+      color: isDarkMode ? "#36322E" : "#E8E4DC",
+      roughness: 0.88,
       metalness: 0.02,
     });
+    const intWallMat = new THREE.MeshStandardMaterial({
+      color: isDarkMode ? "#2A2724" : "#F8F7F4",
+      roughness: 0.92,
+      metalness: 0.01,
+    });
     const wallTrimMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#1C1917" : "#2E2A27",
+      color: isDarkMode ? "#1C1917" : "#1E293B",
       roughness: 0.4,
-      metalness: 0.6,
+      metalness: 0.5,
     });
     const glassMat = new THREE.MeshPhysicalMaterial({
-      color: "#BAE6FD",
+      color: "#E0F2FE",
       transparent: true,
-      opacity: 0.4,
-      roughness: 0.05,
-      transmission: 0.85,
-      ior: 1.5,
+      opacity: 0.35,
+      roughness: 0.04,
+      transmission: 0.9,
+      ior: 1.52,
     });
     const frameMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#1C1917" : "#332F2B",
+      color: isDarkMode ? "#1C1917" : "#1E293B",
       roughness: 0.3,
       metalness: 0.8,
     });
     const doorLeafMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#4A3525" : "#785838",
-      roughness: 0.6,
+      color: isDarkMode ? "#4A3525" : "#8B6D52",
+      roughness: 0.65,
     });
     const ceilingMat = new THREE.MeshStandardMaterial({
       color: isDarkMode ? "#22201E" : "#FAF8F5",
@@ -205,18 +224,72 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     const floorGroup = new THREE.Group();
     rootGroup.add(floorGroup);
 
-    // 1. Foundation / Floor Slab
-    const slabW = layout.plot_width + 1.0;
-    const slabL = layout.plot_length + 1.0;
-    const slabGeo = new THREE.BoxGeometry(slabW, 0.4, slabL);
-    const slabMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#292524" : "#E2DDD5",
+    // 1. Property Site Ground Plinth & Boundary
+    const pw = layout.plot_width;
+    const pl = layout.plot_length;
+    const cx = pw / 2;
+    const cz = pl / 2;
+
+    // Architectural Site Base for the Property
+    const siteGeo = new THREE.BoxGeometry(pw, 0.12, pl);
+    const siteMat = new THREE.MeshStandardMaterial({
+      color: isDarkMode ? "#1C1D21" : "#E8E4DC",
+      roughness: 0.95,
+      metalness: 0.02,
+    });
+    const siteMesh = new THREE.Mesh(siteGeo, siteMat);
+    siteMesh.position.set(cx, -0.06, cz);
+    siteMesh.receiveShadow = true;
+    rootGroup.add(siteMesh);
+
+    // Property Boundary Line around actual plot dimensions
+    const boundaryPts = [
+      new THREE.Vector3(0, 0.01, 0),
+      new THREE.Vector3(pw, 0.01, 0),
+      new THREE.Vector3(pw, 0.01, pl),
+      new THREE.Vector3(0, 0.01, pl),
+      new THREE.Vector3(0, 0.01, 0),
+    ];
+    const boundaryGeo = new THREE.BufferGeometry().setFromPoints(boundaryPts);
+    const boundaryLine = new THREE.Line(
+      boundaryGeo,
+      new THREE.LineBasicMaterial({
+        color: isDarkMode ? "#52525B" : "#94A3B8",
+        linewidth: 2,
+      })
+    );
+    rootGroup.add(boundaryLine);
+
+    // 2. Building Foundation Plinth (Under Rooms Footprint Only)
+    let minBx = Infinity;
+    let maxBx = -Infinity;
+    let minBz = Infinity;
+    let maxBz = -Infinity;
+
+    (floor.rooms || []).forEach((room) => {
+      if (room.rect) {
+        minBx = Math.min(minBx, room.rect.x);
+        maxBx = Math.max(maxBx, room.rect.x + room.rect.width);
+        minBz = Math.min(minBz, room.rect.y);
+        maxBz = Math.max(maxBz, room.rect.y + room.rect.length);
+      }
+    });
+
+    const hasRooms = isFinite(minBx) && minBx < maxBx;
+    const plinthW = hasRooms ? (maxBx - minBx) + 0.6 : pw * 0.7;
+    const plinthL = hasRooms ? (maxBz - minBz) + 0.6 : pl * 0.7;
+    const plinthX = hasRooms ? (minBx + maxBx) / 2 : cx;
+    const plinthZ = hasRooms ? (minBz + maxBz) / 2 : cz;
+
+    const plinthGeo = new THREE.BoxGeometry(plinthW, 0.2, plinthL);
+    const plinthMat = new THREE.MeshStandardMaterial({
+      color: isDarkMode ? "#292524" : "#CBD5E1",
       roughness: 0.8,
     });
-    const slabMesh = new THREE.Mesh(slabGeo, slabMat);
-    slabMesh.position.set(layout.plot_width / 2, -0.2, layout.plot_length / 2);
-    slabMesh.receiveShadow = true;
-    floorGroup.add(slabMesh);
+    const plinthMesh = new THREE.Mesh(plinthGeo, plinthMat);
+    plinthMesh.position.set(plinthX, -0.1, plinthZ);
+    plinthMesh.receiveShadow = true;
+    floorGroup.add(plinthMesh);
 
     // 2. Room Floor Finishes
     (floor.rooms || []).forEach((room) => {
@@ -395,16 +468,85 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     // 7. Roof Parapet & Terrace (if enabled or Full Massing)
     if (showRoof || wallHeightMode === "full") {
       const parapetHeight = 2.5;
-      const parapetGeo = new THREE.BoxGeometry(slabW, parapetHeight, 0.4);
+      const parapetGeo = new THREE.BoxGeometry(plinthW, parapetHeight, 0.4);
       const parapetMat = extWallMat;
 
       // Front & Rear Parapets
       const pFront = new THREE.Mesh(parapetGeo, parapetMat);
-      pFront.position.set(layout.plot_width / 2, fullWallHeight + parapetHeight / 2, slabL / 2);
+      pFront.position.set(plinthX, fullWallHeight + parapetHeight / 2, plinthZ + plinthL / 2);
       const pRear = pFront.clone();
-      pRear.position.z = -slabL / 2;
+      pRear.position.z = plinthZ - plinthL / 2;
 
       floorGroup.add(pFront, pRear);
+    }
+
+    // 8. Preliminary Structural Columns (When Structure Mode is Enabled)
+    if (effectiveShowStructure && layout.structural_planning?.columns) {
+      const columnGroup = new THREE.Group();
+      columnGroup.name = "structural_columns";
+
+      // Architectural subtle concrete PBR material
+      const colMat = new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#52525B" : "#CBD5E1",
+        roughness: 0.85,
+        metalness: 0.1,
+      });
+      const colEdgeMat = new THREE.LineBasicMaterial({
+        color: isDarkMode ? "#C48446" : "#A16207",
+      });
+
+      const colH = currentWallHeight;
+      const activeFloorNum = activeFloorIndex + 1;
+
+      layout.structural_planning.columns.forEach((col) => {
+        const cw = col.width || 0.75;
+        const cd = col.depth || 0.75;
+        const cx = col.x;
+        const cz = col.y;
+
+        const colFloors = col.floors || col.floor_ids || [1];
+        if (!colFloors.includes(activeFloorNum)) return;
+
+        const colGeo = new THREE.BoxGeometry(cw, colH, cd);
+        const colMesh = new THREE.Mesh(colGeo, colMat);
+        colMesh.position.set(cx, colH / 2, cz);
+        colMesh.castShadow = true;
+        colMesh.receiveShadow = true;
+        colMesh.userData = { columnId: col.column_id, type: "column" };
+
+        const colEdges = new THREE.EdgesGeometry(colGeo);
+        const edgeLine = new THREE.LineSegments(colEdges, colEdgeMat);
+        colMesh.add(edgeLine);
+
+        columnGroup.add(colMesh);
+      });
+
+      floorGroup.add(columnGroup);
+    }
+
+    // 6. Site Landscaping Layer (Procedural & Shared Low-Poly Architectural Geometry)
+    const activeLandscape: LandscapePlan =
+      layout.landscape &&
+      ((layout.landscape.elements && layout.landscape.elements.length > 0) ||
+        (layout.landscape.zones && layout.landscape.zones.length > 0))
+        ? layout.landscape
+        : generateFallbackLandscape(layout);
+
+    if (effectiveShowLandscape && activeLandscape) {
+      const lsGroup = new THREE.Group();
+      lsGroup.name = "landscape_root";
+      landscapeGroupRef.current = lsGroup;
+      rootGroup.add(lsGroup);
+
+      buildLandscape3D(
+        lsGroup,
+        activeLandscape,
+        layout.plot_width,
+        layout.plot_length,
+        lightingPreset,
+        isDarkMode,
+        landscapeCategory
+      );
     }
   }, [
     layout,
@@ -416,6 +558,9 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     lightingPreset,
     showRoof,
     currentWallHeight,
+    effectiveShowStructure,
+    effectiveShowLandscape,
+    landscapeCategory,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -489,7 +634,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     // Ground Plane with Architectural Grid
     const groundGeo = new THREE.PlaneGeometry(layout.plot_width + 80, layout.plot_length + 80);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: isDarkMode ? "#18181A" : "#F4EFE6",
+      color: isDarkMode ? "#18181A" : "#E2E8F0",
       roughness: 0.95,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -571,15 +716,15 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     if (sunLightRef.current && skyLightRef.current && sceneRef.current) {
       if (lightingPreset === "sunset") {
         sunLightRef.current.color.set("#FF8E4D");
-        sunLightRef.current.intensity = 1.6;
+        sunLightRef.current.intensity = 1.5;
         sunLightRef.current.position.set(
           layout.plot_width / 2 + 50,
           18,
           layout.plot_length / 2 - 20
         );
         skyLightRef.current.color.set("#FED7AA");
-        skyLightRef.current.groundColor.set("#78350F");
-        sceneRef.current.background = new THREE.Color(isDarkMode ? "#181412" : "#F7EFE9");
+        skyLightRef.current.groundColor.set("#B45309");
+        sceneRef.current.background = new THREE.Color(isDarkMode ? "#181412" : "#FFF7ED");
       } else if (lightingPreset === "night") {
         sunLightRef.current.color.set("#38BDF8");
         sunLightRef.current.intensity = 0.35;
@@ -588,22 +733,22 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         sceneRef.current.background = new THREE.Color("#0F1218");
       } else if (lightingPreset === "studio") {
         sunLightRef.current.color.set("#FFFFFF");
-        sunLightRef.current.intensity = 1.1;
-        skyLightRef.current.color.set("#F8FAFC");
+        sunLightRef.current.intensity = 1.25;
+        skyLightRef.current.color.set("#FFFFFF");
         skyLightRef.current.groundColor.set("#E2E8F0");
-        sceneRef.current.background = new THREE.Color(isDarkMode ? "#1A1A1D" : "#F8F8FA");
+        sceneRef.current.background = new THREE.Color(isDarkMode ? "#1A1A1D" : "#F8FAFC");
       } else {
         // Daylight
-        sunLightRef.current.color.set("#FFFDF7");
-        sunLightRef.current.intensity = 1.35;
+        sunLightRef.current.color.set("#FFFBF0");
+        sunLightRef.current.intensity = 1.45;
         sunLightRef.current.position.set(
           layout.plot_width / 2 + 35,
           52,
           layout.plot_length / 2 - 30
         );
         skyLightRef.current.color.set("#FFFFFF");
-        skyLightRef.current.groundColor.set("#EBE6DF");
-        sceneRef.current.background = new THREE.Color(isDarkMode ? "#121214" : "#FAF8F5");
+        skyLightRef.current.groundColor.set("#CBD5E1");
+        sceneRef.current.background = new THREE.Color(isDarkMode ? "#121214" : "#F3F4F6");
       }
     }
   }, [lightingPreset, isDarkMode, layout]);
@@ -659,7 +804,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full select-none overflow-hidden bg-[#0A0B0E]">
+    <div className="relative w-full h-full select-none overflow-hidden bg-[#ECEEF2]">
       {/* Floating 3D Controls (Top Left / Responsive) */}
       <div className="absolute top-16 sm:top-20 left-3 sm:left-6 z-30 flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] pointer-events-auto">
         {/* View Perspective */}
@@ -695,7 +840,60 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           >
             CUTAWAY
           </button>
+          <button
+            onClick={() => {
+              if (onToggleStructure) {
+                onToggleStructure();
+              } else {
+                setInternalShowStructure((prev) => !prev);
+              }
+            }}
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
+              effectiveShowStructure
+                ? "bg-[#C48446] text-[#0A0B0E] font-medium"
+                : "hover:text-[#F5F3EF]"
+            }`}
+            title="Toggle preliminary structural column grid and vertical pillars"
+          >
+            {effectiveShowStructure ? "STRUCTURE ON" : "STRUCTURE"}
+          </button>
+          <button
+            onClick={() => {
+              if (onToggleLandscape) {
+                onToggleLandscape();
+              } else {
+                setInternalShowLandscape((prev) => !prev);
+              }
+            }}
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
+              effectiveShowLandscape
+                ? "bg-[#2D6A4F] text-[#F5F3EF] font-medium"
+                : "hover:text-[#F5F3EF]"
+            }`}
+            title="Toggle site landscaping layer (lawns, trees, pathway, driveway, features)"
+          >
+            {effectiveShowLandscape ? "LANDSCAPE ON" : "LANDSCAPE"}
+          </button>
         </div>
+
+        {/* Landscape Category Filter */}
+        {effectiveShowLandscape && (
+          <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[9px] sm:text-[10px] font-mono text-[#9E9C98]">
+            {(["all", "vegetation", "paths", "lighting", "furniture"] as const).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setLandscapeCategory(cat)}
+                className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full transition-all uppercase ${
+                  landscapeCategory === cat
+                    ? "bg-[#2D6A4F] text-[#F5F3EF] font-medium shadow-sm"
+                    : "hover:text-[#F5F3EF]"
+                }`}
+              >
+                {cat === "vegetation" ? "VEG" : cat === "lighting" ? "LIGHTS" : cat}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Lighting: Daylight / Sunset */}
         <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
@@ -1019,4 +1217,520 @@ function buildArchitecturalFurniture(
   box.castShadow = true;
   group.add(box);
   return group;
+}
+
+// ---------------------------------------------------------------------------
+// Procedural Architectural 3D Landscaping Engine & Reusable Builders
+// ---------------------------------------------------------------------------
+
+function createLawn(lawn: LandscapeElement, lawnMat: THREE.Material): THREE.Mesh {
+  const lw = Math.max(2.0, lawn.width || 8.0);
+  const ll = Math.max(2.0, lawn.length || 6.0);
+  const lawnGeo = new THREE.BoxGeometry(lw, 0.05, ll);
+  const lawnMesh = new THREE.Mesh(lawnGeo, lawnMat);
+  lawnMesh.position.set(lawn.x, 0.025, lawn.y);
+  lawnMesh.receiveShadow = true;
+  lawnMesh.castShadow = false;
+  lawnMesh.userData = { elementId: lawn.element_id, type: "lawn" };
+  return lawnMesh;
+}
+
+function createDriveway(driveway: LandscapeElement, drivewayMat: THREE.Material): THREE.Group {
+  const dwGroup = new THREE.Group();
+  const dw = Math.max(4.0, driveway.width || 10.0);
+  const dl = Math.max(4.0, driveway.length || 16.0);
+  const driveGeo = new THREE.BoxGeometry(dw, 0.04, dl);
+  const driveMesh = new THREE.Mesh(driveGeo, drivewayMat);
+  driveMesh.position.set(driveway.x, 0.02, driveway.y);
+  driveMesh.receiveShadow = true;
+  dwGroup.add(driveMesh);
+
+  // Concrete joint score lines
+  const jointCount = Math.max(1, Math.floor(dl / 5));
+  for (let j = 1; j <= jointCount; j++) {
+    const jz = driveway.y - dl / 2 + (j * dl) / (jointCount + 1);
+    const linePts = [
+      new THREE.Vector3(driveway.x - dw / 2, 0.042, jz),
+      new THREE.Vector3(driveway.x + dw / 2, 0.042, jz),
+    ];
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+    const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x27272a }));
+    dwGroup.add(line);
+  }
+  dwGroup.userData = { elementId: driveway.element_id, type: "driveway" };
+  return dwGroup;
+}
+
+function createPathway(
+  path: LandscapeElement,
+  paverGeo: THREE.BufferGeometry,
+  pathMat: THREE.Material
+): THREE.Group {
+  const pathGroup = new THREE.Group();
+  if (!path.points || path.points.length < 2) return pathGroup;
+
+  for (let i = 0; i < path.points.length - 1; i++) {
+    const p1 = path.points[i];
+    const p2 = path.points[i + 1];
+    const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (segLen < 0.5) continue;
+    const steps = Math.max(1, Math.round(segLen / 2.6));
+    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const px = p1.x + (p2.x - p1.x) * t;
+      const pz = p1.y + (p2.y - p1.y) * t;
+      const paver = new THREE.Mesh(paverGeo, pathMat);
+      paver.position.set(px, 0.035, pz);
+      paver.rotation.y = -angle;
+      paver.receiveShadow = true;
+      pathGroup.add(paver);
+    }
+  }
+  pathGroup.userData = { elementId: path.element_id, type: "pathway" };
+  return pathGroup;
+}
+
+function createTree(
+  tree: LandscapeElement,
+  idx: number,
+  trunkGeo: THREE.BufferGeometry,
+  trunkMat: THREE.Material,
+  foliageMat1: THREE.Material,
+  foliageMat2: THREE.Material,
+  canopyDodecGeo: THREE.BufferGeometry,
+  canopyConeGeo: THREE.BufferGeometry
+): THREE.Group {
+  const treeGroup = new THREE.Group();
+  treeGroup.position.set(tree.x, 0, tree.y);
+
+  // Deterministic slight scale and rotation variation
+  const scaleMult = 0.9 + (idx % 3) * 0.12;
+  const rotY = ((idx * 47) % 360) * (Math.PI / 180);
+
+  // Trunk
+  const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
+  trunkMesh.position.y = 2.25 * scaleMult;
+  trunkMesh.scale.set(scaleMult, scaleMult, scaleMult);
+  trunkMesh.castShadow = true;
+  trunkMesh.receiveShadow = true;
+  treeGroup.add(trunkMesh);
+
+  // Foliage
+  const isConical = idx % 2 === 1 || tree.properties?.foliage_type === "conical";
+  const foliageMat = idx % 3 === 0 ? foliageMat1 : foliageMat2;
+
+  if (isConical) {
+    const canopy = new THREE.Mesh(canopyConeGeo, foliageMat);
+    canopy.position.y = 5.2 * scaleMult;
+    canopy.scale.set(scaleMult, scaleMult, scaleMult);
+    canopy.rotation.y = rotY;
+    canopy.castShadow = true;
+    canopy.receiveShadow = true;
+    treeGroup.add(canopy);
+  } else {
+    const mainCanopy = new THREE.Mesh(canopyDodecGeo, foliageMat);
+    mainCanopy.position.y = 4.8 * scaleMult;
+    mainCanopy.scale.set(scaleMult, scaleMult, scaleMult);
+    mainCanopy.rotation.y = rotY;
+    mainCanopy.castShadow = true;
+    mainCanopy.receiveShadow = true;
+
+    const subCanopy = new THREE.Mesh(canopyDodecGeo, foliageMat);
+    subCanopy.position.set(0.4 * scaleMult, 5.8 * scaleMult, -0.3 * scaleMult);
+    subCanopy.scale.set(scaleMult * 0.7, scaleMult * 0.7, scaleMult * 0.7);
+    subCanopy.castShadow = true;
+
+    treeGroup.add(mainCanopy, subCanopy);
+  }
+
+  treeGroup.userData = { elementId: tree.element_id, type: "tree" };
+  return treeGroup;
+}
+
+function createShrub(
+  shrub: LandscapeElement,
+  shrubGeo: THREE.BufferGeometry,
+  hedgeMat: THREE.Material
+): THREE.Mesh {
+  const shrubMesh = new THREE.Mesh(shrubGeo, hedgeMat);
+  const scale = 0.8 + ((Math.abs(Math.sin(shrub.x + shrub.y))) % 0.4);
+  shrubMesh.scale.set(scale, scale, scale);
+  shrubMesh.position.set(shrub.x, 0.5 * scale, shrub.y);
+  shrubMesh.castShadow = true;
+  shrubMesh.receiveShadow = true;
+  shrubMesh.userData = { elementId: shrub.element_id, type: "shrub" };
+  return shrubMesh;
+}
+
+function createFlowerBed(
+  flowerBed: LandscapeElement,
+  planterMat: THREE.Material,
+  soilMat: THREE.Material,
+  shrubGeo: THREE.BufferGeometry,
+  flowerMat1: THREE.Material,
+  flowerMat2: THREE.Material
+): THREE.Group {
+  const group = new THREE.Group();
+  const fw = Math.max(2.0, flowerBed.width || 4.0);
+  const fl = Math.max(2.0, flowerBed.length || 3.0);
+
+  const border = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.25, fl), planterMat);
+  border.position.set(flowerBed.x, 0.125, flowerBed.y);
+  border.receiveShadow = true;
+  group.add(border);
+
+  const soil = new THREE.Mesh(new THREE.BoxGeometry(fw - 0.3, 0.08, fl - 0.3), soilMat);
+  soil.position.set(flowerBed.x, 0.22, flowerBed.y);
+  group.add(soil);
+
+  [-fw * 0.25, fw * 0.25].forEach((ox, i) => {
+    const flower = new THREE.Mesh(shrubGeo, i % 2 === 0 ? flowerMat1 : flowerMat2);
+    flower.position.set(flowerBed.x + ox, 0.45, flowerBed.y);
+    flower.scale.set(0.45, 0.45, 0.45);
+    flower.castShadow = true;
+    group.add(flower);
+  });
+
+  group.userData = { elementId: flowerBed.element_id, type: "flower_bed" };
+  return group;
+}
+
+function createPlanter(
+  planter: LandscapeElement,
+  planterMat: THREE.Material,
+  soilMat: THREE.Material,
+  shrubGeo: THREE.BufferGeometry,
+  hedgeMat: THREE.Material
+): THREE.Group {
+  const group = new THREE.Group();
+  const pw = planter.width || 2.5;
+  const pl = planter.length || 1.5;
+
+  const pBox = new THREE.Mesh(new THREE.BoxGeometry(pw, 1.1, pl), planterMat);
+  pBox.position.set(planter.x, 0.55, planter.y);
+  pBox.castShadow = true;
+  pBox.receiveShadow = true;
+
+  const pSoil = new THREE.Mesh(new THREE.BoxGeometry(pw - 0.3, 0.08, pl - 0.3), soilMat);
+  pSoil.position.set(planter.x, 1.05, planter.y);
+
+  [-0.45, 0.45].forEach((ox) => {
+    const shrub = new THREE.Mesh(shrubGeo, hedgeMat);
+    shrub.position.set(planter.x + ox, 1.45, planter.y);
+    shrub.scale.set(0.65, 0.65, 0.65);
+    shrub.castShadow = true;
+    group.add(shrub);
+  });
+
+  group.add(pBox, pSoil);
+  group.userData = { elementId: planter.element_id, type: "planter" };
+  return group;
+}
+
+function createGardenLight(
+  light: LandscapeElement,
+  bollardPostGeo: THREE.BufferGeometry,
+  bollardPostMat: THREE.Material,
+  bollardCapGeo: THREE.BufferGeometry,
+  bollardGlowMat: THREE.Material,
+  isNightOrSunset: boolean,
+  lightingPreset: string
+): THREE.Group {
+  const lightGroup = new THREE.Group();
+  lightGroup.position.set(light.x, 0, light.y);
+
+  const post = new THREE.Mesh(bollardPostGeo, bollardPostMat);
+  post.position.y = 0.9;
+  post.castShadow = true;
+
+  const cap = new THREE.Mesh(bollardCapGeo, bollardGlowMat);
+  cap.position.y = 1.95;
+  cap.castShadow = false;
+
+  lightGroup.add(post, cap);
+
+  if (isNightOrSunset) {
+    const pLight = new THREE.PointLight(
+      0xffd08a,
+      lightingPreset === "night" ? 0.7 : 0.4,
+      14
+    );
+    pLight.position.y = 2.1;
+    pLight.castShadow = false;
+    lightGroup.add(pLight);
+  }
+
+  lightGroup.userData = { elementId: light.element_id, type: "outdoor_light" };
+  return lightGroup;
+}
+
+function createGardenSeating(
+  bench: LandscapeElement,
+  woodBenchMat: THREE.Material,
+  metalMat: THREE.Material
+): THREE.Group {
+  const benchGroup = new THREE.Group();
+  benchGroup.position.set(bench.x, 0, bench.y);
+
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.15, 1.6), woodBenchMat);
+  seat.position.y = 1.4;
+  seat.castShadow = true;
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.9, 0.12), woodBenchMat);
+  back.position.set(0, 2.2, -0.75);
+  back.castShadow = true;
+
+  [-2.0, 2.0].forEach((lx) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.4, 1.5), metalMat);
+    leg.position.set(lx, 0.7, 0);
+    leg.castShadow = true;
+    benchGroup.add(leg);
+  });
+
+  benchGroup.add(seat, back);
+  benchGroup.userData = { elementId: bench.element_id, type: "garden_seating" };
+  return benchGroup;
+}
+
+function createWaterFeature(
+  wf: LandscapeElement,
+  planterMat: THREE.Material,
+  waterPoolMat: THREE.Material
+): THREE.Group {
+  const wfGroup = new THREE.Group();
+  wfGroup.position.set(wf.x, 0, wf.y);
+
+  const wr = wf.radius || 3.0;
+  const basin = new THREE.Mesh(
+    new THREE.CylinderGeometry(wr + 0.4, wr + 0.5, 0.45, 24),
+    planterMat
+  );
+  basin.position.y = 0.225;
+  basin.castShadow = true;
+  basin.receiveShadow = true;
+
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(wr, wr, 0.05, 24), waterPoolMat);
+  water.position.y = 0.42;
+  wfGroup.add(basin, water);
+
+  wfGroup.userData = { elementId: wf.element_id, type: "water_feature" };
+  return wfGroup;
+}
+
+function buildLandscape3D(
+  group: THREE.Group,
+  landscape: LandscapePlan,
+  plotWidth: number,
+  plotLength: number,
+  lightingPreset: string,
+  isDarkMode: boolean,
+  categoryFilter: "all" | "vegetation" | "paths" | "lighting" | "furniture"
+) {
+  // 1. Shared PBR Architectural Landscape Materials (Muted palette, never cartoon neon)
+  const lawnMat = new THREE.MeshStandardMaterial({
+    color: isDarkMode ? "#344B30" : "#557351",
+    roughness: 0.92,
+    metalness: 0.02,
+  });
+  const pathMat = new THREE.MeshStandardMaterial({
+    color: isDarkMode ? "#3D3A37" : "#D4CEB8",
+    roughness: 0.78,
+    metalness: 0.05,
+  });
+  const drivewayMat = new THREE.MeshStandardMaterial({
+    color: isDarkMode ? "#27272A" : "#475569",
+    roughness: 0.85,
+    metalness: 0.08,
+  });
+  const hedgeMat = new THREE.MeshStandardMaterial({
+    color: isDarkMode ? "#263B22" : "#3B5A34",
+    roughness: 0.9,
+  });
+  const trunkMat = new THREE.MeshStandardMaterial({
+    color: "#4A3B32",
+    roughness: 0.85,
+  });
+  const foliageMat1 = new THREE.MeshStandardMaterial({
+    color: isDarkMode ? "#2B4427" : "#43663C",
+    roughness: 0.88,
+    flatShading: true,
+  });
+  const foliageMat2 = new THREE.MeshStandardMaterial({
+    color: isDarkMode ? "#243B20" : "#4E7345",
+    roughness: 0.9,
+    flatShading: true,
+  });
+  const planterMat = new THREE.MeshStandardMaterial({
+    color: isDarkMode ? "#3F3C38" : "#E2E8F0",
+    roughness: 0.7,
+  });
+  const soilMat = new THREE.MeshStandardMaterial({
+    color: "#2C221A",
+    roughness: 0.96,
+  });
+  const metalMat = new THREE.MeshStandardMaterial({
+    color: "#1E293B",
+    roughness: 0.35,
+    metalness: 0.8,
+  });
+  const bollardPostMat = metalMat;
+  const isNightOrSunset = lightingPreset === "sunset" || lightingPreset === "night";
+  const bollardGlowMat = new THREE.MeshStandardMaterial({
+    color: "#FEF3C7",
+    emissive: isNightOrSunset ? "#F59E0B" : "#000000",
+    emissiveIntensity: lightingPreset === "night" ? 1.6 : lightingPreset === "sunset" ? 0.9 : 0.0,
+    roughness: 0.25,
+  });
+  const woodBenchMat = new THREE.MeshStandardMaterial({
+    color: "#78350F",
+    roughness: 0.6,
+  });
+  const waterPoolMat = new THREE.MeshStandardMaterial({
+    color: "#38BDF8",
+    roughness: 0.08,
+    metalness: 0.3,
+    transparent: true,
+    opacity: 0.85,
+  });
+
+  // 2. Shared Low-Poly Geometries (Ensures high WebGL performance)
+  const trunkGeo = new THREE.CylinderGeometry(0.32, 0.44, 4.5, 7);
+  const canopyDodecGeo = new THREE.DodecahedronGeometry(2.3, 1);
+  const canopyConeGeo = new THREE.ConeGeometry(2.5, 5.2, 7);
+  const shrubGeo = new THREE.DodecahedronGeometry(0.85, 1);
+  const bollardPostGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.8, 8);
+  const bollardCapGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.35, 8);
+  const paverGeo = new THREE.BoxGeometry(2.2, 0.05, 1.5);
+
+  const showVeg = categoryFilter === "all" || categoryFilter === "vegetation";
+  const showPaths = categoryFilter === "all" || categoryFilter === "paths";
+  const showLights = categoryFilter === "all" || categoryFilter === "lighting";
+  const showFurn = categoryFilter === "all" || categoryFilter === "furniture";
+
+  // A. Lawns & Turf
+  if (showVeg) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "lawn")
+      .forEach((lawn) => {
+        group.add(createLawn(lawn, lawnMat));
+      });
+  }
+
+  // B. Vehicular Driveway
+  if (showPaths && landscape.driveway) {
+    group.add(createDriveway(landscape.driveway, drivewayMat));
+  }
+
+  // C. Pedestrian Pathway Stepping Stones
+  if (showPaths) {
+    (landscape.paths || []).forEach((path) => {
+      group.add(createPathway(path, paverGeo, pathMat));
+    });
+  }
+
+  // D. Perimeter Boundary Hedges
+  if (showVeg) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "hedge" || e.type === "boundary_greenery")
+      .forEach((hedge) => {
+        const hw = hedge.width || 1.6;
+        const hl = hedge.length || 10.0;
+        const hh = (hedge.properties?.height as number) || 4.2;
+        const hedgeGeo = new THREE.BoxGeometry(hw, hh, hl);
+        const hedgeMesh = new THREE.Mesh(hedgeGeo, hedgeMat);
+        hedgeMesh.position.set(hedge.x, hh / 2, hedge.y);
+        hedgeMesh.castShadow = true;
+        hedgeMesh.receiveShadow = true;
+        hedgeMesh.userData = { elementId: hedge.element_id, type: "hedge" };
+        group.add(hedgeMesh);
+      });
+  }
+
+  // E. Trees (Specimen Architectural Vegetation)
+  if (showVeg) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "tree")
+      .forEach((tree, idx) => {
+        group.add(
+          createTree(
+            tree,
+            idx,
+            trunkGeo,
+            trunkMat,
+            foliageMat1,
+            foliageMat2,
+            canopyDodecGeo,
+            canopyConeGeo
+          )
+        );
+      });
+  }
+
+  // F. Shrubs & Bushes
+  if (showVeg) {
+    (landscape.elements || [])
+      .filter((e) => (e.type as string) === "shrub" || (e.type as string) === "bush")
+      .forEach((shrub) => {
+        group.add(createShrub(shrub, shrubGeo, hedgeMat));
+      });
+  }
+
+  // G. Flower Beds
+  if (showVeg) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "flower_bed")
+      .forEach((fb) => {
+        group.add(
+          createFlowerBed(fb, planterMat, soilMat, shrubGeo, foliageMat1, foliageMat2)
+        );
+      });
+  }
+
+  // H. Planter Boxes & Entry Landings
+  if (showVeg) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "planter")
+      .forEach((planter) => {
+        group.add(createPlanter(planter, planterMat, soilMat, shrubGeo, hedgeMat));
+      });
+  }
+
+  // I. Outdoor Lighting (Bollards & Feature Spotlights)
+  if (showLights) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "outdoor_light")
+      .forEach((light) => {
+        group.add(
+          createGardenLight(
+            light,
+            bollardPostGeo,
+            bollardPostMat,
+            bollardCapGeo,
+            bollardGlowMat,
+            isNightOrSunset,
+            lightingPreset
+          )
+        );
+      });
+  }
+
+  // J. Garden Seating & Furniture
+  if (showFurn) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "garden_seating")
+      .forEach((bench) => {
+        group.add(createGardenSeating(bench, woodBenchMat, metalMat));
+      });
+  }
+
+  // K. Water Feature / Reflecting Pool
+  if (showFurn) {
+    (landscape.elements || [])
+      .filter((e) => e.type === "water_feature")
+      .forEach((wf) => {
+        group.add(createWaterFeature(wf, planterMat, waterPoolMat));
+      });
+  }
 }

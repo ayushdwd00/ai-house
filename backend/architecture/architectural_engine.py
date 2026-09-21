@@ -14,7 +14,8 @@ from models import (
     HouseLayout, FloorPlan, Room, Rect, FurnitureItem, Wall, Door, Window,
     HouseStats, Site, Point2D, ArchitecturalScores, ArchitecturalValidation,
     Stair, StairGeometry, CirculationNetwork, ConstructionSpecification,
-    MaterialQuantities, CostEstimate, BuildingServices, StructuralPlanning
+    MaterialQuantities, CostEstimate, BuildingServices, StructuralPlanning,
+    LandscapePlan, LandscapePreferences
 )
 from architecture.site_planner import plan_site
 from architecture.zoning_graph import ZONE_MAP, PRIVACY_MAP
@@ -538,7 +539,8 @@ def generate_architectural_house_layout(
     vastu_compliant: bool = False,
     user_prompt: str = "",
     variant_seed: Optional[int] = None,
-    construction_spec: Optional[ConstructionSpecification] = None
+    construction_spec: Optional[ConstructionSpecification] = None,
+    landscape_preferences: Optional[LandscapePreferences] = None
 ) -> HouseLayout:
     """
     Executes the complete site-first architectural design pipeline:
@@ -905,10 +907,20 @@ def generate_architectural_house_layout(
 
     # 5. Multi-floor MEP & Structural Planning
     layout.building_services = plan_building_services(floors_list, plot_width, plot_length)
-    layout.structural_planning = plan_preliminary_structure(floors_list, active_spec)
+    layout.structural_planning = plan_preliminary_structure(
+        floors_list, active_spec, site=site, plot_width=plot_width, plot_length=plot_length, layout=layout
+    )
+    layout.structural_system = layout.structural_planning.structural_system
 
     # 6. Physical Material Takeoff & Bottom-Up Cost Estimation
     layout.quantities = calculate_material_quantities(layout, active_spec)
     layout.cost_estimate = estimate_construction_cost(layout, layout.quantities)
+
+    # 7. Deterministic Site Landscaping
+    try:
+        from landscape.landscape_engine import generate_landscape_plan
+        layout.landscape = generate_landscape_plan(layout, preferences=landscape_preferences)
+    except Exception as e:
+        print(f"[LANDSCAPE WARNING] Could not generate landscape plan: {e}")
 
     return layout

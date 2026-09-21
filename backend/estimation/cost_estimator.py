@@ -61,12 +61,17 @@ def estimate_construction_cost(
         ))
 
     # 1. Structural Concrete
+    col_cum = qty.itemized_details.get("column_concrete_volume_cum", 0.0) if qty.itemized_details else 0.0
+    col_cnt = qty.itemized_details.get("column_count", 0) if qty.itemized_details else 0
+    col_note = f" (including {col_cum} m³ across {col_cnt} preliminary columns)" if col_cnt > 0 else ""
     add_line("cost_concrete", "structural", "concrete_m20_m25", qty.concrete_volume_cum,
-             f"Grade M20/M25 for slabs, beams, and columns ({qty.concrete_volume_cum} m³)")
+             f"Grade M20/M25 for slabs, beams, and columns ({qty.concrete_volume_cum} m³{col_note})")
 
     # 2. Steel Reinforcement
+    col_rebar = qty.itemized_details.get("column_reinforcement_allowance_kg", 0.0) if qty.itemized_details else 0.0
+    rebar_note = f" (includes ~{col_rebar} kg assumption-based preliminary column allowance; engineer verification required)" if col_cnt > 0 else ""
     add_line("cost_steel", "structural", "tmt_steel", qty.steel_reinforcement_kg,
-             f"Fe500/Fe550 TMT rebars at ~3.8 kg/sqft built-up area ({qty.steel_reinforcement_kg} kg)")
+             f"Fe500/Fe550 TMT rebars at ~3.8 kg/sqft built-up area ({qty.steel_reinforcement_kg} kg){rebar_note}")
 
     # 3. Masonry Bricks & Mortar
     add_line("cost_bricks", "masonry", "red_brick", qty.brick_or_block_count,

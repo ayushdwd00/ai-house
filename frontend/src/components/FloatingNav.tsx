@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Sparkles, FolderGit2 } from "lucide-react";
 
-export type NavView = "home" | "plan" | "model" | "estimate" | "create" | "projects";
+export type NavView = "home" | "plan" | "model" | "structure" | "estimate" | "create" | "projects";
 
 interface FloatingNavProps {
   currentView: NavView;
@@ -27,12 +27,13 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
 }) => {
   // Navigation items strictly depend on whether we are in a project workspace or home/initial state
   // On Home (or before a project workspace is active): show strictly HOME | PROJECTS
-  // Inside Project Workspace: show HOME | PLAN | MODEL | ESTIMATE
+  // Inside Project Workspace: show HOME | PLAN | MODEL | STRUCTURE | ESTIMATE
   const navItems: { id: NavView; label: string }[] = isProjectWorkspace
     ? [
         { id: "home", label: "HOME" },
         { id: "plan", label: "PLAN" },
         { id: "model", label: "MODEL" },
+        { id: "structure", label: "STRUCTURE" },
         { id: "estimate", label: "ESTIMATE" },
       ]
     : [

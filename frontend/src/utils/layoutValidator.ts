@@ -1,4 +1,5 @@
 import { HouseLayout, Room, FloorPlan } from "@/types/house";
+import { generateFallbackLandscape } from "./landscapeFallback";
 
 export interface LayoutValidationResult {
   isValid: boolean;
@@ -244,6 +245,20 @@ export function validateAndSanitizeHouseLayoutDetailed(
     doors: primaryFloor.doors,
     windows: primaryFloor.windows,
     entry_point: layout.entry_point || { x: plotWidth / 2, y: plotLength, direction: 0 },
+    structural_planning: layout.structural_planning,
+    landscape:
+      layout.landscape &&
+      ((layout.landscape.elements && layout.landscape.elements.length > 0) ||
+        (layout.landscape.zones && layout.landscape.zones.length > 0))
+        ? layout.landscape
+        : generateFallbackLandscape({
+            ...layout,
+            plot_width: plotWidth,
+            plot_length: plotLength,
+            floors: sanitizedFloors,
+            rooms: primaryFloor.rooms,
+            doors: primaryFloor.doors,
+          } as HouseLayout),
   };
 
   return {

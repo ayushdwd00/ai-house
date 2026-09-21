@@ -252,8 +252,160 @@ export interface HouseStats {
   circulation_area_sqft?: number;
 }
 
+export interface StructuralColumn {
+  column_id: string;
+  column_type: "corner" | "wall_intersection" | "perimeter" | "stair_support" | "span_support" | "parking_boundary" | "preliminary_column_candidate";
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  floors?: number[];
+  floor_ids?: number[];
+  supporting_relationship?: string;
+  confidence: "PRELIMINARY";
+  assumptions?: string[];
+}
+
+export interface StructuralBeam {
+  beam_id: string;
+  start_column_id?: string;
+  end_column_id?: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  depth: number;
+  beam_type: "plinth_beam" | "floor_beam" | "tie_beam" | "roof_beam" | string;
+  span_ft: number;
+  floors: number[];
+}
+
+export interface StructuralGrid {
+  rows: number;
+  columns: number;
+  x_grid_lines: number[];
+  y_grid_lines: number[];
+}
+
+export interface StructuralValidationReport {
+  unsupported_spans?: Array<{ span_type?: string; from_column?: string; to_column?: string; span_ft?: number; recommendation?: string }>;
+  unusually_large_spans?: Array<{ span_type?: string; from_column?: string; to_column?: string; span_ft?: number; recommendation?: string }>;
+  columns_conflicting_doors?: string[];
+  columns_conflicting_stairs?: string[];
+  columns_conflicting_parking?: string[];
+  column_alignment_issues?: string[];
+  is_acceptable_preliminary?: boolean;
+  summary?: string;
+}
+
+export interface StructuralPlanning {
+  structural_system?: string;
+  columns?: StructuralColumn[];
+  column_count?: number;
+  beams?: StructuralBeam[];
+  beam_count?: number;
+  grid?: StructuralGrid;
+  assumptions?: string[];
+  validation_report?: StructuralValidationReport;
+  column_grid_suggestions?: Array<{ column_id?: string; x?: number; y?: number; dimensions_in?: string; type?: string; floors?: number[] }>;
+  structural_zones?: Array<{ zone_name?: string; bounds?: Rect; recommendation?: string }>;
+  load_bearing_wall_candidates?: string[];
+  stair_core_location?: { x: number; y: number; width: number; length: number } | null;
+  slab_assumptions?: Record<string, unknown>;
+  disclaimer?: string;
+}
+
+export type LandscapeElementType =
+  | "lawn"
+  | "tree"
+  | "shrub"
+  | "flower_bed"
+  | "planter"
+  | "pathway"
+  | "driveway"
+  | "garden_seating"
+  | "outdoor_light"
+  | "water_feature"
+  | "pergola"
+  | "courtyard"
+  | "hedge"
+  | "boundary_greenery";
+
+export type LandscapeZoneType =
+  | "front_garden"
+  | "rear_garden"
+  | "side_garden"
+  | "courtyard"
+  | "entrance_pathway"
+  | "driveway"
+  | "parking_landscape"
+  | "boundary_planting"
+  | "other";
+
+export interface LandscapeElement {
+  element_id: string;
+  type: LandscapeElementType;
+  x: number;
+  y: number;
+  width?: number;
+  length?: number;
+  radius?: number;
+  height?: number;
+  species?: string;
+  zone?: LandscapeZoneType;
+  properties?: Record<string, unknown>;
+  points?: Point2D[];
+}
+
+export interface LandscapeZone {
+  zone_id: string;
+  name: string;
+  zone_type: LandscapeZoneType;
+  rect?: Rect;
+  area_sqft: number;
+  description?: string;
+}
+
+export interface LandscapePlan {
+  plan_id: string;
+  zones: LandscapeZone[];
+  elements: LandscapeElement[];
+  paths: LandscapeElement[];
+  driveway?: LandscapeElement;
+  outdoor_features: LandscapeElement[];
+  total_green_area_sqft: number;
+  green_coverage_percentage: number;
+  trees_count: number;
+  lights_count: number;
+  water_features_count: number;
+  style: string;
+  summary?: string;
+}
+
+export interface LandscapePreferences {
+  style?: string;
+  front_garden?: boolean;
+  rear_garden?: boolean;
+  pathway_type?: string;
+  entrance_pathway?: boolean;
+  outdoor_lighting?: boolean;
+  tree_density?: "low" | "medium" | "dense";
+  greenery_level?: "low" | "medium" | "high" | "dense";
+  boundary_hedges?: boolean;
+  boundary_planting?: boolean;
+  trees?: number;
+  courtyard?: boolean;
+  water_feature?: boolean;
+  lawn_priority?: boolean;
+  outdoor_seating?: boolean;
+  notes?: string;
+}
+
 export interface HouseLayout {
   id: string;
+  project_id?: string;
+  version_number?: number;
   title: string;
   designer_rationale: string;
   plot_width: number;
@@ -267,6 +419,12 @@ export interface HouseLayout {
   vastu_result?: VastuResult;
   critic_notes?: string[];
   metadata?: Record<string, unknown>;
+  structural_planning?: StructuralPlanning;
+  structural_system?: string;
+  landscape?: LandscapePlan;
+  construction_spec?: Record<string, unknown>;
+  quantities?: Record<string, unknown>;
+  cost_estimate?: Record<string, unknown>;
   rooms: Room[];
   walls?: Wall[];
   exterior_walls: Wall[];
@@ -274,6 +432,27 @@ export interface HouseLayout {
   doors: Door[];
   windows: WindowItem[];
   entry_point: { x: number; y: number; direction: number };
+}
+
+export interface DreamHomeStructuredRequirements {
+  plot: { length: number | null; width: number | null; unit: string };
+  floors: number;
+  bedrooms: number;
+  bathrooms: number;
+  attached_bathrooms?: number | null;
+  kitchen: boolean;
+  living_room: boolean;
+  dining_room: boolean;
+  parking: { required: boolean; cars: number };
+  staircase: { required: boolean; future_floor: boolean };
+  preferences: string[];
+  style: string;
+  natural_light_priority: boolean;
+  open_kitchen: boolean;
+  special_requirements: string[];
+  missing_critical_fields: string[];
+  clarification_prompt?: string | null;
+  designer_intent?: string;
 }
 
 export interface IntakeRequest {

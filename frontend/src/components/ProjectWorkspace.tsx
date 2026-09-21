@@ -58,14 +58,32 @@ const EstimateView = dynamic(
   }
 );
 
+const StructureView = dynamic(
+  () => import("@/components/StructureView").then((m) => m.StructureView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#0A0B0E] text-[#9E9C98]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#C48446] mb-3" />
+        <span className="text-xs font-mono tracking-widest uppercase">Analyzing Structural Grid & Columns...</span>
+      </div>
+    ),
+  }
+);
+
 const ArchitecturalConsultation = dynamic(
   () => import("@/components/ArchitecturalConsultation").then((m) => m.ArchitecturalConsultation),
   { ssr: false }
 );
 
+const DreamHomeConsultationModal = dynamic(
+  () => import("@/components/DreamHomeConsultationModal").then((m) => m.DreamHomeConsultationModal),
+  { ssr: false }
+);
+
 interface ProjectWorkspaceProps {
   projectId: string;
-  initialTab?: "plan" | "model" | "estimate";
+  initialTab?: "plan" | "model" | "structure" | "estimate";
 }
 
 export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
@@ -81,7 +99,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     isHydrated,
   } = useProject();
 
-  const [currentTab, setCurrentTab] = useState<"plan" | "model" | "estimate">(initialTab);
+  const [currentTab, setCurrentTab] = useState<"plan" | "model" | "structure" | "estimate">(initialTab);
   const [layout, setLayout] = useState<HouseLayout | null>(activeProject);
   const [isLoadingProject, setIsLoadingProject] = useState(!activeProject || activeProject.id !== projectId);
 
@@ -99,6 +117,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // Modals & Async States
   const [isCreateChoiceOpen, setIsCreateChoiceOpen] = useState(false);
   const [isConsultationOpen, setIsConsultationOpen] = useState(false);
+  const [isDreamHomeOpen, setIsDreamHomeOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -153,7 +172,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       setIsCreateChoiceOpen(true);
     } else if (view === "projects") {
       setIsProjectsOpen(true);
-    } else if (view === "plan" || view === "model" || view === "estimate") {
+    } else if (view === "plan" || view === "model" || view === "structure" || view === "estimate") {
       setCurrentTab(view);
       router.push(`/project/${projectId}/${view}`);
     }
@@ -350,7 +369,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                     if (id) setSelectedFurnitureId(null);
                   }}
                   onSelectFurniture={(id) => setSelectedFurnitureId(id)}
-                  isDarkMode={true}
+                  isDarkMode={false}
                   lightingPreset={lightingPreset}
                   onChangeLightingPreset={setLightingPreset}
                   cameraPreset={cameraPreset}
@@ -372,7 +391,36 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </motion.div>
           )}
 
-          {/* 3. ESTIMATE & MATERIAL QUANTIFICATION */}
+          {/* 3. STRUCTURE TECHNICAL ARCHITECTURE VIEW */}
+          {currentTab === "structure" && (
+            <motion.div
+              key="view-structure"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="w-full h-full relative"
+            >
+              <ErrorBoundary
+                componentName="Technical Structure View"
+                fallbackMessage="The preliminary structural drawing engine encountered an issue."
+              >
+                <StructureView
+                  layout={layout}
+                  activeFloorIndex={activeFloorIndex}
+                  onSelectFloor={setActiveFloorIndex}
+                />
+              </ErrorBoundary>
+
+              <FloatingAICommandBar
+                onApplyInstruction={handleRefine}
+                isLoading={isRefining}
+                selectedRoomName={selectedRoom?.name}
+              />
+            </motion.div>
+          )}
+
+          {/* 4. ESTIMATE & MATERIAL QUANTIFICATION */}
           {currentTab === "estimate" && (
             <motion.div
               key="view-estimate"
@@ -388,7 +436,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         </AnimatePresence>
       </main>
 
-      {/* CREATE WORKSPACE CHOICE MODAL (DESIGN A NEW HOME vs I ALREADY HAVE A FLOOR PLAN) */}
+      {/* CREATE WORKSPACE CHOICE MODAL (DESIGN A NEW HOME vs I ALREADY HAVE A FLOOR PLAN vs DESCRIBE DREAM HOME) */}
       <CreateChoiceModal
         isOpen={isCreateChoiceOpen}
         onClose={() => setIsCreateChoiceOpen(false)}
@@ -400,6 +448,17 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           setIsCreateChoiceOpen(false);
           setIsUploadOpen(true);
         }}
+        onSelectDreamHome={() => {
+          setIsCreateChoiceOpen(false);
+          setIsDreamHomeOpen(true);
+        }}
+      />
+
+      {/* DREAM HOME NATURAL LANGUAGE CONSULTATION */}
+      <DreamHomeConsultationModal
+        isOpen={isDreamHomeOpen}
+        onClose={() => setIsDreamHomeOpen(false)}
+        onSuccess={handleUploadSuccess}
       />
 
       {/* ONE-QUESTION-AT-A-TIME ARCHITECTURAL CONSULTATION */}

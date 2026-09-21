@@ -51,7 +51,7 @@ def get_groq_client():
         return None
 
 
-from models import ArchitecturalRequirements
+from models import ArchitecturalRequirements, DreamHomeStructuredRequirements, LandscapePreferences
 
 # =============================================================================
 # 1. Pydantic Structured Output Models
@@ -199,6 +199,49 @@ def interpret_requirements_with_groq(prompt: str) -> ArchitecturalRequirements:
 
     vastu = "vastu" in lower or "vaastu" in lower
 
+    # Landscape intent parsing
+    has_landscape_request = any(k in lower for k in [
+        "garden", "greenery", "landscape", "landscaping", "lawn", "trees", "tree", "plants",
+        "pathway", "path", "courtyard", "outdoor light", "lights", "water feature", "backyard"
+    ])
+    ls_prefs = None
+    if has_landscape_request:
+        ls_style = "modern_minimal"
+        if "tropical" in lower or "lush" in lower:
+            ls_style = "lush_tropical"
+        elif "traditional" in lower or "classical" in lower:
+            ls_style = "traditional"
+        elif "scandinavian" in lower or "nordic" in lower:
+            ls_style = "scandinavian"
+        
+        greenery_lvl = "medium"
+        if "lots of greenery" in lower or "dense greenery" in lower or "lots of plants" in lower:
+            greenery_lvl = "dense"
+        elif "minimal" in lower or "minimalist" in lower:
+            greenery_lvl = "low"
+            
+        tree_count = None
+        tree_match = re.search(r'(\d+)\s*(?:tree|trees)\b', lower)
+        if tree_match:
+            tree_count = int(tree_match.group(1))
+
+        ls_prefs = LandscapePreferences(
+            style=ls_style,
+            front_garden="front garden" in lower or "garden in the front" in lower or "small front garden" in lower or "garden" in lower,
+            rear_garden="rear garden" in lower or "back garden" in lower or "backyard" in lower or ("keep the backyard open" not in lower),
+            pathway_type="stepping_stones" if "minimal" in lower else "paved_stone",
+            entrance_pathway="pathway" in lower or "path" in lower or "entrance" in lower,
+            outdoor_lighting="light" in lower or "lighting" in lower,
+            greenery_level=greenery_lvl,
+            boundary_hedges="boundary" in lower or "hedge" in lower or "hedges" in lower,
+            boundary_planting="boundary" in lower or "perimeter" in lower,
+            trees=tree_count,
+            courtyard="courtyard" in lower,
+            water_feature="water feature" in lower or "fountain" in lower or "pond" in lower,
+            lawn_priority=True,
+            outdoor_seating="seating" in lower or "bench" in lower
+        )
+
     return ArchitecturalRequirements(
         plot_width=plot_w,
         plot_length=plot_l,
@@ -215,7 +258,8 @@ def interpret_requirements_with_groq(prompt: str) -> ArchitecturalRequirements:
         patio_balcony_requirement=has_patio,
         courtyard_requirement=has_courtyard,
         user_prompt=prompt,
-        designer_intent=f"Residential layout for {bedrooms} bedrooms on {plot_w}x{plot_l}ft site facing {road}."
+        designer_intent=f"Residential layout for {bedrooms} bedrooms on {plot_w}x{plot_l}ft site facing {road}.",
+        landscape_preferences=ls_prefs
     )
 
 
@@ -225,6 +269,252 @@ def parse_intake_with_groq_or_fallback(prompt: str) -> Dict[str, Any]:
     res = req.model_dump()
     res["ai_note"] = req.designer_intent
     return res
+
+
+def interpret_dream_home_prompt(
+    prompt: str,
+    existing_context: Optional[Dict[str, Any]] = None
+) -> DreamHomeStructuredRequirements:
+    """
+    Translates free-form natural language dream home briefs into structured
+    architectural requirements adhering to DreamHomeStructuredRequirements schema.
+    Uses Groq LLM reasoning with JSON schema when available, with an intelligent
+    deterministic fallback parser.
+    """
+    client = get_groq_client()
+    if client and len(prompt.strip()) > 3:
+        system_prompt = (
+            "You are a Principal Residential Architect. "
+            "Extract structured architectural requirements from the user's natural language dream home description. "
+            "Adhere strictly to this JSON schema:\n"
+            + json.dumps(DreamHomeStructuredRequirements.model_json_schema(), indent=2)
+            + "\nCRITICAL RULES:\n"
+            "- If plot dimensions (e.g. 30x50, 40x60, 1500 sqft) are completely omitted and not in context, "
+            "flag 'missing_critical_fields': ['plot_dimensions'] and set 'clarification_prompt': 'What is your plot size? (e.g. 30×50 ft)'\n"
+            "- If 'future first floor' or 'future floor' is requested, set staircase.required=true and staircase.future_floor=true, with floors=1.\n"
+            "- For 'open kitchen', set open_kitchen=true.\n"
+            "- Extract bedroom count, attached bathrooms, car parking, and priorities."
+        )
+        ctx_str = f"\nExisting context: {json.dumps(existing_context)}" if existing_context else ""
+        for model_name in dict.fromkeys(TEXT_MODEL_CANDIDATES):
+            try:
+                print(f"[DREAM HOME AI] Parsing with Groq model '{model_name}'...")
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt + ctx_str}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.15,
+                    max_tokens=800
+                )
+                data = json.loads(response.choices[0].message.content)
+                req = DreamHomeStructuredRequirements.model_validate(data)
+                print(f"[DREAM HOME AI] SUCCESS parsed by '{model_name}'.")
+                return req
+            except Exception as e:
+                print(f"[DREAM HOME AI] Groq attempt with '{model_name}' failed: {_safe_str(e)}")
+
+    # Deterministic Heuristic Architectural Parser
+    lower = prompt.lower().strip()
+    ctx = existing_context or {}
+
+    # Check if prompt contains plot dimensions
+    dim_match = re.search(r'(\d{2,3})\s*(?:x|by|\*|×)\s*(\d{2,3})', lower)
+    sqft_match = re.search(r'(\d{3,5})\s*(?:sq\s*ft|sqft)', lower)
+
+    plot_w: Optional[float] = None
+    plot_l: Optional[float] = None
+    if dim_match:
+        plot_w = float(dim_match.group(1))
+        plot_l = float(dim_match.group(2))
+    elif sqft_match:
+        sqft = float(sqft_match.group(1))
+        side = (sqft / 1.15) ** 0.5
+        plot_l = round(side, 1)
+        plot_w = round(sqft / plot_l, 1)
+    elif ctx.get("plot", {}).get("width") and ctx.get("plot", {}).get("length"):
+        plot_w = float(ctx["plot"]["width"])
+        plot_l = float(ctx["plot"]["length"])
+
+    # Floors
+    floors = ctx.get("floors", 1)
+    if any(k in lower for k in ["g+1", "g + 1", "2-story", "2 story", "two story", "two floors", "2 floors", "duplex"]):
+        floors = 2
+    elif any(k in lower for k in ["g+2", "g + 2", "3-story", "3 story", "three story"]):
+        floors = 3
+
+    # Future first floor / staircase logic
+    has_future_floor = any(k in lower for k in ["future first floor", "future 1st floor", "future floor", "future expansion", "future level"])
+    staircase_needed = has_future_floor or floors > 1 or any(k in lower for k in ["staircase", "stairs", "stair"])
+
+    # Bedrooms
+    bedrooms = ctx.get("bedrooms", 3)
+    bhk_match = re.search(r'(\d+)\s*bhk\b', lower)
+    bed_match = re.search(r'(\d+)\s*(?:bed|bedroom|bds|br)\b', lower)
+    if bhk_match:
+        bedrooms = int(bhk_match.group(1))
+    elif bed_match:
+        bedrooms = int(bed_match.group(1))
+    bedrooms = max(1, min(6, bedrooms))
+
+    # Bathrooms
+    bathrooms = float(ctx.get("bathrooms", 2.0))
+    bath_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:bath|bathroom|ba)\b', lower)
+    if bath_match:
+        bathrooms = float(bath_match.group(1))
+    bathrooms = max(1.0, min(5.0, bathrooms))
+
+    # Attached bathrooms
+    attached_baths: Optional[int] = ctx.get("attached_bathrooms")
+    if "one attached" in lower or "1 attached" in lower:
+        attached_baths = 1
+    elif "two attached" in lower or "2 attached" in lower:
+        attached_baths = 2
+    elif "all attached" in lower or "each attached" in lower:
+        attached_baths = bedrooms
+    else:
+        att_match = re.search(r'(\d+)\s*attached\b', lower)
+        if att_match:
+            attached_baths = int(att_match.group(1))
+
+    # Parking
+    cars = 1
+    parking_req = True
+    if any(k in lower for k in ["two car", "two cars", "2 car", "2 cars", "two suv", "two suvs", "2 suv", "2 suvs"]):
+        cars = 2
+    elif "no parking" in lower or "without parking" in lower:
+        parking_req = False
+        cars = 0
+    elif "parking" in lower or "car" in lower:
+        cars = 1
+
+    # Open kitchen
+    open_kitchen = True
+    if "closed kitchen" in lower or "separate kitchen" in lower:
+        open_kitchen = False
+
+    # Style
+    style = "modern"
+    if "contemporary" in lower:
+        style = "contemporary"
+    elif "farmhouse" in lower:
+        style = "farmhouse"
+    elif "scandinavian" in lower:
+        style = "scandinavian"
+    elif "minimalist" in lower:
+        style = "minimalist"
+    elif "traditional" in lower:
+        style = "traditional"
+
+    # Priorities & Preferences
+    prefs: List[str] = []
+    natural_light = ("lots of natural light" in lower or "natural light" in lower or "sunlight" in lower or "bright" in lower)
+    if natural_light:
+        prefs.append("Maximized natural daylight and cross ventilation")
+    if "large living" in lower or "big living" in lower:
+        prefs.append("Expanded living room area")
+    if "privacy" in lower:
+        prefs.append("Enhanced bedroom privacy zoning")
+    if open_kitchen:
+        prefs.append("Seamless open kitchen and dining integration")
+    if has_future_floor:
+        prefs.append("Future first-floor expansion with structural stair core alignment")
+    if "parents" in lower:
+        prefs.append("Ground floor elderly-accessible bedroom near living")
+
+    # Special requirements
+    specials: List[str] = []
+    if any(k in lower for k in ["pooja", "puja", "mandir"]):
+        specials.append("Pooja Room")
+    if any(k in lower for k in ["office", "study", "work from home"]):
+        specials.append("Home Office")
+    if any(k in lower for k in ["balcony", "patio", "terrace", "deck"]):
+        specials.append("Covered Balcony / Patio")
+    if "courtyard" in lower:
+        specials.append("Central Courtyard")
+
+    # Check for missing critical fields
+    missing_fields: List[str] = []
+    clarification: Optional[str] = None
+    if plot_w is None or plot_l is None:
+        missing_fields.append("plot_dimensions")
+        clarification = "What is your plot size? (e.g. 30×50 ft)"
+
+    intent = (
+        f"Custom {bedrooms}BHK {style.capitalize()} home brief"
+        + (f" on {plot_w}×{plot_l} ft site" if plot_w and plot_l else "")
+        + f" with {cars}-car parking"
+        + (", open kitchen" if open_kitchen else "")
+        + (", future first-floor stair core" if has_future_floor else "")
+        + "."
+    )
+
+    # Check landscape preferences in dream home prompt
+    has_landscape_request = any(k in lower for k in [
+        "garden", "greenery", "landscape", "landscaping", "lawn", "trees", "tree", "plants",
+        "pathway", "path", "courtyard", "outdoor light", "lights", "water feature", "backyard"
+    ])
+    dream_landscape_prefs = None
+    if has_landscape_request:
+        ls_style = "modern_minimal"
+        if "tropical" in lower or "lush" in lower:
+            ls_style = "lush_tropical"
+        elif "traditional" in lower or "classical" in lower:
+            ls_style = "traditional"
+        elif "scandinavian" in lower or "nordic" in lower:
+            ls_style = "scandinavian"
+
+        greenery_lvl = "medium"
+        if "lots of greenery" in lower or "dense greenery" in lower or "lots of plants" in lower:
+            greenery_lvl = "dense"
+        elif "minimal" in lower or "minimalist" in lower:
+            greenery_lvl = "low"
+
+        tree_count = None
+        tree_match = re.search(r'(\d+)\s*(?:tree|trees)\b', lower)
+        if tree_match:
+            tree_count = int(tree_match.group(1))
+
+        dream_landscape_prefs = LandscapePreferences(
+            style=ls_style,
+            front_garden="front garden" in lower or "garden in the front" in lower or "small front garden" in lower or "garden" in lower,
+            rear_garden="rear garden" in lower or "back garden" in lower or "backyard" in lower or ("keep the backyard open" not in lower),
+            pathway_type="stepping_stones" if "minimal" in lower else "paved_stone",
+            entrance_pathway="pathway" in lower or "path" in lower or "gate to the entrance" in lower or "entrance" in lower,
+            outdoor_lighting="light" in lower or "lighting" in lower,
+            greenery_level=greenery_lvl,
+            boundary_hedges="boundary" in lower or "hedge" in lower or "hedges" in lower,
+            boundary_planting="boundary" in lower or "perimeter" in lower,
+            trees=tree_count,
+            courtyard="courtyard" in lower,
+            water_feature="water feature" in lower or "fountain" in lower or "pond" in lower,
+            lawn_priority=True,
+            outdoor_seating="seating" in lower or "bench" in lower
+        )
+
+    return DreamHomeStructuredRequirements(
+        plot={"length": plot_l, "width": plot_w, "unit": "ft"},
+        floors=floors,
+        bedrooms=bedrooms,
+        bathrooms=bathrooms,
+        attached_bathrooms=attached_baths,
+        kitchen=True,
+        living_room=True,
+        dining_room=True,
+        parking={"required": parking_req, "cars": cars},
+        staircase={"required": staircase_needed, "future_floor": has_future_floor},
+        preferences=prefs,
+        style=style,
+        natural_light_priority=natural_light,
+        open_kitchen=open_kitchen,
+        special_requirements=specials,
+        missing_critical_fields=missing_fields,
+        clarification_prompt=clarification,
+        designer_intent=intent,
+        landscape_preferences=dream_landscape_prefs
+    )
 
 
 # =============================================================================
@@ -519,22 +809,40 @@ def interpret_modification_with_groq(
         target_type = "living_room"
     elif "dining" in lower:
         target_type = "dining"
+    elif "parking" in lower or "suv" in lower or "car" in lower:
+        target_type = "parking"
+    elif "staircase" in lower or "stair" in lower:
+        target_type = "staircase"
     elif "bedroom 2" in lower or "second bedroom" in lower:
+        target_type = "bedroom"
+    elif "bedroom" in lower:
         target_type = "bedroom"
     elif "foyer" in lower or "entry" in lower:
         target_type = "entry_foyer"
 
     op = "enlarge"
     dw, dl = 2.0, 2.0
+    partner = None
+
     if any(k in lower for k in ["smaller", "reduce", "shrink"]):
         op = "shrink"
         dw, dl = -2.0, -2.0
     elif "attached bath" in lower or "add bathroom" in lower:
         op = "add_attached_bath"
-    elif "closer" in lower or "move" in lower:
+    elif any(k in lower for k in ["closer", "move", "near", "put"]):
         op = "relocate_closer"
+        if "dining" in lower:
+            partner = "dining"
+        elif any(k in lower for k in ["entrance", "entry", "foyer"]):
+            partner = "entry_foyer"
+        elif "living" in lower:
+            partner = "living_room"
+    elif "private" in lower or "privacy" in lower:
+        op = "general_adjust"
+        dw, dl = 0.0, 0.0
 
-    partner = "dining" if target_type == "kitchen" else None
+    if not partner and target_type == "kitchen":
+        partner = "dining"
 
     return NaturalLanguageModificationCommand(
         target_room_type=target_type,
@@ -605,3 +913,134 @@ def analyze_floorplan_image(image_base64: str) -> Dict[str, Any]:
         "suggested_length": 32.0,
         "confidence": 0.88
     }
+
+
+# =============================================================================
+# 7. AI Construction & Value-Engineering Advisor
+# =============================================================================
+def generate_construction_advice_with_groq(
+    layout: Any,
+    quantities: Any,
+    cost_estimate: Any
+) -> Dict[str, Any]:
+    """
+    Analyzes calculated geometry, physical quantities takeoff, and cost estimates using Groq
+    to provide actionable value-engineering recommendations.
+    Deterministic rules calculate quantities/costs; Groq provides qualitative architectural advice.
+    """
+    client = get_groq_client()
+    bua = getattr(quantities, "built_up_area_sqft", 1500.0) or 1500.0
+    total_exp = getattr(cost_estimate, "total_expected", 3500000.0) or 3500000.0
+    col_count = getattr(quantities, "structural_columns_count", 12) or 12
+    spec = getattr(layout, "construction_spec", None)
+    tier = getattr(spec, "quality_tier", "STANDARD") if spec else "STANDARD"
+
+    # Contextual data for LLM
+    context = {
+        "built_up_area_sqft": round(bua, 1),
+        "total_expected_inr": round(total_exp, 2),
+        "cost_per_sqft_inr": round(total_exp / max(100.0, bua), 1),
+        "quality_tier": str(tier).upper(),
+        "preliminary_column_count": col_count,
+        "external_wall_length_ft": getattr(quantities, "external_wall_length_ft", 0.0),
+        "internal_wall_length_ft": getattr(quantities, "internal_wall_length_ft", 0.0),
+        "flooring_area_sqft": getattr(quantities, "flooring_area_sqft", 0.0),
+        "concrete_volume_cum": getattr(quantities, "concrete_volume_cum", 0.0),
+        "steel_reinforcement_kg": getattr(quantities, "steel_reinforcement_kg", 0.0)
+    }
+
+    if client:
+        system_prompt = (
+            "You are a Chief Residential Construction Engineer and Value-Engineering Specialist for Indian homes. "
+            "Analyze the provided actual geometric takeoff and cost estimate. "
+            "Formulate 3-5 concrete, actionable architectural recommendations to optimize cost, structural efficiency, "
+            "material consumption, and services routing without sacrificing aesthetic quality. "
+            "CRITICAL RULES:\n"
+            "- Do NOT invent arbitrary quantities or exact rupee savings unless directly based on the provided data.\n"
+            "- Output strictly valid JSON matching this schema:\n"
+            "{\n"
+            '  "summary": "Overall construction cost and efficiency evaluation",\n'
+            '  "recommendations": [\n'
+            '    {\n'
+            '      "title": "Clear concise recommendation title",\n'
+            '      "reason": "Detailed architectural rationale explaining why",\n'
+            '      "impact": "HIGH" | "MEDIUM" | "LOW",\n'
+            '      "category": "COST" | "LAYOUT" | "CONSTRUCTION" | "MATERIAL" | "SERVICES",\n'
+            '      "estimated_impact": "e.g. 4-7% structural concrete reduction or consolidated plumbing stack"\n'
+            '    }\n'
+            '  ]\n'
+            "}"
+        )
+
+        for model_name in dict.fromkeys(TEXT_MODEL_CANDIDATES):
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": json.dumps(context)}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.2,
+                    max_tokens=900
+                )
+                data = json.loads(response.choices[0].message.content)
+                if "summary" in data and "recommendations" in data:
+                    print(f"[AI ADVISOR] Generated construction advice using '{model_name}'.")
+                    return data
+            except Exception as e:
+                print(f"[AI ADVISOR] Groq advice attempt with '{model_name}' failed: {_safe_str(e)}")
+
+    # Deterministic Heuristic Architectural Advisor Fallback
+    wall_ratio = getattr(quantities, "internal_wall_length_ft", 0.0) / max(1.0, bua)
+    recs = [
+        {
+            "title": "Optimize Internal Wall Thickness & Material",
+            "reason": (
+                "Using 4.5-inch AAC (Autoclaved Aerated Concrete) lightweight blocks for non-load-bearing internal partitions "
+                "instead of standard 9-inch red clay brick reduces dead load on beams and foundation while increasing carpet area by 2–4%."
+            ),
+            "impact": "HIGH",
+            "category": "MATERIAL",
+            "estimated_impact": "4-6% structural dead-load savings and improved thermal insulation."
+        },
+        {
+            "title": "Consolidated Vertical Plumbing Stacks",
+            "reason": (
+                "Ensure wet areas (kitchen, powder room, and attached bathrooms) share contiguous vertical shafts. "
+                "Minimizing horizontal pipe runs through RCC slabs prevents water seepage risks and reduces piping expenditure."
+            ),
+            "impact": "MEDIUM",
+            "category": "SERVICES",
+            "estimated_impact": "Reduces sanitary pipe footage by 15–20% and lowers maintenance complexity."
+        },
+        {
+            "title": "Standardize Structural Column Grid Spacing",
+            "reason": (
+                f"With {col_count} preliminary columns planned, aligning columns along common grid axes within 12–15 ft spans "
+                "maximizes two-way slab action and eliminates excessive depth requirements for transfer beams."
+            ),
+            "impact": "MEDIUM",
+            "category": "CONSTRUCTION",
+            "estimated_impact": "Optimizes RCC slab thickness to 125–150 mm, avoiding deep drops."
+        },
+        {
+            "title": "Natural Daylight & Cross-Ventilation Strategy",
+            "reason": (
+                "Orient habitable room fenestration towards North and East elevations where possible to harness glare-free daylight "
+                "while minimizing heat ingress from harsh South-West solar radiation."
+            ),
+            "impact": "LOW",
+            "category": "LAYOUT",
+            "estimated_impact": "Long-term reduction in daylight electrical load and HVAC power demand."
+        }
+    ]
+
+    return {
+        "summary": (
+            f"Preliminary budget of ₹{round(total_exp):,} at ₹{round(total_exp / max(100.0, bua)):,}/sqft "
+            f"reflects a solid {tier} specification. The structural envelope and wall layout demonstrate good material efficiency."
+        ),
+        "recommendations": recs
+    }
+

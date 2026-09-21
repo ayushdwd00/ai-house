@@ -161,12 +161,62 @@ def calculate_material_quantities(
     # 6. Boundary Wall (perimeter minus 10ft gate)
     boundary_len = max(0.0, round(2 * (plot_w + plot_l) - 10.0, 2))
 
+    # Column specific preliminary takeoff
+    columns_list = []
+    if layout.structural_planning and hasattr(layout.structural_planning, "columns"):
+        columns_list = layout.structural_planning.columns or []
+
+    column_count = len(columns_list)
+    column_concrete_cuft = 0.0
+    for col in columns_list:
+        w = getattr(col, "width", 0.75)
+        d = getattr(col, "depth", 0.75)
+        fl_count = len(getattr(col, "floors", [1])) or 1
+        column_concrete_cuft += (w * d * wall_height * fl_count)
+    column_concrete_cuft = round(column_concrete_cuft, 2)
+    column_concrete_cum = round(column_concrete_cuft * 0.0283168, 2)
+    # Preliminary reinforcement allowance: ~150 kg/m3 (assumption-based residential allowance)
+    column_rebar_allowance_kg = round(column_concrete_cum * 150.0, 1)
+
+    # Beam specific preliminary takeoff
+    beams_list = []
+    if layout.structural_planning and hasattr(layout.structural_planning, "beams"):
+        beams_list = layout.structural_planning.beams or []
+
+    beam_count = len(beams_list)
+    beam_length_ft = 0.0
+    beam_concrete_cuft = 0.0
+    for b in beams_list:
+        b_span = getattr(b, "span_ft", 0.0)
+        bw = getattr(b, "width", 0.75)
+        bd = getattr(b, "depth", 1.25)
+        b_floors = len(getattr(b, "floors", [1])) or 1
+        beam_length_ft += (b_span * b_floors)
+        beam_concrete_cuft += (bw * bd * b_span * b_floors)
+
+    beam_length_ft = round(beam_length_ft, 1)
+    beam_concrete_cuft = round(beam_concrete_cuft, 2)
+    beam_concrete_cum = round(beam_concrete_cuft * 0.0283168, 2)
+    beam_rebar_allowance_kg = round(beam_concrete_cum * 140.0, 1)
+
     itemized = {
         "masonry_wall_volume_cuft": total_net_wall_vol,
         "brick_count": brick_count,
         "mortar_volume_cuft": mortar_cuft,
         "structural_concrete_cum": total_concrete_cum,
         "steel_reinforcement_kg": steel_kg,
+        "column_count": column_count,
+        "column_concrete_volume_cuft": column_concrete_cuft,
+        "column_concrete_volume_cum": column_concrete_cum,
+        "column_reinforcement_allowance_kg": column_rebar_allowance_kg,
+        "column_reinforcement_note": "Assumption-based preliminary allowance (final schedule requires structural-engineer verification).",
+        "beam_count": beam_count,
+        "beam_length_ft": beam_length_ft,
+        "beam_concrete_volume_cuft": beam_concrete_cuft,
+        "beam_concrete_volume_cum": beam_concrete_cum,
+        "beam_reinforcement_allowance_kg": beam_rebar_allowance_kg,
+        "beam_reinforcement_note": "Assumption-based preliminary allowance.",
+        "structural_assumptions": layout.structural_planning.assumptions if layout.structural_planning else ["Standard residential RCC frame specification."],
         "internal_plaster_sqft": internal_plaster_sqft,
         "external_plaster_sqft": external_plaster_sqft,
         "flooring_sqft": flooring_sqft,

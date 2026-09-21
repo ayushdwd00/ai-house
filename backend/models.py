@@ -575,6 +575,22 @@ class MaterialQuantities(BaseModel):
     confidence: float = 0.88
     disclaimer: str = "Preliminary quantity estimate derived from architectural geometry. Actual site consumption may vary."
 
+    @property
+    def structural_columns_count(self) -> int:
+        return self.itemized_details.get("column_count", 0)
+
+    @property
+    def column_concrete_volume_cuft(self) -> float:
+        return self.itemized_details.get("column_concrete_volume_cuft", 0.0)
+
+    @property
+    def column_concrete_volume_cum(self) -> float:
+        return self.itemized_details.get("column_concrete_volume_cum", 0.0)
+
+    @property
+    def column_reinforcement_allowance_kg(self) -> float:
+        return self.itemized_details.get("column_reinforcement_allowance_kg", 0.0)
+
 class MaterialRate(BaseModel):
     material_id: str
     material_name: str
@@ -636,14 +652,77 @@ class BuildingServices(BaseModel):
     stacking_efficiency_score: float = 85.0
     notes: Optional[str] = None
 
+class StructuralColumn(BaseModel):
+    column_id: str = Field(..., description="Stable column identifier, e.g. C01, C02")
+    column_type: Literal[
+        "corner", "wall_intersection", "perimeter", "stair_support",
+        "span_support", "parking_boundary", "preliminary_column_candidate"
+    ] = "corner"
+    x: float = Field(..., description="X coordinate in feet")
+    y: float = Field(..., description="Y coordinate in feet")
+    width: float = Field(default=0.75, description="Column width in feet (0.75 ft = 9 in)")
+    depth: float = Field(default=0.75, description="Column depth in feet (0.75 ft = 9 in)")
+    floors: List[int] = Field(default_factory=lambda: [1], description="Floor numbers this column serves")
+    floor_ids: List[int] = Field(default_factory=lambda: [1], description="Alias for floors")
+    supporting_relationship: str = Field(default="ground_to_roof", description="Structural load path relationship")
+    confidence: Literal["PRELIMINARY"] = "PRELIMINARY"
+    assumptions: List[str] = Field(default_factory=list)
+
+    def __init__(self, **data):
+        if "floors" in data and "floor_ids" not in data:
+            data["floor_ids"] = list(data["floors"])
+        elif "floor_ids" in data and "floors" not in data:
+            data["floors"] = list(data["floor_ids"])
+        super().__init__(**data)
+
+class StructuralGrid(BaseModel):
+    rows: int = 1
+    columns: int = 1
+    x_grid_lines: List[float] = Field(default_factory=list)
+    y_grid_lines: List[float] = Field(default_factory=list)
+
+class StructuralValidationReport(BaseModel):
+    unsupported_spans: List[Dict[str, Any]] = Field(default_factory=list)
+    unusually_large_spans: List[Dict[str, Any]] = Field(default_factory=list)
+    columns_conflicting_doors: List[str] = Field(default_factory=list)
+    columns_conflicting_stairs: List[str] = Field(default_factory=list)
+    columns_conflicting_parking: List[str] = Field(default_factory=list)
+    column_alignment_issues: List[str] = Field(default_factory=list)
+    is_acceptable_preliminary: bool = True
+    summary: str = "Preliminary structural checks completed successfully."
+
+class StructuralBeam(BaseModel):
+    beam_id: str = Field(..., description="Stable beam identifier, e.g. B01, B02")
+    start_column_id: Optional[str] = None
+    end_column_id: Optional[str] = None
+    x1: float = Field(..., description="Start X coordinate in feet")
+    y1: float = Field(..., description="Start Y coordinate in feet")
+    x2: float = Field(..., description="End X coordinate in feet")
+    y2: float = Field(..., description="End Y coordinate in feet")
+    width: float = Field(default=0.75, description="Beam width in feet (0.75 ft = 9 in)")
+    depth: float = Field(default=1.25, description="Beam depth in feet (1.25 ft = 15 in)")
+    beam_type: Literal["plinth_beam", "floor_beam", "tie_beam", "roof_beam"] = "floor_beam"
+    span_ft: float = Field(..., description="Span length in feet")
+    floors: List[int] = Field(default_factory=lambda: [1], description="Floors where this beam is present")
+
 class StructuralPlanning(BaseModel):
-    structural_system: str = "RCC Frame"
+    structural_system: str = "RCC_FRAME"
+    columns: List[StructuralColumn] = Field(default_factory=list)
+    column_count: int = 0
+    beams: List[StructuralBeam] = Field(default_factory=list)
+    beam_count: int = 0
+    grid: Optional[StructuralGrid] = None
+    assumptions: List[str] = Field(default_factory=list)
+    validation_report: Optional[StructuralValidationReport] = None
     column_grid_suggestions: List[Dict[str, Any]] = Field(default_factory=list)
     structural_zones: List[Dict[str, Any]] = Field(default_factory=list)
     load_bearing_wall_candidates: List[str] = Field(default_factory=list)
     stair_core_location: Optional[Dict[str, float]] = None
     slab_assumptions: Dict[str, Any] = Field(default_factory=dict)
-    disclaimer: str = "Preliminary architectural planning only. Final structural design must be verified by a qualified structural engineer."
+    disclaimer: str = (
+        "Preliminary structural planning — final column size, spacing, "
+        "reinforcement and foundation design require structural-engineer verification."
+    )
 
 class FloorPlanSource(BaseModel):
     source_type: Literal["ai_generated", "image_upload", "camera_capture", "cad_import"] = "ai_generated"
@@ -668,7 +747,71 @@ class ReconstructionVerificationState(BaseModel):
     uncertain_entities: List[Dict[str, Any]] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
     suggested_corrections: List[str] = Field(default_factory=list)
-    scale_calibrated: bool = False
+LandscapeElementType = Literal[
+    "lawn", "tree", "shrub", "flower_bed", "planter",
+    "pathway", "driveway", "garden_seating", "outdoor_light",
+    "water_feature", "pergola", "courtyard", "hedge", "boundary_greenery"
+]
+
+LandscapeZoneType = Literal[
+    "front_garden", "rear_garden", "side_garden", "courtyard",
+    "entrance_pathway", "driveway", "parking_landscape", "boundary_planting", "other"
+]
+
+class LandscapeElement(BaseModel):
+    element_id: str = Field(..., description="Unique stable ID, e.g. TREE_01, PATH_01, LAWN_FRONT")
+    type: LandscapeElementType
+    x: float = Field(..., description="Center X coordinate in feet")
+    y: float = Field(..., description="Center Y coordinate in feet")
+    width: Optional[float] = None
+    length: Optional[float] = None
+    radius: Optional[float] = None
+    height: Optional[float] = None
+    species: Optional[str] = None
+    zone: Optional[LandscapeZoneType] = None
+    properties: Dict[str, Any] = Field(default_factory=dict)
+    points: Optional[List[Point2D]] = None
+
+class LandscapeZone(BaseModel):
+    zone_id: str
+    name: str
+    zone_type: LandscapeZoneType = "front_garden"
+    rect: Optional[Rect] = None
+    area_sqft: float = 0.0
+    description: Optional[str] = None
+
+class LandscapePlan(BaseModel):
+    plan_id: str = "LANDSCAPE_01"
+    zones: List[LandscapeZone] = Field(default_factory=list)
+    elements: List[LandscapeElement] = Field(default_factory=list)
+    paths: List[LandscapeElement] = Field(default_factory=list)
+    driveway: Optional[LandscapeElement] = None
+    outdoor_features: List[LandscapeElement] = Field(default_factory=list)
+    total_green_area_sqft: float = 0.0
+    green_coverage_percentage: float = 0.0
+    trees_count: int = 0
+    lights_count: int = 0
+    water_features_count: int = 0
+    style: str = "modern_minimal"
+    summary: Optional[str] = None
+
+class LandscapePreferences(BaseModel):
+    style: Optional[str] = "modern_minimal"
+    front_garden: bool = True
+    rear_garden: bool = True
+    pathway_type: str = "stepping_stones"
+    entrance_pathway: bool = True
+    outdoor_lighting: bool = True
+    tree_density: Literal["low", "medium", "dense"] = "medium"
+    greenery_level: Literal["low", "medium", "high", "dense"] = "medium"
+    boundary_hedges: bool = True
+    boundary_planting: bool = True
+    trees: Optional[int] = None
+    courtyard: bool = False
+    water_feature: bool = False
+    lawn_priority: bool = True
+    outdoor_seating: bool = True
+    notes: Optional[str] = None
 
 class HouseLayout(BaseModel):
     id: str
@@ -691,6 +834,8 @@ class HouseLayout(BaseModel):
     cost_estimate: Optional[CostEstimate] = None
     building_services: Optional[BuildingServices] = None
     structural_planning: Optional[StructuralPlanning] = None
+    structural_system: Optional[str] = "RCC_FRAME"
+    landscape: Optional[LandscapePlan] = None
     floorplan_source: Optional[FloorPlanSource] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
@@ -744,6 +889,7 @@ class ArchitecturalRequirements(BaseModel):
     designer_intent: str = Field(default="", description="High-level architectural vision statement")
     notes: Optional[str] = None
     user_prompt: str = Field(default="", description="Original user prompt")
+    landscape_preferences: Optional[LandscapePreferences] = None
 
 class IntakeRequest(BaseModel):
     user_prompt: Optional[str] = None
@@ -760,6 +906,7 @@ class IntakeRequest(BaseModel):
     special_rooms: Optional[List[str]] = Field(default_factory=list)
     open_concept: Optional[bool] = True
     vastu_compliant: Optional[bool] = False
+    landscape_preferences: Optional[LandscapePreferences] = None
 
     def to_architectural_requirements(self) -> ArchitecturalRequirements:
         special = list(self.special_rooms or [])
@@ -784,7 +931,8 @@ class IntakeRequest(BaseModel):
             office_requirement=has_office,
             patio_balcony_requirement=has_patio,
             courtyard_requirement=has_courtyard,
-            user_prompt=self.user_prompt or ""
+            user_prompt=self.user_prompt or "",
+            landscape_preferences=self.landscape_preferences
         )
 
 class RefineRequest(BaseModel):
@@ -803,3 +951,61 @@ class EditRoomResponse(BaseModel):
     status: Literal["accepted", "autocorrected", "rejected"]
     reason: Optional[str] = None
     adjusted_rect: Rect
+
+class DreamHomeStructuredRequirements(BaseModel):
+    plot: Dict[str, Any] = Field(
+        default_factory=lambda: {"length": None, "width": None, "unit": "ft"},
+        description="Plot dimensions: length, width, unit"
+    )
+    floors: int = Field(default=1, description="Number of floors")
+    bedrooms: int = Field(default=3, description="Number of bedrooms")
+    bathrooms: float = Field(default=2.0, description="Number of bathrooms")
+    attached_bathrooms: Optional[int] = Field(default=None, description="Number of attached en-suite bathrooms")
+    kitchen: bool = Field(default=True, description="Whether kitchen is required")
+    living_room: bool = Field(default=True, description="Whether living room is required")
+    dining_room: bool = Field(default=True, description="Whether dining room is required")
+    parking: Dict[str, Any] = Field(
+        default_factory=lambda: {"required": True, "cars": 1},
+        description="Parking requirements"
+    )
+    staircase: Dict[str, Any] = Field(
+        default_factory=lambda: {"required": False, "future_floor": False},
+        description="Staircase requirements including future expansion"
+    )
+    preferences: List[str] = Field(default_factory=list, description="Architectural preferences")
+    style: str = Field(default="modern", description="Architectural style")
+    natural_light_priority: bool = Field(default=True, description="Daylight priority")
+    open_kitchen: bool = Field(default=True, description="Open kitchen concept")
+    special_requirements: List[str] = Field(default_factory=list, description="Specialized spaces or lifestyle requests")
+    missing_critical_fields: List[str] = Field(default_factory=list, description="Critical fields missing from user prompt")
+    clarification_prompt: Optional[str] = Field(default=None, description="Short targeted question for missing critical information")
+    designer_intent: str = Field(default="", description="High-level architectural vision statement")
+    landscape_preferences: Optional[LandscapePreferences] = None
+
+    def to_intake_request(self) -> IntakeRequest:
+        p_w = self.plot.get("width")
+        p_l = self.plot.get("length")
+        # default to 40x50 if still unset
+        width_val = float(p_w) if p_w is not None else 40.0
+        length_val = float(p_l) if p_l is not None else 50.0
+
+        parking_cars = int(self.parking.get("cars", 1)) if self.parking.get("required", True) else 0
+
+        special = list(self.special_requirements or [])
+        if self.staircase.get("required") and "Staircase" not in special:
+            special.append("Staircase")
+
+        return IntakeRequest(
+            plot_width=width_val,
+            plot_length=length_val,
+            num_floors=self.floors,
+            bedrooms=self.bedrooms,
+            bathrooms=self.bathrooms,
+            attached_bathroom_count=self.attached_bathrooms,
+            parking_cars=parking_cars,
+            style=self.style or "Modern Scandinavian",
+            special_rooms=special,
+            open_concept=self.open_kitchen,
+            landscape_preferences=self.landscape_preferences,
+            user_prompt=f"Dream Home: {self.bedrooms} bed, {self.bathrooms} bath, {self.style} style"
+        )

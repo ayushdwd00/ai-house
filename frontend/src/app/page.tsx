@@ -23,6 +23,11 @@ const UploadModal = dynamic(
   { ssr: false }
 );
 
+const DreamHomeConsultationModal = dynamic(
+  () => import("@/components/DreamHomeConsultationModal").then((m) => m.DreamHomeConsultationModal),
+  { ssr: false }
+);
+
 const GenerationProgressModal = dynamic(
   () => import("@/components/GenerationProgressModal").then((m) => m.GenerationProgressModal),
   { ssr: false }
@@ -36,6 +41,7 @@ export default function HomePage() {
   const [isCreateChoiceOpen, setIsCreateChoiceOpen] = useState(false);
   const [isConsultationOpen, setIsConsultationOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isDreamHomeOpen, setIsDreamHomeOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
 
   // Synthesis States
@@ -61,6 +67,18 @@ export default function HomePage() {
   const handleSelectUploadPlan = () => {
     setIsCreateChoiceOpen(false);
     setIsUploadOpen(true);
+  };
+
+  // Triggered when user selects "3. DESCRIBE YOUR DREAM HOME"
+  const handleSelectDreamHome = () => {
+    setIsCreateChoiceOpen(false);
+    setIsDreamHomeOpen(true);
+  };
+
+  const handleDreamHomeSuccess = (layout: HouseLayout) => {
+    setIsDreamHomeOpen(false);
+    const newProjectId = createProject(layout);
+    router.push(`/project/${newProjectId}/plan`);
   };
 
   // Submit intake from step-by-step Architectural Consultation
@@ -156,12 +174,21 @@ export default function HomePage() {
 
       {/* CREATE FLOW CHOICE MODAL:
           1. DESIGN A NEW HOME
-          2. I ALREADY HAVE A FLOOR PLAN */}
+          2. I ALREADY HAVE A FLOOR PLAN
+          3. DESCRIBE YOUR DREAM HOME */}
       <CreateChoiceModal
         isOpen={isCreateChoiceOpen}
         onClose={() => setIsCreateChoiceOpen(false)}
         onSelectDesignNew={handleSelectDesignNew}
         onSelectUploadPlan={handleSelectUploadPlan}
+        onSelectDreamHome={handleSelectDreamHome}
+      />
+
+      {/* FLOW 3: NATURAL-LANGUAGE DESCRIBE YOUR DREAM HOME CONSULTATION MODAL */}
+      <DreamHomeConsultationModal
+        isOpen={isDreamHomeOpen}
+        onClose={() => setIsDreamHomeOpen(false)}
+        onSuccess={handleDreamHomeSuccess}
       />
 
       {/* FLOW 1: ONE-QUESTION-AT-A-TIME ARCHITECTURAL CONSULTATION */}

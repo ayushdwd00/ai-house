@@ -164,3 +164,63 @@ export async function editRoomLayout(
     return null;
   }
 }
+
+/**
+ * Interprets a natural language 'Describe Your Dream Home' prompt into a structured brief.
+ */
+export async function interpretDreamHomePrompt(
+  prompt: string,
+  context?: Record<string, unknown>
+): Promise<{
+  brief: import("@/types/house").DreamHomeStructuredRequirements;
+  ready_to_generate: boolean;
+  missing_critical_fields: string[];
+  clarification_prompt?: string | null;
+}> {
+  const url = `${API_BASE_URL}/api/dream-home/interpret`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, context }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to interpret dream home prompt (HTTP ${res.status})`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("[API ERROR] interpretDreamHomePrompt failed:", { url, error: err });
+    throw new Error(formatApiError(err));
+  }
+}
+
+/**
+ * Generates a full HouseLayout from confirmed DreamHomeStructuredRequirements.
+ */
+export async function generateDreamHomeLayout(
+  brief: import("@/types/house").DreamHomeStructuredRequirements
+): Promise<HouseLayout> {
+  const url = `${API_BASE_URL}/api/dream-home/generate`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(brief),
+    });
+
+    if (!res.ok) {
+      let detail = `Dream home generation failed (HTTP ${res.status})`;
+      try {
+        const errJson = await res.json();
+        if (errJson.detail) detail = String(errJson.detail);
+      } catch (_) {}
+      throw new Error(detail);
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("[API ERROR] generateDreamHomeLayout failed:", { url, error: err });
+    throw new Error(formatApiError(err));
+  }
+}
+
