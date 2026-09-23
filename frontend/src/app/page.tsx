@@ -96,11 +96,9 @@ export default function HomePage() {
         throw new Error("Received an incomplete or unrenderable architectural layout from the solver.");
       }
 
-      setTimeout(() => {
-        setIsGenerating(false);
-        const newProjectId = createProject(sanitized);
-        router.push(`/project/${newProjectId}/plan`);
-      }, 1200);
+      setIsGenerating(false);
+      const newProjectId = createProject(sanitized);
+      router.push(`/project/${newProjectId}/plan`);
     } catch (err) {
       console.error("[GENERATION ERROR]", err);
       setIsGenerating(false);

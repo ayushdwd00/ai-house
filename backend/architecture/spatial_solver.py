@@ -75,25 +75,37 @@ def solve_spatial_layout(
             x = model.NewIntVar(p_x, p_x, f"x_{r.id}")
             y = model.NewIntVar(p_y, p_y, f"y_{r.id}")
         else:
-            # Determine bounds in integer grid units
-            min_w = int(round(r.min_width * GRID_SCALE))
-            max_w = int(round(r.max_width * GRID_SCALE))
-            min_l = int(round(r.min_length * GRID_SCALE))
-            max_l = int(round(r.max_length * GRID_SCALE))
-            pref_w = int(round(r.preferred_width * GRID_SCALE))
-            pref_l = int(round(r.preferred_length * GRID_SCALE))
+            is_hard = getattr(r, "is_hard_constraint", False) or getattr(r, "size_mode", "") == "manual"
+            if is_hard:
+                # Level 1: HARD USER DIMENSION (strictly locked, never violated)
+                pref_w = int(round(r.preferred_width * GRID_SCALE))
+                pref_l = int(round(r.preferred_length * GRID_SCALE))
+                w = model.NewIntVar(pref_w, pref_w, f"w_{r.id}")
+                l = model.NewIntVar(pref_l, pref_l, f"l_{r.id}")
+                x = model.NewIntVar(0, max(0, env_w_int - pref_w), f"x_{r.id}")
+                y = model.NewIntVar(0, max(0, env_l_int - pref_l), f"y_{r.id}")
+                min_w = pref_w
+                min_l = pref_l
+            else:
+                # Level 2 & 3: PREFERRED & MINIMUM DIMENSIONS
+                min_w = int(round(r.min_width * GRID_SCALE))
+                max_w = int(round(r.max_width * GRID_SCALE))
+                min_l = int(round(r.min_length * GRID_SCALE))
+                max_l = int(round(r.max_length * GRID_SCALE))
+                pref_w = int(round(r.preferred_width * GRID_SCALE))
+                pref_l = int(round(r.preferred_length * GRID_SCALE))
 
-            # Clamp max within envelope
-            max_w = min(max_w, env_w_int)
-            max_l = min(max_l, env_l_int)
-            min_w = min(min_w, max_w)
-            min_l = min(min_l, max_l)
+                # Clamp max within envelope
+                max_w = min(max_w, env_w_int)
+                max_l = min(max_l, env_l_int)
+                min_w = min(min_w, max_w)
+                min_l = min(min_l, max_l)
 
-            # Variables
-            w = model.NewIntVar(min_w, max_w, f"w_{r.id}")
-            l = model.NewIntVar(min_l, max_l, f"l_{r.id}")
-            x = model.NewIntVar(0, env_w_int - min_w, f"x_{r.id}")
-            y = model.NewIntVar(0, env_l_int - min_l, f"y_{r.id}")
+                # Variables
+                w = model.NewIntVar(min_w, max_w, f"w_{r.id}")
+                l = model.NewIntVar(min_l, max_l, f"l_{r.id}")
+                x = model.NewIntVar(0, max(0, env_w_int - min_w), f"x_{r.id}")
+                y = model.NewIntVar(0, max(0, env_l_int - min_l), f"y_{r.id}")
 
         # Ensure containment within buildable envelope
         x_end = model.NewIntVar(min_w if not is_pinned else p_w, env_w_int, f"x_end_{r.id}")

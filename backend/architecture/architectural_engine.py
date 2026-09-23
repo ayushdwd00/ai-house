@@ -70,15 +70,191 @@ def build_room_program(
     bathrooms: float,
     attached_bathroom_count: Optional[int] = None,
     special_rooms: Optional[List[str]] = None,
-    open_concept: bool = True
+    open_concept: bool = True,
+    room_allocations: Optional[List[Any]] = None
 ) -> List[Room]:
     """
     Synthesizes an architectural room program with hard minimums,
     preferred optimization targets, and required adjacencies.
-    Supports user-specified attached_bathroom_count for en-suite bedrooms.
+    Supports user-specified attached_bathroom_count and explicit room_allocations.
     """
     rooms: List[Room] = []
     special_rooms = special_rooms or []
+
+    # If explicit user room allocations are supplied for this floor, build program from them
+    if room_allocations and len(room_allocations) > 0:
+        floor_allocs = []
+        for a in room_allocations:
+            f_num = getattr(a, "floor_number", None)
+            if f_num is None and isinstance(a, dict):
+                f_num = a.get("floor_number", 1)
+            if f_num == floor_num:
+                floor_allocs.append(a)
+
+        if floor_allocs:
+            for alloc in floor_allocs:
+                r_id = getattr(alloc, "room_id", None) or getattr(alloc, "id", None)
+                if not r_id and isinstance(alloc, dict):
+                    r_id = alloc.get("room_id") or alloc.get("id")
+                r_name = getattr(alloc, "name", None) or (alloc.get("name") if isinstance(alloc, dict) else "Room")
+                r_type = getattr(alloc, "type", None) or (alloc.get("type") if isinstance(alloc, dict) else "bedroom")
+                r_zone = getattr(alloc, "zone", None) or (alloc.get("zone") if isinstance(alloc, dict) else "private")
+
+                clean_type = r_type.lower()
+                alloc_len = getattr(alloc, "length", None) or (alloc.get("length") if isinstance(alloc, dict) else None)
+                alloc_wid = getattr(alloc, "width", None) or (alloc.get("width") if isinstance(alloc, dict) else None)
+                size_mode = getattr(alloc, "size_mode", "ai_recommended") or (alloc.get("size_mode") if isinstance(alloc, dict) else "ai_recommended")
+                is_hard = getattr(alloc, "is_hard_constraint", False) or (alloc.get("is_hard_constraint") if isinstance(alloc, dict) else False)
+                min_len = getattr(alloc, "min_length", None) or (alloc.get("min_length") if isinstance(alloc, dict) else None)
+                min_wid = getattr(alloc, "min_width", None) or (alloc.get("min_width") if isinstance(alloc, dict) else None)
+                pref_len = getattr(alloc, "preferred_length", None) or (alloc.get("preferred_length") if isinstance(alloc, dict) else None)
+                pref_wid = getattr(alloc, "preferred_width", None) or (alloc.get("preferred_width") if isinstance(alloc, dict) else None)
+
+                if "master" in clean_type or "primary" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 11.5, 13.0, 13.5, 15.5, 18.0, 20.0
+                    zone = "private"
+                    privacy = "intimate"
+                    daylight = "high"
+                elif "bed" in clean_type or "guest" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 10.0, 11.0, 11.5, 13.0, 15.0, 16.0
+                    zone = "private"
+                    privacy = "private"
+                    daylight = "high"
+                elif "living" in clean_type or "drawing" in clean_type or "lounge" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 12.0, 14.0, 14.0, 17.0, 18.0, 22.0
+                    zone = "public"
+                    privacy = "public"
+                    daylight = "high"
+                elif "dining" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 9.0, 10.5, 11.0, 13.0, 14.0, 16.0
+                    zone = "public"
+                    privacy = "semi_private"
+                    daylight = "high"
+                elif "kitchen" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 8.0, 9.5, 10.0, 12.0, 15.0, 16.0
+                    zone = "service"
+                    privacy = "semi_private"
+                    daylight = "high"
+                elif "bath" in clean_type or "toilet" in clean_type or "powder" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 4.5, 6.5, 5.5, 7.5, 8.0, 10.0
+                    zone = "service"
+                    privacy = "intimate"
+                    daylight = "low"
+                elif "pooja" in clean_type or "mandir" in clean_type or "puja" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 4.5, 5.0, 5.5, 6.5, 8.0, 9.0
+                    zone = "special"
+                    privacy = "semi_private"
+                    daylight = "medium"
+                elif "office" in clean_type or "study" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 8.0, 9.0, 10.0, 11.5, 13.0, 14.0
+                    zone = "special"
+                    privacy = "semi_private"
+                    daylight = "high"
+                elif "balcony" in clean_type or "terrace" in clean_type or "patio" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 4.5, 7.0, 6.0, 10.0, 10.0, 16.0
+                    zone = "special"
+                    privacy = "semi_private"
+                    daylight = "high"
+                elif "utility" in clean_type or "laundry" in clean_type or "store" in clean_type:
+                    mw, ml, pw, pl, xw, xl = 5.0, 6.0, 6.0, 7.5, 8.0, 10.0
+                    zone = "service"
+                    privacy = "semi_private"
+                    daylight = "low"
+                else:
+                    mw, ml, pw, pl, xw, xl = 8.0, 9.0, 10.0, 11.0, 13.0, 14.0
+                    zone = r_zone or "private"
+                    privacy = "semi_private"
+                    daylight = "medium"
+
+                # Override dimensions if user provided manual or recommended values
+                if alloc_len and alloc_wid:
+                    w = float(min(alloc_len, alloc_wid))
+                    l = float(max(alloc_len, alloc_wid))
+                    if size_mode == "manual" or is_hard:
+                        # Hard user constraint: exact target dimensions strictly locked
+                        mw = w
+                        pw = w
+                        xw = w
+                        ml = l
+                        pl = l
+                        xl = l
+                    else:
+                        # AI Recommended dimension: preferred target with architectural tolerance
+                        pw = float(pref_wid) if pref_wid else w
+                        pl = float(pref_len) if pref_len else l
+                        mw = float(min_wid) if min_wid else max(3.5, pw * 0.85)
+                        ml = float(min_len) if min_len else max(3.5, pl * 0.85)
+                        xw = pw * 1.25
+                        xl = pl * 1.25
+
+                rooms.append(Room(
+                    id=r_id or f"f{floor_num}_{clean_type}_{len(rooms)+1}",
+                    name=r_name,
+                    type=clean_type,
+                    zone=zone,
+                    floor=floor_num,
+                    min_width=mw, min_length=ml,
+                    preferred_width=pw, preferred_length=pl,
+                    max_width=xw, max_length=xl,
+                    is_hard_constraint=(size_mode == "manual" or is_hard),
+                    size_mode="manual" if (size_mode == "manual" or is_hard) else "ai_recommended",
+                    privacy_level=privacy,
+                    daylight_requirement=daylight,
+                    exterior_wall_requirement=("bed" in clean_type or "living" in clean_type or "kitchen" in clean_type),
+                    color=ROOM_COLORS.get(clean_type, "#E5EDEF"),
+                    rationale=f"{r_name} allocated to Level {floor_num}."
+                ))
+
+            # Ensure vertical circulation stairs if total_floors > 1
+            if total_floors > 1 and not any(r.type == "staircase" for r in rooms):
+                rooms.append(Room(
+                    id=f"f{floor_num}_staircase",
+                    name="Staircase Core",
+                    type="staircase",
+                    zone="circulation",
+                    floor=floor_num,
+                    min_width=7.0, min_length=9.0,
+                    preferred_width=8.0, preferred_length=10.0,
+                    max_width=9.5, max_length=12.0,
+                    privacy_level="semi_private",
+                    color=ROOM_COLORS["staircase"],
+                    rationale="Central vertical circulation core with ergonomic risers and treads."
+                ))
+
+            # Ensure circulation hallway
+            if not any(r.type == "hallway" for r in rooms):
+                rooms.append(Room(
+                    id=f"f{floor_num}_hallway",
+                    name="Circulation Hall",
+                    type="hallway",
+                    zone="circulation",
+                    floor=floor_num,
+                    min_width=4.0, min_length=8.0,
+                    preferred_width=5.0, preferred_length=12.0,
+                    max_width=7.0, max_length=24.0,
+                    privacy_level="semi_private",
+                    color=ROOM_COLORS["hallway"],
+                    rationale="Acoustic buffer corridor linking living zones to quiet quarters."
+                ))
+
+            # If ground floor and no foyer, add foyer
+            if floor_num == 1 and not any("foyer" in r.type for r in rooms):
+                rooms.insert(0, Room(
+                    id=f"f{floor_num}_entry_foyer",
+                    name="Entry Foyer",
+                    type="entry_foyer",
+                    zone="public",
+                    floor=floor_num,
+                    min_width=5.5, min_length=6.0,
+                    preferred_width=7.5, preferred_length=8.0,
+                    max_width=12.0, max_length=12.0,
+                    privacy_level="public",
+                    daylight_requirement="medium",
+                    color=ROOM_COLORS["entry_foyer"],
+                    rationale="Transitional airlock providing privacy buffer and welcoming arrival."
+                ))
+
+            return rooms
 
     # Determine target attached bathrooms (default to 1 if bedrooms >= 1)
     if attached_bathroom_count is not None:
@@ -86,7 +262,7 @@ def build_room_program(
     else:
         target_attached = min(1, bedrooms)
 
-    # Single-story OR Ground floor of multi-story
+    # Single-story OR Ground floor of multi-story (procedural fallback)
     if floor_num == 1:
         # 1. Entry Foyer
         rooms.append(Room(
@@ -536,7 +712,8 @@ def generate_architectural_house_layout(
     user_prompt: str = "",
     variant_seed: Optional[int] = None,
     construction_spec: Optional[ConstructionSpecification] = None,
-    landscape_preferences: Optional[LandscapePreferences] = None
+    landscape_preferences: Optional[LandscapePreferences] = None,
+    room_allocations: Optional[List[Any]] = None
 ) -> HouseLayout:
     """
     Executes the complete site-first architectural design pipeline:
@@ -544,8 +721,8 @@ def generate_architectural_house_layout(
     Furniture clearances -> Construction spec wall network & openings -> Multi-floor coordination ->
     Building services & structural planning -> Quantities takeoff & cost estimation -> Canonical HouseLayout.
     """
-    plot_width = round(max(24.0, min(100.0, float(plot_width))), 1)
-    plot_length = round(max(24.0, min(120.0, float(plot_length))), 1)
+    plot_width = round(max(15.0, min(200.0, float(plot_width))), 1)
+    plot_length = round(max(20.0, min(250.0, float(plot_length))), 1)
     num_floors = max(1, min(3, int(num_floors)))
     parking_spaces = max(0, min(3, int(parking_spaces)))
     road_side = road_side if road_side in ["north", "south", "east", "west"] else "south"
@@ -589,7 +766,8 @@ def generate_architectural_house_layout(
         special_rooms=special_rooms or [],
         open_concept=open_concept,
         vastu_compliant=vastu_compliant,
-        designer_intent=user_prompt or ""
+        designer_intent=user_prompt or "",
+        room_allocations=room_allocations
     )
 
     # 4. Formulate Architectural Concept Strategies via Groq Active Reasoning Layer (with caching)
@@ -610,7 +788,7 @@ def generate_architectural_house_layout(
     ground_stair_rect: Optional[Rect] = None
 
     for floor_idx in range(1, num_floors + 1):
-        floor_name = "Ground Floor" if floor_idx == 1 else f"Level {floor_idx}"
+        floor_name = "Ground Floor" if floor_idx == 1 else ("First Floor" if floor_idx == 2 else ("Second Floor" if floor_idx == 3 else f"Level {floor_idx}"))
         
         # Build room program for this floor
         floor_rooms = build_room_program(
@@ -620,7 +798,8 @@ def generate_architectural_house_layout(
             bathrooms=bathrooms,
             attached_bathroom_count=attached_bathroom_count,
             special_rooms=special_rooms,
-            open_concept=open_concept
+            open_concept=open_concept,
+            room_allocations=room_allocations
         )
 
         # Generate architectural topological schemes (integrating Groq concept strategies)
@@ -706,8 +885,8 @@ def generate_architectural_house_layout(
 
         if not solved_candidates:
             default_scheme = schemes[0]
-            candidate = solve_spatial_layout(floor_rooms, site, default_scheme, time_limit_sec=5.0, variant_seed=variant_seed)
-            if not candidate:
+            candidate = solve_spatial_layout(floor_rooms, site, default_scheme, time_limit_sec=4.0, variant_seed=variant_seed)
+            if not candidate or not candidate.is_valid:
                 empty_val = ArchitecturalValidation(
                     is_valid=False,
                     errors=[f"Plot buildable envelope ({site.buildable_envelope.width}x{site.buildable_envelope.length}ft) is insufficient for {bedrooms} bedrooms and requested spaces."]
@@ -734,6 +913,52 @@ def generate_architectural_house_layout(
                         aspect_ratio=round(plot_width / max(1.0, plot_length), 2)
                     )
                 )
+            else:
+                walls, doors, windows = generate_wall_network_and_openings(
+                    candidate.rooms,
+                    site,
+                    wall_height=active_spec.wall_height_ft,
+                    construction_spec=active_spec
+                )
+                furn_scores = []
+                for r in candidate.rooms:
+                    f_items, f_score, _ = validate_and_place_furniture(r, doors=doors, windows=windows)
+                    r.furniture = f_items
+                    r.furniture_ids = [f.id for f in f_items]
+                    furn_scores.append(f_score)
+
+                scores, validation = calculate_architectural_scores(
+                    rooms=candidate.rooms,
+                    site=site,
+                    walls=walls,
+                    doors=doors,
+                    windows=windows,
+                    furniture_scores=furn_scores,
+                    vastu_enabled=vastu_compliant
+                )
+                candidate_obj = {
+                    "candidate": candidate,
+                    "walls": walls,
+                    "doors": doors,
+                    "windows": windows,
+                    "scores": scores,
+                    "validation": validation,
+                    "summary": {
+                        "scheme_id": default_scheme.scheme_id,
+                        "name": default_scheme.name,
+                        "description": default_scheme.description,
+                        "overall_score": scores.overall_score,
+                        "circulation_score": scores.circulation_score,
+                        "privacy_score": scores.privacy_score,
+                        "daylight_score": scores.daylight_score,
+                        "space_efficiency_score": scores.space_efficiency_score,
+                        "furniture_fit_score": scores.furniture_fit_score,
+                        "vastu_score": scores.vastu_score,
+                        "warnings": validation.warnings
+                    }
+                }
+                solved_candidates.append(candidate_obj)
+                candidate_summaries.append(candidate_obj["summary"])
 
         # Deterministic Candidate Ranking
         def candidate_rank_score(c):

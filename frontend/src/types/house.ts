@@ -247,6 +247,8 @@ export interface Room {
   min_length?: number;
   preferred_width?: number;
   preferred_length?: number;
+  is_hard_constraint?: boolean;
+  size_mode?: "manual" | "ai_recommended";
   area_sqft: number;
   orientation?: "north" | "south" | "east" | "west";
   privacy_level?: "public" | "semi_private" | "private" | "intimate";
@@ -255,6 +257,16 @@ export interface Room {
   dimensions_label?: string;
   rationale?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface EditRoomResult {
+  layout: HouseLayout;
+  status: "accepted" | "autocorrected" | "rejected";
+  reason?: string | null;
+  adjusted_rect: Rect;
+  affected_rooms?: string[];
+  success?: boolean;
+  message?: string;
 }
 
 export interface CirculationNetwork {
@@ -546,10 +558,76 @@ export interface DreamHomeStructuredRequirements {
   designer_intent?: string;
 }
 
+export interface RoomAllocationItem {
+  id?: string;
+  room_id?: string;
+  name: string;
+  type: string;
+  floor_id: string;
+  floor_number: number;
+  zone?: ZoneType | string;
+  required?: boolean;
+  min_area?: number;
+  preferred_area?: number;
+  max_area?: number;
+  privacy?: string;
+  daylight?: string;
+  ventilation?: string;
+  size_mode?: "manual" | "ai_recommended";
+  length?: number;
+  width?: number;
+  min_length?: number;
+  min_width?: number;
+  preferred_length?: number;
+  preferred_width?: number;
+  is_hard_constraint?: boolean;
+  quantity?: number;
+  rationale?: string;
+}
+
+export interface PlotDimensionsInput {
+  length: number;
+  width: number;
+  unit: "ft" | "m";
+}
+
+export interface StrategyOption {
+  id: string;
+  title: string;
+  description: string;
+  recommended_floors: number;
+  feasibility_status: "feasible" | "tight" | "infeasible";
+  room_allocations: Array<{
+    room_id: string;
+    name: string;
+    type: string;
+    floor_number: number;
+    length: number;
+    width: number;
+  }>;
+}
+
+export interface DimensionRecommendationResponse {
+  plot_width_ft: number;
+  plot_length_ft: number;
+  plot_area_sqft: number;
+  buildable_width_ft: number;
+  buildable_length_ft: number;
+  buildable_ground_area_sqft: number;
+  total_requested_ground_area_sqft: number;
+  ground_coverage_pct: number;
+  feasibility_status: "comfortable" | "tight" | "requires_multistage" | "infeasible";
+  feasibility_message: string;
+  recommended_solution: string;
+  rooms: RoomAllocationItem[];
+  strategies: StrategyOption[];
+}
+
 export interface IntakeRequest {
   user_prompt?: string;
   plot_width?: number;
   plot_length?: number;
+  plot?: PlotDimensionsInput;
   num_floors?: number;
   bedrooms?: number;
   bathrooms?: number;
@@ -561,6 +639,23 @@ export interface IntakeRequest {
   special_rooms?: string[];
   open_concept?: boolean;
   vastu_compliant?: boolean;
+  room_allocations?: RoomAllocationItem[];
+  room_requirements?: RoomAllocationItem[];
+}
+
+export interface DimensionRecommendationRequest {
+  plot_width: number;
+  plot_length: number;
+  plot_unit?: string;
+  num_floors?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  attached_baths?: string;
+  attached_bathroom_count?: number;
+  parking_cars?: number;
+  road_side?: string;
+  special_rooms?: string[];
+  rooms?: RoomAllocationItem[];
 }
 
 export interface RefineRequest {

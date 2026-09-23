@@ -40,7 +40,11 @@ def compute_setback_profile(
         )
 
     area = plot_width * plot_length
-    if area <= 1400:  # e.g., 30x40, 25x50
+    if area <= 700:  # e.g., 20x30, 20x35
+        front, rear, left, right = 3.0, 2.0, 1.5, 1.5
+    elif area <= 1000:  # e.g., 25x35, 25x40
+        front, rear, left, right = 3.5, 2.5, 2.0, 2.0
+    elif area <= 1400:  # e.g., 30x40, 25x50
         front, rear, left, right = 4.0, 3.0, 2.5, 2.5
     elif area <= 2600:  # e.g., 40x50, 40x60
         front, rear, left, right = 5.0, 4.0, 3.0, 3.0

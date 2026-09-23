@@ -580,6 +580,8 @@ class Room(BaseModel):
     actual_width: float = 0.0
     actual_length: float = 0.0
     area_sqft: float = 0.0
+    is_hard_constraint: bool = False
+    size_mode: Optional[Literal["manual", "ai_recommended"]] = "ai_recommended"
     
     # Spatial Requirements
     privacy_level: PrivacyLevel = "public"
@@ -1074,12 +1076,57 @@ class HouseLayout(BaseModel):
         elif "id" not in data and "project_id" in data:
             data["id"] = data["project_id"]
 
+        if "title" not in data:
+            data["title"] = "Architectural Residence Plan"
+        if "designer_rationale" not in data:
+            data["designer_rationale"] = "Synthesized by AI architectural engine."
+        if "stats" not in data:
+            pw = float(data.get("plot_width", 40.0))
+            pl = float(data.get("plot_length", 50.0))
+            rooms = data.get("rooms", [])
+            bed_count = len([r for r in rooms if "bed" in (getattr(r, "type", "") or "")])
+            data["stats"] = HouseStats(
+                total_area_sqft=round(pw * pl, 1),
+                living_area_sqft=round(pw * pl * 0.7, 1),
+                width_ft=pw,
+                length_ft=pl,
+                num_floors=int(data.get("num_floors", 1)),
+                bedroom_count=max(1, bed_count),
+                bathroom_count=1.0,
+                aspect_ratio=round(max(pw, pl) / max(0.1, min(pw, pl)), 2),
+            )
+
         if "walls" in data and "exterior_walls" not in data:
             data["exterior_walls"] = [w for w in data["walls"] if w.wall_type == "exterior" or w.is_exterior]
             data["interior_walls"] = [w for w in data["walls"] if w.wall_type != "exterior" and not w.is_exterior]
         elif "exterior_walls" in data and "interior_walls" in data and "walls" not in data:
             data["walls"] = list(data["exterior_walls"]) + list(data["interior_walls"])
         super().__init__(**data)
+
+class RoomAllocationItem(BaseModel):
+    id: Optional[str] = None
+    room_id: Optional[str] = None
+    name: str
+    type: str
+    floor_id: str = "floor_1"
+    floor_number: int = 1
+    zone: Optional[str] = "private"
+    required: bool = True
+    min_area: Optional[float] = None
+    preferred_area: Optional[float] = None
+    max_area: Optional[float] = None
+    privacy: Optional[str] = None
+    daylight: Optional[str] = None
+    ventilation: Optional[str] = None
+    size_mode: Optional[Literal["manual", "ai_recommended"]] = "ai_recommended"
+    length: Optional[float] = None
+    width: Optional[float] = None
+    min_length: Optional[float] = None
+    min_width: Optional[float] = None
+    preferred_length: Optional[float] = None
+    preferred_width: Optional[float] = None
+    is_hard_constraint: Optional[bool] = False
+    quantity: Optional[int] = 1
 
 class ArchitecturalRequirements(BaseModel):
     plot_width: float = Field(default=40.0, description="Plot frontage width in feet")
@@ -1110,11 +1157,13 @@ class ArchitecturalRequirements(BaseModel):
     notes: Optional[str] = None
     user_prompt: str = Field(default="", description="Original user prompt")
     landscape_preferences: Optional[LandscapePreferences] = None
+    room_allocations: Optional[List[RoomAllocationItem]] = None
 
 class IntakeRequest(BaseModel):
     user_prompt: Optional[str] = None
     plot_width: Optional[float] = 42.0
     plot_length: Optional[float] = 36.0
+    plot: Optional[Dict[str, Any]] = None
     num_floors: Optional[int] = 1
     bedrooms: Optional[int] = 3
     bathrooms: Optional[float] = 2.0
@@ -1127,6 +1176,8 @@ class IntakeRequest(BaseModel):
     open_concept: Optional[bool] = True
     vastu_compliant: Optional[bool] = False
     landscape_preferences: Optional[LandscapePreferences] = None
+    room_allocations: Optional[List[RoomAllocationItem]] = None
+    room_requirements: Optional[List[RoomAllocationItem]] = None
 
     def to_architectural_requirements(self) -> ArchitecturalRequirements:
         special = list(self.special_rooms or [])
@@ -1134,9 +1185,23 @@ class IntakeRequest(BaseModel):
         has_patio = any("patio" in s.lower() or "balcony" in s.lower() or "terrace" in s.lower() for s in special)
         has_courtyard = any("courtyard" in s.lower() for s in special)
 
+        pw = float(self.plot_width or 40.0)
+        pl = float(self.plot_length or 50.0)
+        if self.plot:
+            w_raw = self.plot.get("width")
+            l_raw = self.plot.get("length")
+            unit = self.plot.get("unit", "ft")
+            mult = 3.28084 if unit == "m" else 1.0
+            if w_raw:
+                pw = round(float(w_raw) * mult, 1)
+            if l_raw:
+                pl = round(float(l_raw) * mult, 1)
+
+        allocs = self.room_requirements or self.room_allocations
+
         return ArchitecturalRequirements(
-            plot_width=float(self.plot_width or 40.0),
-            plot_length=float(self.plot_length or 50.0),
+            plot_width=pw,
+            plot_length=pl,
             road_side=self.road_side or "south",
             north_direction=self.north_direction,
             num_floors=int(self.num_floors or 1),
@@ -1152,7 +1217,8 @@ class IntakeRequest(BaseModel):
             patio_balcony_requirement=has_patio,
             courtyard_requirement=has_courtyard,
             user_prompt=self.user_prompt or "",
-            landscape_preferences=self.landscape_preferences
+            landscape_preferences=self.landscape_preferences,
+            room_allocations=allocs
         )
 
 class RefineRequest(BaseModel):
@@ -1165,12 +1231,14 @@ class EditRoomRequest(BaseModel):
     current_layout: HouseLayout
     room_id: str
     proposed_rect: Rect
+    push_adjacent: bool = True
 
 class EditRoomResponse(BaseModel):
     layout: HouseLayout
     status: Literal["accepted", "autocorrected", "rejected"]
     reason: Optional[str] = None
     adjusted_rect: Rect
+    affected_rooms: List[str] = Field(default_factory=list)
 
 class DreamHomeStructuredRequirements(BaseModel):
     plot: Dict[str, Any] = Field(

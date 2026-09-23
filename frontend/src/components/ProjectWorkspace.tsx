@@ -172,6 +172,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       setIsCreateChoiceOpen(true);
     } else if (view === "projects") {
       setIsProjectsOpen(true);
+    } else if (view === "edit") {
+      router.push(`/project/${projectId}/edit`);
     } else if (view === "plan" || view === "model" || view === "structure" || view === "estimate") {
       setCurrentTab(view);
       router.push(`/project/${projectId}/${view}`);
@@ -199,11 +201,9 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         throw new Error("Received an incomplete architectural layout from solver.");
       }
 
-      setTimeout(() => {
-        setIsGenerating(false);
-        const newPid = createProject(sanitized);
-        router.push(`/project/${newPid}/plan`);
-      }, 1200);
+      setIsGenerating(false);
+      const newPid = createProject(sanitized);
+      router.push(`/project/${newPid}/plan`);
     } catch (err) {
       console.error("Backend generation error:", err);
       setIsGenerating(false);
@@ -334,12 +334,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   isDarkMode={true}
                 />
               </ErrorBoundary>
-
-              <FloatingAICommandBar
-                onApplyInstruction={handleRefine}
-                isLoading={isRefining}
-                selectedRoomName={selectedRoom?.name}
-              />
             </motion.div>
           )}
 
@@ -382,12 +376,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   onToggleRoof={() => setShowRoof((r) => !r)}
                 />
               </ErrorBoundary>
-
-              <FloatingAICommandBar
-                onApplyInstruction={handleRefine}
-                isLoading={isRefining}
-                selectedRoomName={selectedRoom?.name}
-              />
             </motion.div>
           )}
 
@@ -411,12 +399,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   onSelectFloor={setActiveFloorIndex}
                 />
               </ErrorBoundary>
-
-              <FloatingAICommandBar
-                onApplyInstruction={handleRefine}
-                isLoading={isRefining}
-                selectedRoomName={selectedRoom?.name}
-              />
             </motion.div>
           )}
 

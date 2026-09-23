@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { HouseLayout, FloorPlan, Room, FurnitureItem } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
 import {
@@ -60,6 +61,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
   onRegenerateLayout,
   isRegenerating = false,
 }) => {
+  const router = useRouter();
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -1100,23 +1102,14 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
           <span>{showLandscape ? "LANDSCAPE ON" : "LANDSCAPE"}</span>
         </button>
 
-        {/* EDIT ROOMS (DRAG & DROP) TOGGLE */}
+        {/* EDIT IN DEDICATED STUDIO BUTTON */}
         <button
-          onClick={() => {
-            if (!isEditMode) {
-              setWorkingRooms(JSON.parse(JSON.stringify(currentFloor.rooms || layout.rooms || [])));
-              setHasChanges(false);
-            }
-            setIsEditMode((prev) => !prev);
-          }}
-          className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-[11px] font-mono tracking-wider transition-all shadow-2xl ${
-            isEditMode
-              ? "bg-[#C48446] text-[#0A0B0E] font-semibold ring-2 ring-[#C48446]/40"
-              : "bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 hover:border-[#C48446]/40"
-          }`}
+          onClick={() => router.push(`/project/${layout.id}/edit`)}
+          className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-[11px] font-mono tracking-wider transition-all shadow-2xl bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 hover:border-[#C48446]/40"
+          title="Open Dedicated Full-Screen Architectural Studio Editor"
         >
-          <Move className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
-          <span>{isEditMode ? "EDITING" : "DRAG ROOMS"}</span>
+          <Move className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#C48446]" />
+          <span>EDITING</span>
         </button>
 
         {/* EXPORT 2D MAP AS IMAGE BUTTON */}
@@ -1154,84 +1147,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
         </div>
       )}
 
-      {/* 2. EDITING BANNER (Appears when isEditMode is active) */}
-      {isEditMode && (
-        <div className="absolute top-36 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 px-5 py-2.5 rounded-2xl bg-[#12141A]/95 border border-[#C48446]/40 backdrop-blur-xl shadow-2xl text-xs font-mono">
-          <div className="flex items-center gap-2 text-[#C48446]">
-            <Sparkles className="w-4 h-4 animate-pulse" />
-            <span className="font-medium tracking-wide">DRAG ROOMS TO REORGANIZE</span>
-          </div>
 
-          <div className="h-4 w-px bg-white/10" />
-
-          {/* Size Adjusters if room selected */}
-          {selectedRoom && (
-            <div className="flex items-center gap-2 text-[11px] text-[#9E9C98]">
-              <span>{selectedRoom.name}:</span>
-              <button
-                onClick={() => handleResizeSelectedRoom("width", -1)}
-                className="p-1 rounded bg-white/5 hover:bg-white/10"
-                title="Decrease Width"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span>{selectedRoom.rect.width}&apos;W</span>
-              <button
-                onClick={() => handleResizeSelectedRoom("width", 1)}
-                className="p-1 rounded bg-white/5 hover:bg-white/10"
-                title="Increase Width"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-
-              <button
-                onClick={() => handleResizeSelectedRoom("length", -1)}
-                className="p-1 rounded bg-white/5 hover:bg-white/10 ml-1"
-                title="Decrease Length"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span>{selectedRoom.rect.length}&apos;L</span>
-              <button
-                onClick={() => handleResizeSelectedRoom("length", 1)}
-                className="p-1 rounded bg-white/5 hover:bg-white/10"
-                title="Increase Length"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-
-          <div className="h-4 w-px bg-white/10" />
-
-          {/* Reset & Apply Buttons */}
-          <button
-            onClick={handleCancelEdits}
-            className="flex items-center gap-1 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span>RESET</span>
-          </button>
-
-          <button
-            onClick={handleApplyEdits}
-            disabled={isRegenerating}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#C48446] hover:bg-[#D49354] text-[#0A0B0E] font-semibold text-xs tracking-wider transition-all shadow-lg shadow-[#C48446]/20"
-          >
-            {isRegenerating ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>REGENERATING...</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                <span>OKAY (REGENERATE MAP)</span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
 
       {/* 3. MAIN DRAFTING SVG CANVAS */}
       <div

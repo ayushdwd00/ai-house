@@ -1,5 +1,4 @@
-import React from "react";
-import { ProjectWorkspace } from "@/components/ProjectWorkspace";
+import { redirect } from "next/navigation";
 
 export default async function DedicatedDesignEditPage({
   params,
@@ -7,5 +6,5 @@ export default async function DedicatedDesignEditPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  return <ProjectWorkspace projectId={projectId} initialTab="plan" />;
+  redirect(`/project/${projectId}/edit`);
 }

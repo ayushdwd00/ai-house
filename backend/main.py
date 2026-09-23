@@ -85,6 +85,20 @@ def health_check():
         "vision_model": os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-3.2-11b-vision-instruct")
     }
 
+from architecture.dimension_recommender import (
+    DimensionRecommendationRequest,
+    DimensionRecommendationResponse,
+    analyze_and_recommend_dimensions,
+)
+
+@app.post("/api/recommend-dimensions", response_model=DimensionRecommendationResponse)
+def recommend_dimensions_endpoint(req: DimensionRecommendationRequest):
+    """
+    Computes plot-aware architectural room dimensions, feasibility status,
+    and multi-floor strategies based on plot geometry and user functional program.
+    """
+    return analyze_and_recommend_dimensions(req)
+
 @app.post("/api/generate", response_model=HouseLayout)
 def generate_layout_endpoint(req: IntakeRequest):
     """
@@ -95,25 +109,40 @@ def generate_layout_endpoint(req: IntakeRequest):
     """
     t0 = time.time()
 
+    # Extract plot dimensions respecting explicit manual inputs and unit conversion
+    plot_w = req.plot_width or 40.0
+    plot_l = req.plot_length or 50.0
+    if req.plot:
+        w_val = req.plot.get("width")
+        l_val = req.plot.get("length")
+        unit = req.plot.get("unit", "ft")
+        mult = 3.28084 if unit == "m" else 1.0
+        if w_val:
+            plot_w = round(float(w_val) * mult, 1)
+        if l_val:
+            plot_l = round(float(l_val) * mult, 1)
+
     if req.user_prompt and len(req.user_prompt.strip()) > 3:
         parsed = parse_intake_with_groq_or_fallback(req.user_prompt)
-        plot_w = parsed.get("plot_width", req.plot_width or 42.0)
-        plot_l = parsed.get("plot_length", req.plot_length or 36.0)
-        num_floors = parsed.get("num_floors", req.num_floors or 1)
+        if not req.plot and not req.plot_width:
+            plot_w = parsed.get("plot_width", plot_w)
+        if not req.plot and not req.plot_length:
+            plot_l = parsed.get("plot_length", plot_l)
+        num_floors = req.num_floors if req.num_floors is not None else parsed.get("num_floors", 1)
         bedrooms = parsed.get("bedrooms", req.bedrooms or 3)
         bathrooms = parsed.get("bathrooms", req.bathrooms or 2.0)
         style = parsed.get("style", req.style or "Modern Scandinavian")
         special_rooms = parsed.get("special_rooms", req.special_rooms or [])
         open_concept = parsed.get("open_concept", req.open_concept if req.open_concept is not None else True)
     else:
-        plot_w = req.plot_width or 42.0
-        plot_l = req.plot_length or 36.0
         num_floors = req.num_floors or 1
         bedrooms = req.bedrooms or 3
         bathrooms = req.bathrooms or 2.0
         style = req.style or "Modern Scandinavian"
         special_rooms = req.special_rooms or []
         open_concept = req.open_concept if req.open_concept is not None else True
+
+    allocations = req.room_requirements or req.room_allocations
 
     layout = generate_architectural_house_layout(
         plot_width=plot_w,
@@ -130,7 +159,8 @@ def generate_layout_endpoint(req: IntakeRequest):
         open_concept=open_concept,
         vastu_compliant=req.vastu_compliant or False,
         user_prompt=req.user_prompt or "",
-        landscape_preferences=req.landscape_preferences
+        landscape_preferences=req.landscape_preferences,
+        room_allocations=allocations
     )
 
     t_total_ms = round((time.time() - t0) * 1000, 1)
@@ -430,12 +460,21 @@ def undo_version_endpoint(project_id: str):
 def edit_room_endpoint(req: EditRoomRequest):
     """
     Validates and updates an individual room's rect within the canonical layout.
-    Checks buildable envelope containment and zero-overlap constraints.
-    Accepts, auto-corrects (snaps to envelope/nearest boundary), or rejects with reason.
+    Enforces:
+    1. Buildable envelope & setback containment (cannot cross plot boundary).
+    2. Room minimums (min_width, min_length).
+    3. Shared wall behavior: moves shared boundaries cleanly with single canonical walls.
+    4. Adjacent room management: adjusts adjoining neighbors if they have room to yield,
+       or rejects with clear message if neighbor would shrink below minimums.
+    5. Attached bathroom continuity: preserves connection and contact.
+    6. Furniture revalidation inside room bounds.
+    7. Full wall network & door/window regeneration.
+    8. Floor-aware local re-optimization and persistence.
     """
     layout = req.current_layout.model_copy(deep=True)
     room_id = req.room_id
     proposed = req.proposed_rect
+    push_adjacent = getattr(req, "push_adjacent", True)
 
     target_room = None
     target_floor = None
@@ -462,113 +501,231 @@ def edit_room_endpoint(req: EditRoomRequest):
             adjusted_rect=proposed
         )
 
-    # 1. Check Envelope Bounds
+    orig_rect = target_room.rect or Rect(x=target_room.x, y=target_room.y, width=target_room.width, length=target_room.depth)
+
+    # 1. Check Room Minimums
+    min_w = getattr(target_room, "min_width", 5.0) or 5.0
+    min_l = getattr(target_room, "min_length", 5.0) or 5.0
+
+    if proposed.width < min_w - 0.05:
+        return EditRoomResponse(
+            layout=layout,
+            status="rejected",
+            reason=f"Minimum width: {round(min_w, 1)}'-0\"",
+            adjusted_rect=orig_rect
+        )
+
+    if proposed.length < min_l - 0.05:
+        return EditRoomResponse(
+            layout=layout,
+            status="rejected",
+            reason=f"Minimum length: {round(min_l, 1)}'-0\"",
+            adjusted_rect=orig_rect
+        )
+
+    # 2. Check Envelope & Setbacks
     site = layout.site
     if site and site.buildable_envelope:
         env = site.buildable_envelope
     else:
         env = Rect(x=0.0, y=0.0, width=layout.plot_width, length=layout.plot_length)
 
-    min_w = getattr(target_room, "min_width", 5.0)
-    min_l = getattr(target_room, "min_length", 5.0)
-
     new_w = round(max(min_w, min(env.width, proposed.width)), 1)
     new_l = round(max(min_l, min(env.length, proposed.length)), 1)
-
     clamped_x = round(max(env.x, min(env.right - new_w, proposed.x)), 1)
     clamped_y = round(max(env.y, min(env.bottom - new_l, proposed.y)), 1)
 
-    autocorrected = (clamped_x != proposed.x or clamped_y != proposed.y or new_w != proposed.width or new_l != proposed.length)
+    envelope_clamped = (clamped_x != proposed.x or clamped_y != proposed.y or new_w != proposed.width or new_l != proposed.length)
     current_rect = Rect(x=clamped_x, y=clamped_y, width=new_w, length=new_l)
-    prop_box = box(current_rect.x, current_rect.y, current_rect.right, current_rect.bottom)
 
-    # 2. Check Overlap with Other Rooms
-    other_rooms = [r for r in (target_floor.rooms if target_floor else layout.rooms) if r.id != room_id and r.rect]
-    conflicts = []
+    # 3. Adjacent Room Management & Shared Wall Behavior
+    floor_rooms = target_floor.rooms if target_floor else layout.rooms
+    other_rooms = [r for r in floor_rooms if r.id != room_id and r.rect]
+    affected_room_ids: List[str] = []
+
+    # Detect edge movement deltas
+    delta_right = current_rect.right - orig_rect.right
+    delta_left = orig_rect.x - current_rect.x
+    delta_bottom = current_rect.bottom - orig_rect.bottom
+    delta_top = orig_rect.y - current_rect.y
+
+    if push_adjacent:
+        # Check Right Edge Expansion
+        if delta_right > 0.1:
+            for o in other_rooms:
+                if abs(o.rect.x - orig_rect.right) <= 0.6 and (min(current_rect.bottom, o.rect.bottom) - max(current_rect.y, o.rect.y)) > 0.5:
+                    o_min_w = getattr(o, "min_width", 5.0) or 5.0
+                    new_o_w = round(o.rect.right - current_rect.right, 1)
+                    if new_o_w < o_min_w:
+                        return EditRoomResponse(
+                            layout=layout,
+                            status="rejected",
+                            reason=f"Expanding {target_room.name} by {round(delta_right, 1)} ft would make {o.name} smaller than its minimum required width of {round(o_min_w, 1)}'.",
+                            adjusted_rect=orig_rect
+                        )
+                    o.rect.x = current_rect.right
+                    o.rect.width = new_o_w
+                    o.actual_width = new_o_w
+                    o.area_sqft = round(new_o_w * o.rect.length, 1)
+                    o.dimensions_label = f"{round(new_o_w, 1)}' × {round(o.rect.length, 1)}'"
+                    affected_room_ids.append(o.id)
+
+        # Check Left Edge Expansion
+        if delta_left > 0.1:
+            for o in other_rooms:
+                if abs(o.rect.right - orig_rect.x) <= 0.6 and (min(current_rect.bottom, o.rect.bottom) - max(current_rect.y, o.rect.y)) > 0.5:
+                    o_min_w = getattr(o, "min_width", 5.0) or 5.0
+                    new_o_w = round(current_rect.x - o.rect.x, 1)
+                    if new_o_w < o_min_w:
+                        return EditRoomResponse(
+                            layout=layout,
+                            status="rejected",
+                            reason=f"Expanding {target_room.name} by {round(delta_left, 1)} ft would make {o.name} smaller than its minimum required width of {round(o_min_w, 1)}'.",
+                            adjusted_rect=orig_rect
+                        )
+                    o.rect.width = new_o_w
+                    o.actual_width = new_o_w
+                    o.area_sqft = round(new_o_w * o.rect.length, 1)
+                    o.dimensions_label = f"{round(new_o_w, 1)}' × {round(o.rect.length, 1)}'"
+                    affected_room_ids.append(o.id)
+
+        # Check Bottom Edge Expansion
+        if delta_bottom > 0.1:
+            for o in other_rooms:
+                if abs(o.rect.y - orig_rect.bottom) <= 0.6 and (min(current_rect.right, o.rect.right) - max(current_rect.x, o.rect.x)) > 0.5:
+                    o_min_l = getattr(o, "min_length", 5.0) or 5.0
+                    new_o_l = round(o.rect.bottom - current_rect.bottom, 1)
+                    if new_o_l < o_min_l:
+                        return EditRoomResponse(
+                            layout=layout,
+                            status="rejected",
+                            reason=f"Expanding {target_room.name} by {round(delta_bottom, 1)} ft would make {o.name} smaller than its minimum required length of {round(o_min_l, 1)}'.",
+                            adjusted_rect=orig_rect
+                        )
+                    o.rect.y = current_rect.bottom
+                    o.rect.length = new_o_l
+                    o.actual_length = new_o_l
+                    o.area_sqft = round(o.rect.width * new_o_l, 1)
+                    o.dimensions_label = f"{round(o.rect.width, 1)}' × {round(new_o_l, 1)}'"
+                    affected_room_ids.append(o.id)
+
+        # Check Top Edge Expansion
+        if delta_top > 0.1:
+            for o in other_rooms:
+                if abs(o.rect.bottom - orig_rect.y) <= 0.6 and (min(current_rect.right, o.rect.right) - max(current_rect.x, o.rect.x)) > 0.5:
+                    o_min_l = getattr(o, "min_length", 5.0) or 5.0
+                    new_o_l = round(current_rect.y - o.rect.y, 1)
+                    if new_o_l < o_min_l:
+                        return EditRoomResponse(
+                            layout=layout,
+                            status="rejected",
+                            reason=f"Expanding {target_room.name} by {round(delta_top, 1)} ft would make {o.name} smaller than its minimum required length of {round(o_min_l, 1)}'.",
+                            adjusted_rect=orig_rect
+                        )
+                    o.rect.length = new_o_l
+                    o.actual_length = new_o_l
+                    o.area_sqft = round(o.rect.width * new_o_l, 1)
+                    o.dimensions_label = f"{round(o.rect.width, 1)}' × {round(new_o_l, 1)}'"
+                    affected_room_ids.append(o.id)
+
+    # 4. Check for Room Overlap
+    prop_box = box(current_rect.x, current_rect.y, current_rect.right, current_rect.bottom)
     for o in other_rooms:
         o_box = box(o.rect.x, o.rect.y, o.rect.right, o.rect.bottom)
         inter = prop_box.intersection(o_box)
         if inter.area > 0.2:
-            conflicts.append((o, inter.area))
-
-    if conflicts:
-        resolved = False
-        conflicts.sort(key=lambda x: x[1], reverse=True)
-        conf_room, max_inter_area = conflicts[0]
-
-        room_area = new_w * new_l
-        if max_inter_area / max(1.0, room_area) > 0.55:
             return EditRoomResponse(
                 layout=layout,
                 status="rejected",
-                reason=f"Position overlaps with {conf_room.name} ({round(max_inter_area, 1)} sq ft). Returned to valid position.",
-                adjusted_rect=target_room.rect
+                reason=f"Room cannot be expanded further without affecting {o.name}.",
+                adjusted_rect=orig_rect
             )
 
-        snap_candidates = [
-            Rect(x=round(conf_room.rect.right, 1), y=current_rect.y, width=new_w, length=new_l),
-            Rect(x=round(conf_room.rect.x - new_w, 1), y=current_rect.y, width=new_w, length=new_l),
-            Rect(x=current_rect.x, y=round(conf_room.rect.bottom, 1), width=new_w, length=new_l),
-            Rect(x=current_rect.x, y=round(conf_room.rect.y - new_l, 1), width=new_w, length=new_l),
-        ]
+    # 5. Attached Bathroom Continuity Preservation
+    # If target room is bedroom with attached bathroom, ensure bathroom maintains connection
+    for o in other_rooms:
+        if (getattr(o, "attached_room_id", None) == target_room.id or getattr(target_room, "attached_room_id", None) == o.id) and o.type in ["bathroom", "master_bedroom"]:
+            # Check if o still touches target_room
+            o_box = box(o.rect.x, o.rect.y, o.rect.right, o.rect.bottom)
+            touches = prop_box.touches(o_box) or prop_box.distance(o_box) < 0.2
+            if not touches:
+                # Shift attached bathroom to remain adjacent along the nearest edge
+                if abs(orig_rect.right - o.rect.x) < 0.5:
+                    o.rect.x = current_rect.right
+                elif abs(orig_rect.x - o.rect.right) < 0.5:
+                    o.rect.x = current_rect.x - o.rect.width
+                elif abs(orig_rect.bottom - o.rect.y) < 0.5:
+                    o.rect.y = current_rect.bottom
+                elif abs(orig_rect.y - o.rect.bottom) < 0.5:
+                    o.rect.y = current_rect.y - o.rect.length
+                affected_room_ids.append(o.id)
 
-        env_box = box(env.x, env.y, env.right, env.bottom)
-        for cand in snap_candidates:
-            c_box = box(cand.x, cand.y, cand.right, cand.bottom)
-            if not env_box.contains(c_box):
-                continue
-            has_coll = False
-            for o in other_rooms:
-                ob = box(o.rect.x, o.rect.y, o.rect.right, o.rect.bottom)
-                if c_box.intersection(ob).area > 0.15:
-                    has_coll = True
-                    break
-            if not has_coll:
-                current_rect = cand
-                resolved = True
-                autocorrected = True
-                break
-
-        if not resolved:
-            return EditRoomResponse(
-                layout=layout,
-                status="rejected",
-                reason=f"Position overlaps with {conf_room.name}. Snapped back to original position.",
-                adjusted_rect=target_room.rect
-            )
-
+    # Commit target room rect
     target_room.rect = current_rect
+    target_room.x = current_rect.x
+    target_room.y = current_rect.y
+    target_room.width = current_rect.width
+    target_room.depth = current_rect.length
     target_room.actual_width = current_rect.width
     target_room.actual_length = current_rect.length
     target_room.area_sqft = current_rect.area
+    target_room.area = current_rect.area
     target_room.dimensions_label = f"{round(current_rect.width, 1)}' × {round(current_rect.length, 1)}'"
 
     for r in layout.rooms:
         if r.id == room_id:
             r.rect = current_rect
+            r.x = current_rect.x
+            r.y = current_rect.y
+            r.width = current_rect.width
+            r.depth = current_rect.length
             r.actual_width = current_rect.width
             r.actual_length = current_rect.length
             r.area_sqft = current_rect.area
+            r.area = current_rect.area
             r.dimensions_label = target_room.dimensions_label
 
-    f_items, f_score, _ = validate_and_place_furniture(target_room)
+    # 6. Revalidate Furniture inside Target Room & Affected Rooms
+    f_items, _, _ = validate_and_place_furniture(target_room)
     target_room.furniture = f_items
     for r in layout.rooms:
         if r.id == room_id:
             r.furniture = f_items
 
-    floor_rooms = target_floor.rooms if target_floor else layout.rooms
+    for aff_id in affected_room_ids:
+        aff_room = next((r for r in floor_rooms if r.id == aff_id), None)
+        if aff_room:
+            aff_furn, _, _ = validate_and_place_furniture(aff_room)
+            aff_room.furniture = aff_furn
+            for r in layout.rooms:
+                if r.id == aff_id:
+                    r.furniture = aff_furn
+                    if aff_room.rect:
+                        r.rect = aff_room.rect
+                        r.x = aff_room.rect.x
+                        r.y = aff_room.rect.y
+                        r.width = aff_room.rect.width
+                        r.depth = aff_room.rect.length
+                        r.actual_width = aff_room.rect.width
+                        r.actual_length = aff_room.rect.length
+                        r.area_sqft = aff_room.rect.area
+                        r.area = aff_room.rect.area
+                        r.dimensions_label = aff_room.dimensions_label
+
+    # 7. Global Wall Network, Door & Window Regeneration
     walls, doors, windows = generate_wall_network_and_openings(floor_rooms, site or layout.site)
     if target_floor:
         target_floor.walls = walls
         target_floor.doors = doors
         target_floor.windows = windows
+
     layout.walls = walls
     layout.exterior_walls = [w for w in walls if w.wall_type == "exterior" or w.is_exterior]
     layout.interior_walls = [w for w in walls if w.wall_type != "exterior" and not w.is_exterior]
     layout.doors = doors
     layout.windows = windows
 
+    # 8. Scores, Quantities & Cost Estimates
     furn_scores = [getattr(r, "furniture_score", 85.0) for r in floor_rooms]
     scores, validation = calculate_architectural_scores(
         rooms=floor_rooms,
@@ -584,14 +741,21 @@ def edit_room_endpoint(req: EditRoomRequest):
     layout.quantities = calculate_material_quantities(layout, layout.construction_spec)
     layout.cost_estimate = estimate_construction_cost(layout, layout.quantities)
 
-    status_str = "autocorrected" if autocorrected else "accepted"
-    reason_str = "Position auto-aligned to stay within bounds and avoid room collision." if autocorrected else None
+    # 9. Auto-Persist to project storage
+    try:
+        save_project(layout, layout.id)
+    except Exception as e:
+        print(f"[STORAGE WARNING] Failed to persist edited layout: {e}")
+
+    status_str = "autocorrected" if envelope_clamped else "accepted"
+    reason_str = "Dimensions clamped to buildable envelope." if envelope_clamped else None
 
     return EditRoomResponse(
         layout=layout,
         status=status_str,
         reason=reason_str,
-        adjusted_rect=current_rect
+        adjusted_rect=current_rect,
+        affected_rooms=affected_room_ids
     )
 
 @app.websocket("/ws/refine")

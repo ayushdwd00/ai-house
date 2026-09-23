@@ -14,17 +14,94 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 
-const HeroHouse3D = dynamic(
-  () => import("./HeroHouse3D").then((m) => m.HeroHouse3D),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-full bg-[#0C0E12] flex items-center justify-center">
-        <div className="w-2 h-2 rounded-full bg-[#C48446] animate-pulse" />
-      </div>
-    ),
-  }
-);
+const ArchitecturalHeroBackdrop: React.FC = () => {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden select-none bg-[#0A0B0E]">
+      {/* 1. Deep Atmospheric Warm Radial Glows */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 45% at 50% 32%, rgba(196, 132, 70, 0.08) 0%, transparent 75%), radial-gradient(circle at 50% 85%, rgba(20, 24, 34, 0.4) 0%, transparent 60%)",
+        }}
+      />
+
+      {/* 2. Precision Architectural Drafting Grid Pattern */}
+      <svg
+        className="absolute inset-0 w-full h-full opacity-60"
+        xmlns="http://www.w3.org/2000/svg"
+        width="100%"
+        height="100%"
+      >
+        <defs>
+          {/* 64px Grid with hairline subdivisions */}
+          <pattern id="archSubGrid" width="16" height="16" patternUnits="userSpaceOnUse">
+            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="0.5" />
+          </pattern>
+          <pattern id="archMainGrid" width="64" height="64" patternUnits="userSpaceOnUse">
+            <rect width="64" height="64" fill="url(#archSubGrid)" />
+            <path d="M 64 0 L 0 0 0 64" fill="none" stroke="rgba(255, 255, 255, 0.04)" strokeWidth="0.8" />
+            {/* Corner crosshairs */}
+            <path
+              d="M -3 0 L 3 0 M 0 -3 L 0 3 M 61 0 L 67 0 M 64 -3 L 64 3"
+              fill="none"
+              stroke="rgba(196, 132, 70, 0.18)"
+              strokeWidth="0.8"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#archMainGrid)" />
+
+        {/* Faint Architectural Plan Line Geometry (Abstract Minimalist Blueprint) */}
+        <g stroke="rgba(255, 255, 255, 0.04)" strokeWidth="1" fill="none">
+          {/* Outer Boundary Envelope */}
+          <rect x="15%" y="18%" width="70%" height="64%" rx="2" strokeDasharray="6 4" stroke="rgba(196, 132, 70, 0.08)" />
+
+          {/* Central Spatial Pavilions */}
+          <rect x="22%" y="24%" width="28%" height="34%" stroke="rgba(255, 255, 255, 0.05)" />
+          <rect x="22.2%" y="24.3%" width="27.6%" height="33.4%" stroke="rgba(255, 255, 255, 0.025)" />
+
+          <rect x="52%" y="28%" width="26%" height="40%" stroke="rgba(255, 255, 255, 0.05)" />
+          <rect x="52.2%" y="28.3%" width="25.6%" height="39.4%" stroke="rgba(255, 255, 255, 0.025)" />
+
+          {/* Circulation Axis Lines */}
+          <line x1="12%" y1="52%" x2="88%" y2="52%" stroke="rgba(196, 132, 70, 0.09)" strokeDasharray="3 3" />
+          <line x1="50%" y1="12%" x2="50%" y2="88%" stroke="rgba(196, 132, 70, 0.09)" strokeDasharray="3 3" />
+
+          {/* Dimension Chains / Architectural Ticks */}
+          <line x1="22%" y1="20%" x2="50%" y2="20%" stroke="rgba(255, 255, 255, 0.08)" />
+          <line x1="22%" y1="18.5%" x2="22%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
+          <line x1="50%" y1="18.5%" x2="50%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
+
+          <line x1="52%" y1="20%" x2="78%" y2="20%" stroke="rgba(255, 255, 255, 0.08)" />
+          <line x1="52%" y1="18.5%" x2="52%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
+          <line x1="78%" y1="18.5%" x2="78%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
+        </g>
+
+        {/* Delicate Blueprint Annotations */}
+        <g fill="rgba(255, 255, 255, 0.18)" fontSize="9" fontFamily="monospace" letterSpacing="0.15em">
+          <text x="23%" y="17%">MODULAR ZONE A // 42&apos;-0&quot;</text>
+          <text x="53%" y="17%">LIVING WING B // 36&apos;-0&quot;</text>
+          <text x="16%" y="80%">DATUM REF ±0.000M</text>
+          <text x="73%" y="80%">SOLAR AZIMUTH 142.5°</text>
+        </g>
+
+        {/* Minimalist Cardinal North Indicator (Top Right) */}
+        <g transform="translate(1380, 110)" stroke="rgba(196, 132, 70, 0.25)" fill="none" strokeWidth="0.8">
+          <circle cx="0" cy="0" r="18" stroke="rgba(255, 255, 255, 0.04)" />
+          <line x1="0" y1="-22" x2="0" y2="22" stroke="rgba(196, 132, 70, 0.35)" />
+          <line x1="-22" y1="0" x2="22" y2="0" stroke="rgba(255, 255, 255, 0.06)" />
+          <polygon points="0,-18 3.5,-6 -3.5,-6" fill="rgba(196, 132, 70, 0.4)" stroke="none" />
+          <text x="0" y="-26" textAnchor="middle" fill="rgba(196, 132, 70, 0.45)" fontSize="8" fontFamily="monospace">N</text>
+        </g>
+      </svg>
+
+      {/* 3. Soft Perimeter Vignette (Blends into header and next sections) */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0A0B0E] via-transparent to-[#0A0B0E] opacity-90" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0A0B0E] via-transparent to-[#0A0B0E] opacity-60" />
+    </div>
+  );
+};
 
 interface HomePageViewProps {
   onStartDesign: () => void;
@@ -53,13 +130,8 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
     <div className="w-full min-h-screen bg-[#0A0B0E] text-[#F5F3EF] overflow-x-hidden selection:bg-[#C48446]/30">
       {/* 1. CINEMATIC HERO SECTION */}
       <section className="relative w-full h-screen flex flex-col justify-between overflow-hidden">
-        {/* Full-Screen 3D Modern House Canvas */}
-        <div className="absolute inset-0 z-0">
-          <HeroHouse3D
-            className="w-full h-full"
-            onClickHouse={onOpenModelMode}
-          />
-        </div>
+        {/* Lightweight Static Architectural Hero Backdrop */}
+        <ArchitecturalHeroBackdrop />
 
         {/* Ambient Top Vignette & Subtle Atmospheric Gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0B0E]/80 via-transparent to-[#0A0B0E] pointer-events-none z-10" />
@@ -124,11 +196,11 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
           </motion.div>
         </div>
 
-        {/* Bottom Scroll Indicator & Quick Upload Trigger */}
+        {/* Bottom Details & Quick Upload Trigger */}
         <div className="relative z-20 w-full px-8 py-6 flex items-center justify-between text-[11px] font-mono text-[#6B6964]">
           <div className="flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-emerald-500/80" />
-            <span>INTERACTIVE WEBGL MODEL ACTIVE</span>
+            <span className="w-2 h-2 rounded-full bg-[#C48446] animate-pulse" />
+            <span>ATELIER ARCHAI // RESIDENTIAL DESIGN CORE</span>
           </div>
 
           <button

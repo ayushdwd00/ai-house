@@ -140,8 +140,19 @@ export async function refineHouseLayout(
 export async function editRoomLayout(
   currentLayout: HouseLayout,
   roomId: string,
-  proposedRect: Rect
+  proposedRect: Rect,
+  pushAdjacent: boolean = true
 ): Promise<HouseLayout | null> {
+  const result = await editRoomLayoutFull(currentLayout, roomId, proposedRect, pushAdjacent);
+  return result?.layout || null;
+}
+
+export async function editRoomLayoutFull(
+  currentLayout: HouseLayout,
+  roomId: string,
+  proposedRect: Rect,
+  pushAdjacent: boolean = true
+): Promise<import("@/types/house").EditRoomResult | null> {
   const url = `${API_BASE_URL}/api/edit-room`;
   try {
     const res = await fetch(url, {
@@ -151,16 +162,41 @@ export async function editRoomLayout(
         current_layout: currentLayout,
         room_id: roomId,
         proposed_rect: proposedRect,
+        push_adjacent: pushAdjacent,
       }),
     });
 
     if (res.ok) {
       const result = await res.json();
-      return result.layout || null;
+      return result;
     }
     return null;
   } catch (err) {
     console.error("[API ERROR] editRoomLayout failed:", { url, error: err });
+    return null;
+  }
+}
+
+/**
+ * Request AI-recommended room dimensions and feasibility analysis.
+ */
+export async function recommendDimensions(
+  req: import("@/types/house").DimensionRecommendationRequest
+): Promise<import("@/types/house").DimensionRecommendationResponse | null> {
+  const url = `${API_BASE_URL}/api/recommend-dimensions`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  } catch (err) {
+    console.error("[API ERROR] recommendDimensions failed:", { url, error: err });
     return null;
   }
 }
