@@ -7,7 +7,7 @@ and style configurations for residential landscape planning.
 from typing import Dict, Any
 
 # Geometric Buffers & Clearances (in feet)
-TREE_BUILDING_BUFFER = 1.8      # Minimum clearance between tree center and building exterior wall
+TREE_BUILDING_BUFFER = 2.6      # Minimum clearance between tree center and building exterior wall
 TREE_DOOR_BUFFER = 3.5          # Minimum clearance from exterior door threshold
 TREE_PARKING_BUFFER = 2.0       # Minimum clearance from parking stall
 TREE_DRIVEWAY_BUFFER = 2.0      # Minimum clearance from driveway edges

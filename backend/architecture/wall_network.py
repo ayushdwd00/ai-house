@@ -42,31 +42,62 @@ def generate_wall_network_and_openings(
         int_thickness = 0.375 # standard 4.5-inch masonry (or 0.5ft baseline)
         active_wall_height = wall_height
 
+    from shapely.geometry import box as s_box, Point as s_Point
+    from shapely.ops import unary_union
+
+    valid_room_boxes = [
+        s_box(r.rect.x, r.rect.y, r.rect.right, r.rect.bottom)
+        for r in rooms if r.rect and r.rect.area > 0.5
+    ]
+    footprint_union = unary_union(valid_room_boxes) if valid_room_boxes else None
+    footprint_boundary = footprint_union.boundary if footprint_union is not None else None
+
     # Map of room_id to Room
     room_map = {r.id: r for r in rooms if r.rect}
 
     # Extract all horizontal and vertical segment slices from rooms
-    h_lines: Dict[float, List[Tuple[float, float, str, str]]] = {}
-    v_lines: Dict[float, List[Tuple[float, float, str, str]]] = {}
-
-    def snap_coord(val: float) -> float:
-        return round(val * 2.0) / 2.0
+    raw_h_lines: Dict[float, List[Tuple[float, float, str, str]]] = {}
+    raw_v_lines: Dict[float, List[Tuple[float, float, str, str]]] = {}
 
     for r in rooms:
         if not r.rect:
             continue
-        rx, ry = snap_coord(r.rect.x), snap_coord(r.rect.y)
-        rw, rl = snap_coord(r.rect.width), snap_coord(r.rect.length)
+        rx, ry = r.rect.x, r.rect.y
+        rw, rl = r.rect.width, r.rect.length
         rx2, ry2 = rx + rw, ry + rl
 
         # Top edge
-        h_lines.setdefault(ry, []).append((rx, rx2, r.id, "top"))
+        raw_h_lines.setdefault(round(ry, 2), []).append((rx, rx2, r.id, "top"))
         # Bottom edge
-        h_lines.setdefault(ry2, []).append((rx, rx2, r.id, "bottom"))
+        raw_h_lines.setdefault(round(ry2, 2), []).append((rx, rx2, r.id, "bottom"))
         # Left edge
-        v_lines.setdefault(rx, []).append((ry, ry2, r.id, "left"))
+        raw_v_lines.setdefault(round(rx, 2), []).append((ry, ry2, r.id, "left"))
         # Right edge
-        v_lines.setdefault(rx2, []).append((ry, ry2, r.id, "right"))
+        raw_v_lines.setdefault(round(rx2, 2), []).append((ry, ry2, r.id, "right"))
+
+    # Cluster coordinate lines within 0.15 ft tolerance to prevent split double walls
+    def cluster_lines(raw_dict: Dict[float, List[Tuple[float, float, str, str]]], tol: float = 0.15) -> Dict[float, List[Tuple[float, float, str, str]]]:
+        if not raw_dict:
+            return {}
+        sorted_keys = sorted(raw_dict.keys())
+        clusters: List[List[float]] = []
+        for k in sorted_keys:
+            if not clusters or (k - clusters[-1][-1]) > tol:
+                clusters.append([k])
+            else:
+                clusters[-1].append(k)
+
+        clustered_dict: Dict[float, List[Tuple[float, float, str, str]]] = {}
+        for c in clusters:
+            rep_key = round(sum(c) / len(c), 2)
+            merged_segs: List[Tuple[float, float, str, str]] = []
+            for k in c:
+                merged_segs.extend(raw_dict[k])
+            clustered_dict[rep_key] = merged_segs
+        return clustered_dict
+
+    h_lines = cluster_lines(raw_h_lines, tol=0.15)
+    v_lines = cluster_lines(raw_v_lines, tol=0.15)
 
     # Helper to resolve 1D overlapping segments on a single line
     def resolve_segments_on_line(line_val: float, raw_segs: List[Tuple[float, float, str, str]], is_horizontal: bool):
@@ -78,6 +109,8 @@ def generate_wall_network_and_openings(
             points.add(round(e, 2))
         sorted_pts = sorted(list(points))
 
+        # First pass: generate sub-segments
+        sub_segs = []
         for i in range(len(sorted_pts) - 1):
             p1, p2 = sorted_pts[i], sorted_pts[i + 1]
             if p2 - p1 < 0.2:  # Ignore microscopic slivers
@@ -94,10 +127,32 @@ def generate_wall_network_and_openings(
                 continue
 
             r_ids = sorted(list(touching_rooms))
-            is_interior = len(r_ids) >= 2
+
+            # Strictly classify is_exterior via footprint boundary
+            mid_pt = s_Point(mid, line_val) if is_horizontal else s_Point(line_val, mid)
+            on_boundary = False
+            if footprint_boundary is not None:
+                on_boundary = (footprint_boundary.distance(mid_pt) < 0.15)
+
+            is_interior = (len(r_ids) >= 2) and (not on_boundary)
             wall_type = "interior" if is_interior else "exterior"
             thickness = int_thickness if is_interior else ext_thickness
+            sub_segs.append((p1, p2, r_ids, wall_type, is_interior, thickness))
 
+        # Second pass: merge consecutive collinear segments with same wall_type and room connectivity
+        merged_segs = []
+        for seg in sub_segs:
+            if not merged_segs:
+                merged_segs.append(list(seg))
+            else:
+                prev = merged_segs[-1]
+                # If touching, same wall_type, same thickness, and matching rooms (or both exterior)
+                if abs(prev[1] - seg[0]) < 0.05 and prev[3] == seg[3] and prev[5] == seg[5] and (prev[3] == "exterior" or prev[2] == seg[2]):
+                    prev[1] = seg[1]  # extend previous segment
+                else:
+                    merged_segs.append(list(seg))
+
+        for p1, p2, r_ids, wall_type, is_interior, thickness in merged_segs:
             if is_horizontal:
                 start_pt = Point2D(x=p1, y=line_val)
                 end_pt = Point2D(x=p2, y=line_val)
@@ -444,5 +499,16 @@ def generate_wall_network_and_openings(
         net_area = max(0.0, round(gross_area - openings_area, 2))
         w.net_surface_area_sqft = net_area
         w.volume_cuft = round(net_area * w.thickness, 2)
+
+    # Sanity check: Ensure exterior wall length corresponds to building envelope perimeter
+    if footprint_boundary is not None and footprint_boundary.length > 0:
+        ext_wall_len = sum(math.hypot(w.end.x - w.start.x, w.end.y - w.start.y) for w in walls if w.is_exterior)
+        boundary_len = footprint_boundary.length
+        # Under normal conditions, ext_wall_len tracks boundary_len within ~10%
+        if ext_wall_len > boundary_len * 1.3:
+            import logging
+            logging.getLogger("wall_network").warning(
+                f"Exterior wall length ({ext_wall_len:.1f} ft) exceeds footprint perimeter ({boundary_len:.1f} ft) by >30%."
+            )
 
     return walls, doors, windows

@@ -4,7 +4,7 @@ Establishes residential architectural functional zoning, privacy hierarchy,
 and weighted relationship graphs using NetworkX.
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 import networkx as nx
 from models import ZoneType, RoomType, PrivacyLevel, Room
 
@@ -159,3 +159,66 @@ def compute_relationship_weight(r1: Room, r2: Room) -> float:
         return REQUIRED_SEPARATION
 
     return NEUTRAL
+
+
+def validate_circulation_network(
+    rooms: List[Room],
+    doors: List[Any]
+) -> Tuple[bool, List[str], List[str]]:
+    """
+    Verifies that all habitable rooms are reachable from the entrance without
+    violating privacy hierarchies (no through-bedroom paths; no bath-to-kitchen opening).
+    Returns (is_valid, errors, warnings).
+    """
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # Build connectivity graph from door links
+    CG = nx.Graph()
+    for r in rooms:
+        CG.add_node(r.id, type=r.type, zone=r.zone)
+
+    door_pairs = []
+    for d in doors:
+        r1 = getattr(d, "from_room_id", getattr(d, "from_room", None))
+        r2 = getattr(d, "to_room_id", getattr(d, "to_room", None))
+        if not r1 or not r2:
+            conn = getattr(d, "connects_room_ids", [])
+            if len(conn) >= 2:
+                r1, r2 = conn[0], conn[1]
+        if r1 and r2:
+            door_pairs.append((r1, r2))
+            CG.add_edge(r1, r2)
+
+    # 1. Entrance reachability
+    entry_nodes = [r.id for r in rooms if r.type in ["entry_foyer", "living_room"]]
+    if "outdoor" in CG:
+        entry_nodes.append("outdoor")
+
+    for r in rooms:
+        if r.type in ["hallway", "balcony", "patio", "parking"]:
+            continue
+        has_path = any(nx.has_path(CG, r.id, ent) for ent in entry_nodes if ent in CG)
+        if not has_path:
+            errors.append(f"Room '{r.name}' ({r.id}) is unreachable from the entrance.")
+
+    # 2. Privacy Rule: Bedrooms must not be through-circulation corridors
+    bedroom_ids = {r.id for r in rooms if r.type in ["bedroom", "master_bedroom", "guest_bedroom"]}
+    for b_id in bedroom_ids:
+        attached_bath = next((r.id for r in rooms if r.type == "bathroom" and r.attached_room_id == b_id), None)
+        neighbors = set(CG.neighbors(b_id)) if b_id in CG else set()
+        # Non-attached neighbors
+        external_links = [n for n in neighbors if n != attached_bath and n != "outdoor"]
+        if len(external_links) > 1:
+            errors.append(f"Bedroom {b_id} functions as a through-room connected to multiple spaces: {external_links}.")
+
+    # 3. Direct kitchen to bathroom prohibition
+    kitchen_ids = {r.id for r in rooms if r.type == "kitchen"}
+    bathroom_ids = {r.id for r in rooms if r.type in ["bathroom", "powder_room"]}
+    for k_id in kitchen_ids:
+        for b_id in bathroom_ids:
+            if CG.has_edge(k_id, b_id):
+                errors.append(f"Sanitary conflict: Bathroom '{b_id}' opens directly into Kitchen '{k_id}'.")
+
+    return (len(errors) == 0, errors, warnings)
+

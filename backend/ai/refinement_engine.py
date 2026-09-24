@@ -14,8 +14,9 @@ and creates an immutable new project version.
 
 from typing import List, Dict, Tuple, Optional, Any
 import copy
+import re
 from shapely.geometry import box
-from models import HouseLayout, FloorPlan, Room, Rect, Point2D, ConstructionSpecification
+from models import HouseLayout, FloorPlan, Room, Rect, Point2D, ConstructionSpecification, ParkingSpace
 from architecture.furniture_validator import validate_and_place_furniture
 from architecture.wall_network import generate_wall_network_and_openings
 from architecture.architectural_scorer import calculate_architectural_scores
@@ -24,6 +25,7 @@ from architecture.spatial_solver import solve_spatial_layout, GRID_SCALE
 from architecture.topology_engine import ArchitecturalScheme
 from estimation.material_quantity_engine import calculate_material_quantities
 from estimation.cost_estimator import estimate_construction_cost
+from estimation.rate_provider import get_material_rate_context
 from construction.building_services_engine import plan_building_services
 from construction.structural_planner import plan_preliminary_structure
 from ortools.sat.python import cp_model
@@ -35,6 +37,7 @@ def parse_refinement_intent(instruction: str, current_layout: HouseLayout) -> Di
     """
     Identifies target room and modification parameters from natural language
     using Groq Pydantic structured output with robust deterministic fallback.
+    Supports English and Hinglish commands.
     """
     rooms_summary = {"rooms": [r.type for r in getattr(current_layout, "rooms", [])]}
     cmd: NaturalLanguageModificationCommand = interpret_modification_with_groq(instruction, rooms_summary)
@@ -44,21 +47,28 @@ def parse_refinement_intent(instruction: str, current_layout: HouseLayout) -> Di
     delta_w = cmd.delta_width
     delta_l = cmd.delta_length
     partner_room = cmd.partner_room
+    target_value = getattr(cmd, "target_value", None)
 
-    # Check for specific room indexing in instruction (e.g. "bedroom 2", "bed 2")
+    # Check for specific room indexing in instruction (e.g. "bedroom 2", "bed 2", "dusra bedroom")
     inst_lower = instruction.lower()
     target_room = None
 
     all_rooms = current_layout.rooms if current_layout.rooms else [r for fp in current_layout.floors for r in fp.rooms]
 
-    if "bedroom 2" in inst_lower or "bed 2" in inst_lower:
+    if "bedroom 2" in inst_lower or "bed 2" in inst_lower or "dusra bedroom" in inst_lower:
         candidates = [r for r in all_rooms if r.type == "bedroom" and "master" not in r.id and "master" not in r.name.lower()]
         if len(candidates) >= 2:
             target_room = candidates[1]
         elif candidates:
             target_room = candidates[0]
-    elif "bedroom 1" in inst_lower or "master bedroom" in inst_lower:
+    elif "bedroom 1" in inst_lower or "master bedroom" in inst_lower or "bada bedroom" in inst_lower or "master" in inst_lower:
         target_room = next((r for r in all_rooms if r.type == "master_bedroom"), None)
+    elif "kitchen" in inst_lower or "rasoi" in inst_lower:
+        target_room = next((r for r in all_rooms if r.type == "kitchen"), None)
+    elif "living" in inst_lower or "hall" in inst_lower or "baithak" in inst_lower:
+        target_room = next((r for r in all_rooms if r.type in ["living_room", "living"]), None)
+    elif "dining" in inst_lower or "khana" in inst_lower:
+        target_room = next((r for r in all_rooms if r.type == "dining"), None)
 
     if not target_room and target_type:
         for r in all_rooms:
@@ -76,6 +86,7 @@ def parse_refinement_intent(instruction: str, current_layout: HouseLayout) -> Di
         "delta_w": delta_w,
         "delta_l": delta_l,
         "partner_room": partner_room,
+        "target_value": target_value,
         "instruction": instruction,
         "architectural_rationale": cmd.architectural_rationale
     }
@@ -93,6 +104,106 @@ def refine_current_house_layout(
     """
     inst_lower = instruction.lower()
     active_spec = current_layout.construction_spec or ConstructionSpecification()
+
+    # 0A. Check for Parking Refinement (e.g. "2 car parking chahiye", "parking for 2 cars")
+    if "parking" in inst_lower or "car" in inst_lower or "gadi" in inst_lower:
+        if any(kw in inst_lower for kw in ["2 car", "two car", "2 cars", "do car", "2 gadi", "2-car", "double car", "expand parking"]):
+            cars = 2
+        elif any(kw in inst_lower for kw in ["1 car", "one car", "single car", "ek car"]):
+            cars = 1
+        else:
+            cars = 2 if "parking" in inst_lower else 1
+
+        new_layout = current_layout.model_copy(deep=True)
+        if new_layout.site:
+            req_w = 18.0 if cars >= 2 else 10.0
+            req_l = 18.0
+            if new_layout.site.parking:
+                new_layout.site.parking.capacity = cars
+                new_layout.site.parking.vehicle_type = "two_car" if cars >= 2 else "car"
+                new_layout.site.parking.rect.width = req_w
+                new_layout.site.parking.rect.length = req_l
+            else:
+                px = new_layout.site.buildable_envelope.x if new_layout.site.buildable_envelope else 4.0
+                py = new_layout.site.buildable_envelope.y if new_layout.site.buildable_envelope else 4.0
+                new_layout.site.parking = ParkingSpace(
+                    id="parking_01",
+                    capacity=cars,
+                    is_covered=True,
+                    vehicle_type="two_car" if cars >= 2 else "car",
+                    rect=Rect(x=px, y=py, width=req_w, length=req_l)
+                )
+
+        new_layout.version_number = (current_layout.version_number or 1) + 1
+        rationale = f"Parking capacity reconfigured to accommodate {cars} vehicle(s) ({18.0 if cars >= 2 else 10.0}'×18.0')."
+        new_layout.designer_rationale = rationale
+        diff = {
+            "modified_element": "Parking Specification",
+            "instruction": instruction,
+            "parking_capacity": cars,
+            "architectural_rationale": rationale,
+            "version": new_layout.version_number
+        }
+        return new_layout, diff
+
+    # 0B. Check for Budget Constraint Refinement (e.g. "budget 45 lakh ke andar rakho", "keep budget under 50 lakh")
+    if any(kw in inst_lower for kw in ["budget", "lakh", "lac", "crore", "kharach"]):
+        num_m = re.search(r'(\d+(?:\.\d+)?)\s*(lakh|lakhs|lac|lacs|cr|crore|crores)?', inst_lower)
+        if num_m:
+            base_num = float(num_m.group(1))
+            unit = num_m.group(2) or ""
+            if "cr" in unit or "crore" in unit:
+                target_budget = base_num * 10000000.0
+            elif "lakh" in unit or "lac" in unit:
+                target_budget = base_num * 100000.0
+            elif base_num > 100000:
+                target_budget = base_num
+            else:
+                target_budget = base_num * 100000.0
+
+            new_layout = current_layout.model_copy(deep=True)
+            spec = new_layout.construction_spec or ConstructionSpecification()
+            initial_cost = current_layout.cost_estimate.total_cost_expected if current_layout.cost_estimate else 0.0
+
+            tier_progression = ["luxury", "premium", "standard", "economy"]
+            selected_tier = spec.quality_tier
+            best_estimate = current_layout.cost_estimate
+            best_spec = spec
+            best_quantities = current_layout.quantities
+
+            for tier in tier_progression:
+                cand_spec = spec.model_copy(deep=True)
+                cand_spec.quality_tier = tier
+                cand_quantities = calculate_material_quantities(new_layout, cand_spec)
+                cand_estimate = estimate_construction_cost(new_layout, cand_quantities, rate_context=get_material_rate_context(quality_tier=tier))
+                selected_tier = tier
+                best_estimate = cand_estimate
+                best_spec = cand_spec
+                best_quantities = cand_quantities
+                if cand_estimate.total_cost_expected <= target_budget:
+                    break
+
+            new_layout.construction_spec = best_spec
+            new_layout.quantities = best_quantities
+            new_layout.cost_estimate = best_estimate
+            new_layout.version_number = (current_layout.version_number or 1) + 1
+            rationale = (
+                f"Budget optimization: Adjusted specification tier to '{selected_tier}'. "
+                f"Preliminary cost reduced from ₹{initial_cost:,.0f} to ₹{best_estimate.total_cost_expected:,.0f} "
+                f"(target: ₹{target_budget:,.0f})."
+            )
+            new_layout.designer_rationale = rationale
+            diff = {
+                "modified_element": "Construction Specification (Budget)",
+                "instruction": instruction,
+                "target_budget": target_budget,
+                "initial_cost": initial_cost,
+                "new_cost": best_estimate.total_cost_expected,
+                "quality_tier": selected_tier,
+                "architectural_rationale": rationale,
+                "version": new_layout.version_number
+            }
+            return new_layout, diff
 
     # 0. Check for Landscape Refinement Commands (e.g., "Add garden", "Remove tree", "Add outdoor lights")
     landscape_triggers = [
@@ -258,11 +369,9 @@ def refine_current_house_layout(
     if op == "enlarge":
         matched_room.preferred_width = min(22.0, matched_room.preferred_width + intent.get("delta_w", 2.0))
         matched_room.preferred_length = min(24.0, matched_room.preferred_length + intent.get("delta_l", 2.0))
-        cluster_rooms = [matched_room] + neighbors
     elif op == "shrink":
         matched_room.preferred_width = max(matched_room.min_width, matched_room.preferred_width + intent.get("delta_w", -2.0))
         matched_room.preferred_length = max(matched_room.min_length, matched_room.preferred_length + intent.get("delta_l", -2.0))
-        cluster_rooms = [matched_room] + neighbors
     elif op == "add_attached_bath":
         bath_id = f"f{matched_floor_idx+1}_attached_bath_{matched_room.id}"
         new_bath = Room(
@@ -281,33 +390,23 @@ def refine_current_house_layout(
         )
         matched_room.attached_room_id = bath_id
         matched_room.required_adjacencies.append(bath_id)
-        cluster_rooms = [matched_room, new_bath] + neighbors
         floor_plan.rooms.append(new_bath)
-    elif op in ["relocate_closer", "relocate"]:
-        partner_name = intent.get("partner_room")
-        partner_room = None
-        if partner_name:
-            partner_room = next((r for r in floor_plan.rooms if partner_name in r.type or partner_name in r.id.lower() or partner_name in r.name.lower()), None)
-        if partner_room and partner_room.id != matched_room.id and partner_room not in neighbors:
-            cluster_rooms = [matched_room, partner_room] + neighbors
-        else:
-            cluster_rooms = [matched_room] + neighbors
-    else:
-        cluster_rooms = [matched_room] + neighbors
 
-    # Bounding envelope of the cluster
-    c_min_x = min(r.rect.x for r in cluster_rooms if r.rect)
-    c_min_y = min(r.rect.y for r in cluster_rooms if r.rect)
-    c_max_x = max(r.rect.right for r in cluster_rooms if r.rect)
-    c_max_y = max(r.rect.bottom for r in cluster_rooms if r.rect)
+    # Solve across all rooms on this floor to strictly guarantee zero overlaps
+    cluster_rooms = [r for r in floor_plan.rooms if r.rect or r.id == matched_room.id or (op == "add_attached_bath" and r.parent_room_id == matched_room.id)]
 
-    # Expand bounding box slightly (2 ft) towards site envelope if enlarging
+    # Bounding envelope: use full buildable envelope for the floor
     site = new_layout.site
     if site and site.buildable_envelope:
-        c_min_x = max(site.buildable_envelope.x, c_min_x - (1.0 if op == "enlarge" else 0.0))
-        c_min_y = max(site.buildable_envelope.y, c_min_y - (1.0 if op == "enlarge" else 0.0))
-        c_max_x = min(site.buildable_envelope.right, c_max_x + (2.0 if op == "enlarge" else 0.0))
-        c_max_y = min(site.buildable_envelope.bottom, c_max_y + (2.0 if op == "enlarge" else 0.0))
+        c_min_x = site.buildable_envelope.x
+        c_min_y = site.buildable_envelope.y
+        c_max_x = site.buildable_envelope.right
+        c_max_y = site.buildable_envelope.bottom
+    else:
+        c_min_x = min(r.rect.x for r in cluster_rooms if r.rect)
+        c_min_y = min(r.rect.y for r in cluster_rooms if r.rect)
+        c_max_x = max(r.rect.right for r in cluster_rooms if r.rect)
+        c_max_y = max(r.rect.bottom for r in cluster_rooms if r.rect)
 
     env_w_int = int(round((c_max_x - c_min_x) * GRID_SCALE))
     env_l_int = int(round((c_max_y - c_min_y) * GRID_SCALE))
@@ -342,13 +441,26 @@ def refine_current_house_layout(
 
         x_iv = model.NewIntervalVar(x, w, x_end, f"xiv_{r.id}")
         y_iv = model.NewIntervalVar(y, l, y_end, f"yiv_{r.id}")
-
         x_vars[r.id] = x
         y_vars[r.id] = y
         w_vars[r.id] = w
         l_vars[r.id] = l
         x_intervals.append(x_iv)
         y_intervals.append(y_iv)
+
+        # Unaffected rooms: heavily penalize deviation from current position to keep them frozen
+        if r.id != matched_room.id and r.rect:
+            orig_x = int(round((r.rect.x - c_min_x) * GRID_SCALE))
+            orig_y = int(round((r.rect.y - c_min_y) * GRID_SCALE))
+            orig_w = int(round(r.rect.width * GRID_SCALE))
+            orig_l = int(round(r.rect.length * GRID_SCALE))
+            dx_orig = model.NewIntVar(0, env_w_int, f"dx_orig_{r.id}")
+            dy_orig = model.NewIntVar(0, env_l_int, f"dy_orig_{r.id}")
+            model.Add(dx_orig >= x - orig_x)
+            model.Add(dx_orig >= orig_x - x)
+            model.Add(dy_orig >= y - orig_y)
+            model.Add(dy_orig >= orig_y - y)
+            objs.append(dx_orig * 25 + dy_orig * 25)
 
         pref_w = int(round(r.preferred_width * GRID_SCALE))
         pref_l = int(round(r.preferred_length * GRID_SCALE))

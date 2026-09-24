@@ -207,11 +207,19 @@ def generate_landscape_plan(
 
     # 8. Lawns (Front and Rear Turf Surfaces)
     if prefs.front_garden and prefs.lawn_priority:
-        # Calculate front lawn rect, carving out parking if on front side
-        fl_w = max(4.0, plot_w - (parking_rect.width + 4.0 if (parking_rect and parking_rect.y >= plot_l - sb_front - 2.0) else 0.0) - sb_left - sb_right)
-        fl_x = round((parking_rect.right + 2.0) if (parking_rect and parking_rect.x < plot_w / 2.0 and parking_rect.y >= plot_l - sb_front - 2.0) else sb_left, 1)
         fl_y = round(plot_l - sb_front + 0.5 if road_side == "south" else 0.5, 1)
         fl_l = max(3.0, sb_front - 1.0)
+        fl_x = sb_left
+        fl_w = max(3.0, round(plot_w - sb_left - sb_right, 1))
+
+        if parking_rect:
+            if parking_rect.x < plot_w / 2.0:
+                fl_x = round(parking_rect.right + 1.0, 1)
+                fl_w = max(3.0, round((plot_w - sb_right) - fl_x, 1))
+            else:
+                fl_x = sb_left
+                fl_w = max(3.0, round(parking_rect.x - sb_left - 1.0, 1))
+
         lawn_front = LandscapeElement(
             element_id="LAWN_FRONT",
             type="lawn",
@@ -265,7 +273,12 @@ def generate_landscape_plan(
         zone="entrance_pathway",
         properties={"material": style_cfg.get("planter_style", "geometric_concrete")}
     )
-    elements.extend([planter_left, planter_right])
+    p1_box = box(p1_x - 1.25, p_y - 0.75, p1_x + 1.25, p_y + 0.75)
+    if not (building_footprint.intersects(p1_box) or (parking_poly and parking_poly.intersects(p1_box))):
+        elements.append(planter_left)
+    p2_box = box(p2_x - 1.25, p_y - 0.75, p2_x + 1.25, p_y + 0.75)
+    if not (building_footprint.intersects(p2_box) or (parking_poly and parking_poly.intersects(p2_box))):
+        elements.append(planter_right)
 
     # 10. Boundary Greenery / Perimeter Hedges
     if prefs.boundary_hedges or prefs.boundary_planting:
@@ -474,6 +487,74 @@ def generate_landscape_plan(
         )
         outdoor_features.append(water_feat)
         elements.append(water_feat)
+
+    # 13B. Indian Domestic Landscape Elements (Collision-Free)
+    def _is_clear(chk_poly: Polygon) -> bool:
+        if building_footprint.intersects(chk_poly):
+            return False
+        if parking_poly and parking_poly.intersects(chk_poly):
+            return False
+        if driveway_poly and driveway_poly.intersects(chk_poly):
+            return False
+        return True
+
+    # 1. Sacred Tulsi Vrindavan Planter (Front or Northeast open area)
+    tulsi_cx = round(plot_w - sb_right - 1.5, 1)
+    tulsi_cy = round(plot_l - 1.8 if road_side == "south" else 1.8, 1)
+    tulsi_poly = box(tulsi_cx - 1.25, tulsi_cy - 1.25, tulsi_cx + 1.25, tulsi_cy + 1.25)
+    if _is_clear(tulsi_poly) and tulsi_cx > 1.5 and tulsi_cy > 1.5 and tulsi_cx < (plot_w - 1.5) and tulsi_cy < (plot_l - 1.5):
+        tulsi = LandscapeElement(
+            element_id="TULSI_PLANTER_01",
+            type="planter",
+            name="Tulsi Vrindavan Planter",
+            x=tulsi_cx,
+            y=tulsi_cy,
+            width=2.5,
+            length=2.5,
+            zone="front_garden",
+            properties={"usage": "sacred_tulsi", "planter_type": "traditional_vrindavan"}
+        )
+        outdoor_features.append(tulsi)
+        elements.append(tulsi)
+
+    # 2. Kitchen Garden Raised Bed (Rear/Side Setback)
+    kg_cx = round(sb_left + 2.5, 1)
+    kg_cy = round(1.5 if road_side == "south" else plot_l - 1.8, 1)
+    kg_poly = box(kg_cx - 2.5, kg_cy - 1.0, kg_cx + 2.5, kg_cy + 1.0)
+    if _is_clear(kg_poly) and kg_cx > 2.5 and kg_cy > 1.0 and kg_cx < (plot_w - 2.5) and kg_cy < (plot_l - 1.0):
+        kg_bed = LandscapeElement(
+            element_id="KITCHEN_GARDEN_01",
+            type="flower_bed",
+            name="Kitchen Garden Herb Bed",
+            x=kg_cx,
+            y=kg_cy,
+            width=5.0,
+            length=2.0,
+            zone="rear_garden",
+            properties={"usage": "kitchen_garden", "produce": "herbs_vegetables"}
+        )
+        outdoor_features.append(kg_bed)
+        elements.append(kg_bed)
+
+    # 3. Rainwater Recharge Soak Pit (Setback Corner)
+    rwh_cx = round(sb_left + 1.5, 1)
+    rwh_cy = round(plot_l - 1.8 if road_side == "south" else 1.5, 1)
+    rwh_poly = box(rwh_cx - 1.25, rwh_cy - 1.25, rwh_cx + 1.25, rwh_cy + 1.25)
+    if _is_clear(rwh_poly) and rwh_cx > 1.5 and rwh_cy > 1.5 and rwh_cx < (plot_w - 1.5) and rwh_cy < (plot_l - 1.5):
+        rwh = LandscapeElement(
+            element_id="RAINWATER_PIT_01",
+            type="water_feature",
+            name="Rainwater Recharge Pit",
+            x=rwh_cx,
+            y=rwh_cy,
+            width=2.5,
+            length=2.5,
+            radius=1.25,
+            zone="drainage_recharge",
+            properties={"purpose": "rainwater_harvesting_percolation"}
+        )
+        outdoor_features.append(rwh)
+        elements.append(rwh)
 
     # 14. Metrics & Summary
     # Calculate green area

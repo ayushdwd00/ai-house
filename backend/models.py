@@ -114,6 +114,7 @@ class Site(BaseModel):
     pedestrian_path: Optional[List[Point2D]] = None
     driveway: Optional[Rect] = None
     north_direction: Optional[float] = 0.0
+    city: Optional[str] = None
 
 class MaterialDefinition(BaseModel):
     id: str
@@ -550,7 +551,7 @@ class Room(BaseModel):
     floor_id: Optional[str] = None
     name: str
     type: RoomType
-    zone: ZoneType
+    zone: ZoneType = "public"
     floor: int = 1
     rect: Optional[Rect] = None
     x: float = 0.0
@@ -604,6 +605,16 @@ class Room(BaseModel):
             data["room_id"] = data["id"]
         if "floor_id" not in data:
             data["floor_id"] = f"floor_{data.get('floor', 1)}"
+        if not data.get("zone"):
+            r_type = data.get("type", "")
+            if "bed" in r_type:
+                data["zone"] = "private"
+            elif "bath" in r_type or "kitchen" in r_type or "utility" in r_type:
+                data["zone"] = "service"
+            elif "hall" in r_type or "stair" in r_type or "foyer" in r_type:
+                data["zone"] = "circulation"
+            else:
+                data["zone"] = "public"
 
         # Harmonize rect with x, y, width, depth
         if "rect" in data and data["rect"]:
@@ -734,7 +745,7 @@ class ConstructionSpecification(BaseModel):
     floor_to_floor_height_ft: float = 10.5
     slab_thickness_in: float = 6.0
     slab_thickness_ft: float = 0.5
-    quality_tier: Literal["basic", "standard", "premium", "custom"] = "standard"
+    quality_tier: Literal["basic", "economy", "standard", "premium", "luxury", "custom"] = "standard"
     recommended_value: Optional[str] = None
     reason: Optional[str] = None
     assumptions: List[str] = Field(default_factory=list)
@@ -771,6 +782,8 @@ class MaterialQuantities(BaseModel):
     total_wall_area_sqft: float = 0.0
     wall_volume_cuft: float = 0.0
     openings_deduction_sqft: float = 0.0
+    excavation_volume_cuft: float = 0.0
+    excavation_volume_cum: float = 0.0
     brick_or_block_count: int = 0
     mortar_volume_cuft: float = 0.0
     slab_area_sqft: float = 0.0
@@ -862,7 +875,15 @@ class CostEstimate(BaseModel):
     items: List[CostEstimateLineItem] = Field(default_factory=list)
     area_based_benchmark: Dict[str, float] = Field(default_factory=dict)
     discrepancy_flag: Optional[str] = None
-    disclaimer: str = "Preliminary AI-generated planning estimate. Costs vary by exact site location, supplier, contractor, and market conditions."
+    disclaimer: str = "PRELIMINARY CONSTRUCTION ESTIMATE. Not a contractor quote. Real costs depend on soil, structural engineering, and market conditions."
+    exclusions: List[str] = Field(default_factory=list)
+    rate_source_summary: Optional[str] = None
+    quality_tier: Optional[str] = None
+    city: Optional[str] = None
+
+    @property
+    def total_cost_expected(self) -> float:
+        return self.total_expected
 
 class BuildingServices(BaseModel):
     plumbing_stacks: List[Dict[str, Any]] = Field(default_factory=list)
@@ -1158,6 +1179,8 @@ class ArchitecturalRequirements(BaseModel):
     user_prompt: str = Field(default="", description="Original user prompt")
     landscape_preferences: Optional[LandscapePreferences] = None
     room_allocations: Optional[List[RoomAllocationItem]] = None
+    llm_source: Optional[str] = Field(default="llm", description="Source tracking: 'llm', 'retry', or 'deterministic_fallback'")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class IntakeRequest(BaseModel):
     user_prompt: Optional[str] = None
@@ -1240,6 +1263,14 @@ class EditRoomResponse(BaseModel):
     adjusted_rect: Rect
     affected_rooms: List[str] = Field(default_factory=list)
 
+    @property
+    def success(self) -> bool:
+        return self.status in ["accepted", "autocorrected"]
+
+    @property
+    def message(self) -> str:
+        return self.reason or ""
+
 class DreamHomeStructuredRequirements(BaseModel):
     plot: Dict[str, Any] = Field(
         default_factory=lambda: {"length": None, "width": None, "unit": "ft"},
@@ -1297,3 +1328,11 @@ class DreamHomeStructuredRequirements(BaseModel):
             landscape_preferences=self.landscape_preferences,
             user_prompt=f"Dream Home: {self.bedrooms} bed, {self.bathrooms} bath, {self.style} style"
         )
+
+class GenerationFailureResponse(BaseModel):
+    status: Literal["failed"] = "failed"
+    stage: str
+    error_code: str
+    message: str
+    diagnostics: Dict[str, Any] = Field(default_factory=dict)
+

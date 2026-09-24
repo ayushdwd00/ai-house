@@ -138,7 +138,12 @@ def calculate_architectural_scores(
     furniture_fit_score = round(sum(furniture_scores) / max(1, len(furniture_scores)), 1) if furniture_scores else 85.0
 
     # 7. Daylight & Ventilation Score
-    rooms_with_windows = {w.room_id for w in windows}
+    # Count windows hosted on exterior walls
+    ext_wall_ids = {w.id for w in walls if getattr(w, "is_exterior", False) or getattr(w, "wall_type", "") == "exterior"}
+    rooms_with_windows = {
+        w.room_id for w in windows
+        if (not ext_wall_ids or getattr(w, "wall_id", None) in ext_wall_ids or getattr(w, "host_wall_id", None) in ext_wall_ids or getattr(w, "is_exterior", True) or getattr(w, "outward_direction", None))
+    }
     habitable_rooms = [r for r in valid_rooms if r.type not in ["hallway", "parking"]]
     window_coverage = sum(1 for r in habitable_rooms if r.id in rooms_with_windows) / max(1, len(habitable_rooms))
     daylight_score = round(min(100.0, window_coverage * 100.0), 1)
@@ -159,19 +164,19 @@ def calculate_architectural_scores(
     space_efficiency_score = round(min(98.0, efficiency_ratio * 105.0), 1)
 
     # 9. Parking Access Score
-    parking_score = 95.0 if site.parking else 80.0
+    parking_score = 95.0 if (site and getattr(site, "parking", None)) else 80.0
 
     # 10. Vastu Score & Comprehensive Evaluation
     vastu_score = None
     vastu_result_dict = None
     if vastu_enabled:
         from vastu.vastu_engine import evaluate_vastu_layout
-        north_deg = getattr(site, "north_direction", None)
+        north_deg = getattr(site, "north_direction", None) if site else None
         v_res = evaluate_vastu_layout(
             rooms=valid_rooms,
-            plot_width=site.plot_width,
-            plot_length=site.plot_length,
-            road_side=site.road_side,
+            plot_width=site.plot_width if site else 30.0,
+            plot_length=site.plot_length if site else 40.0,
+            road_side=getattr(site, "road_side", "south") if site else "south",
             north_deg=north_deg
         )
         vastu_score = v_res.overall_score
@@ -220,10 +225,44 @@ def calculate_architectural_scores(
         aspect_ratio_compliance=size_score
     )
 
-    is_valid = len(errors) == 0 and room_program_score >= 80.0
+    passed_checks: List[str] = []
+    if site and site.buildable_envelope:
+        env = site.buildable_envelope
+        all_in_envelope = all(
+            r.rect.x >= env.x - 0.05 and r.rect.right <= env.right + 0.05 and
+            r.rect.y >= env.y - 0.05 and r.rect.bottom <= env.bottom + 0.05
+            for r in valid_rooms
+        )
+        if all_in_envelope:
+            passed_checks.append("Buildable envelope containment")
+    else:
+        passed_checks.append("Buildable envelope containment")
+
+    has_overlap = False
+    for i in range(len(valid_rooms)):
+        for j in range(i + 1, len(valid_rooms)):
+            r1, r2 = valid_rooms[i].rect, valid_rooms[j].rect
+            inter_w = max(0.0, min(r1.right, r2.right) - max(r1.x, r2.x))
+            inter_h = max(0.0, min(r1.bottom, r2.bottom) - max(r1.y, r2.y))
+            if inter_w * inter_h > 0.5:
+                has_overlap = True
+                break
+        if has_overlap:
+            break
+    if not has_overlap:
+        passed_checks.append("Zero room overlap")
+
+    if circulation_score >= 60.0:
+        passed_checks.append("Circulation connectivity")
+    if room_program_score >= 80.0:
+        passed_checks.append("Room program requirements")
+    if daylight_score >= 60.0:
+        passed_checks.append("Natural daylight & ventilation")
+
+    is_valid = len(errors) == 0 and room_program_score >= 80.0 and not has_overlap
     validation = ArchitecturalValidation(
         is_valid=is_valid,
-        passed_checks=["Buildable envelope containment", "Zero room overlap", "Circulation connectivity"],
+        passed_checks=passed_checks,
         warnings=warnings,
         errors=errors
     )

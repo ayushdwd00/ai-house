@@ -1,6 +1,9 @@
 import os
 import base64
 import time
+import uuid
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -8,8 +11,9 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request, Path as FastPath
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, PlainTextResponse
 from typing import Optional, List, Dict, Any
+from export.cad_export_engine import export_layout_to_dxf, export_layout_to_indian_drawing_svg, get_door_window_schedules
 
 from models import (
     HouseLayout, IntakeRequest, RefineRequest, EditRoomRequest, EditRoomResponse,
@@ -76,11 +80,15 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health_check():
+    from llm import get_llm_client
+    client = get_llm_client()
     return {
         "status": "healthy",
         "service": "AI House Architectural Planning & Construction Intelligence Engine",
         "engine": "CP-SAT + Shapely + NetworkX + Groq Reasoning + Construction Engine",
         "has_groq_key": bool(os.getenv("GROQ_API_KEY") and os.getenv("GROQ_API_KEY") != "your_groq_api_key_here"),
+        "llm_online": client.is_available(),
+        "task_models": getattr(client, "_verified_task_models", {}),
         "text_model": os.getenv("GROQ_TEXT_MODEL", "openai/gpt-oss-120b"),
         "vision_model": os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-3.2-11b-vision-instruct")
     }
@@ -99,17 +107,12 @@ def recommend_dimensions_endpoint(req: DimensionRecommendationRequest):
     """
     return analyze_and_recommend_dimensions(req)
 
-@app.post("/api/generate", response_model=HouseLayout)
-def generate_layout_endpoint(req: IntakeRequest):
-    """
-    Executes the site-first architectural design engine:
-    Site setbacks & envelope -> Functional zoning & relationship graph ->
-    CP-SAT constraint solver -> Furniture programs -> Shared wall network ->
-    Real mathematical scoring -> Groq critic candidate selection -> Quantities & Cost.
-    """
-    t0 = time.time()
+JOBS_DB: Dict[str, Dict[str, Any]] = {}
+thread_pool = ThreadPoolExecutor(max_workers=4)
 
-    # Extract plot dimensions respecting explicit manual inputs and unit conversion
+
+def _execute_generation(req: IntakeRequest) -> HouseLayout:
+    t0 = time.time()
     plot_w = req.plot_width or 40.0
     plot_l = req.plot_length or 50.0
     if req.plot:
@@ -173,13 +176,78 @@ def generate_layout_endpoint(req: IntakeRequest):
         "cost_estimate_ms": 12.0
     }
 
-    # Persist as initial project version (v1)
     try:
         save_project(layout, layout.id)
     except Exception as e:
         print(f"[STORAGE WARNING] Could not persist project: {e}")
 
     return layout
+
+
+def _run_job_worker(job_id: str, req: IntakeRequest):
+    try:
+        JOBS_DB[job_id]["status"] = "processing"
+        JOBS_DB[job_id]["progress"] = 30.0
+        JOBS_DB[job_id]["stage"] = "spatial_solver"
+        layout = _execute_generation(req)
+        JOBS_DB[job_id]["status"] = "completed"
+        JOBS_DB[job_id]["progress"] = 100.0
+        JOBS_DB[job_id]["stage"] = "done"
+        JOBS_DB[job_id]["result"] = layout.model_dump()
+    except Exception as e:
+        JOBS_DB[job_id]["status"] = "failed"
+        JOBS_DB[job_id]["progress"] = 0.0
+        JOBS_DB[job_id]["stage"] = "error"
+        JOBS_DB[job_id]["error"] = {
+            "status": "failed",
+            "stage": "solver",
+            "error_code": "GENERATION_FAILURE",
+            "message": str(e),
+            "diagnostics": [
+                f"Plot dimensions: {req.plot_width}x{req.plot_length}",
+                f"Requested program: {req.bedrooms}BHK, {req.num_floors} floors"
+            ]
+        }
+
+
+@app.post("/api/generate")
+def generate_layout_endpoint(req: IntakeRequest, async_job: bool = False):
+    """
+    Executes the site-first architectural design engine.
+    If async_job=True, returns 202 Accepted with job_id for non-blocking polling.
+    Otherwise returns canonical HouseLayout synchronously (100% backward compatible).
+    """
+    if async_job:
+        job_id = str(uuid.uuid4())
+        JOBS_DB[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "progress": 0.0,
+            "stage": "queued",
+            "result": None,
+            "error": None
+        }
+        thread_pool.submit(_run_job_worker, job_id, req)
+        return JSONResponse(status_code=202, content={"job_id": job_id, "status": "queued"})
+
+    return _execute_generation(req)
+
+
+@app.get("/api/jobs/{job_id}")
+def get_job_status_endpoint(job_id: str):
+    """Returns status, progress, stage and result or diagnostics of a background generation job."""
+    job = JOBS_DB.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@app.post("/api/estimate", response_model=CostEstimate)
+def estimate_cost_endpoint(layout: HouseLayout):
+    """Calculates fresh itemized CPWD/PWD BOQ cost estimate from canonical HouseLayout."""
+    quantities = calculate_material_quantities(layout, layout.construction_spec)
+    return estimate_construction_cost(layout, quantities)
+
 
 @app.post("/api/intake")
 def intake_flow_endpoint(req: IntakeRequest):
@@ -457,7 +525,7 @@ def undo_version_endpoint(project_id: str):
     return undone
 
 @app.post("/api/edit-room", response_model=EditRoomResponse)
-def edit_room_endpoint(req: EditRoomRequest):
+async def edit_room_endpoint(req: EditRoomRequest):
     """
     Validates and updates an individual room's rect within the canonical layout.
     Enforces:
@@ -776,3 +844,56 @@ async def websocket_refine(websocket: WebSocket):
                 await websocket.send_json({"status": "error", "message": "Missing layout or instruction"})
     except WebSocketDisconnect:
         pass
+
+
+@app.post("/api/export/dxf")
+async def export_dxf_endpoint(layout: HouseLayout):
+    """Generates standard AutoCAD R12 DXF format from canonical HouseLayout."""
+    dxf_content = export_layout_to_dxf(layout)
+    filename = f"{layout.id or 'floorplan'}.dxf"
+    return PlainTextResponse(
+        content=dxf_content,
+        media_type="application/dxf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.post("/api/export/svg")
+async def export_svg_endpoint(layout: HouseLayout):
+    """Generates an Indian Standard architectural blueprint SVG drawing."""
+    svg_content = export_layout_to_indian_drawing_svg(layout)
+    filename = f"{layout.id or 'floorplan'}.svg"
+    return Response(
+        content=svg_content,
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'}
+    )
+
+
+@app.get("/api/projects/{project_id}/export/dxf")
+async def export_project_dxf(project_id: str = FastPath(...)):
+    """Export saved project to AutoCAD DXF."""
+    layout = get_project(project_id)
+    if not layout:
+        raise HTTPException(status_code=404, detail="Project not found")
+    dxf_content = export_layout_to_dxf(layout)
+    return PlainTextResponse(
+        content=dxf_content,
+        media_type="application/dxf",
+        headers={"Content-Disposition": f'attachment; filename="{project_id}.dxf"'}
+    )
+
+
+@app.get("/api/projects/{project_id}/export/svg")
+async def export_project_svg(project_id: str = FastPath(...)):
+    """Export saved project to Indian standard blueprint SVG."""
+    layout = get_project(project_id)
+    if not layout:
+        raise HTTPException(status_code=404, detail="Project not found")
+    svg_content = export_layout_to_indian_drawing_svg(layout)
+    return Response(
+        content=svg_content,
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": f'inline; filename="{project_id}.svg"'}
+    )
+

@@ -9,6 +9,7 @@ Groq Architectural Critic -> Canonical HouseLayout Model.
 
 from typing import List, Dict, Tuple, Optional, Any
 import uuid
+from shapely.geometry import box
 
 from models import (
     HouseLayout, FloorPlan, Room, Rect, FurnitureItem, Wall, Door, Window,
@@ -658,6 +659,92 @@ def build_room_program(
             rationale="Upper level family bathroom."
         ))
 
+        if any("balcony" in s.lower() or "terrace" in s.lower() for s in special_rooms):
+            rooms.append(Room(
+                id=f"f{floor_num}_balcony",
+                name="Balcony",
+                type="balcony",
+                zone="special",
+                floor=floor_num,
+                min_width=4.0, min_length=6.0,
+                preferred_width=5.0, preferred_length=10.0,
+                max_width=7.0, max_length=16.0,
+                privacy_level="semi_private",
+                color=ROOM_COLORS.get("balcony", "#a3e635"),
+                rationale="Upper level shaded balcony."
+            ))
+
+    elif floor_num >= 3:
+        # Level 3 (G+2) / Rooftop / Penthouse level
+        rooms.append(Room(
+            id=f"f{floor_num}_staircase",
+            name="Staircase Core",
+            type="staircase",
+            zone="circulation",
+            floor=floor_num,
+            min_width=7.0, min_length=9.0,
+            preferred_width=8.0, preferred_length=10.0,
+            max_width=9.5, max_length=12.0,
+            privacy_level="semi_private",
+            color=ROOM_COLORS["staircase"],
+            rationale="Vertical stair core continuing through to upper level."
+        ))
+        rooms.append(Room(
+            id=f"f{floor_num}_hallway",
+            name="Upper Landing",
+            type="hallway",
+            zone="circulation",
+            floor=floor_num,
+            min_width=4.0, min_length=6.0,
+            preferred_width=5.0, preferred_length=10.0,
+            max_width=7.0, max_length=16.0,
+            privacy_level="semi_private",
+            color=ROOM_COLORS["hallway"],
+            rationale="Circulation corridor connecting rooftop spaces."
+        ))
+        rooms.append(Room(
+            id=f"f{floor_num}_lounge",
+            name="Family Lounge",
+            type="bedroom",
+            zone="private",
+            floor=floor_num,
+            min_width=11.0, min_length=12.0,
+            preferred_width=13.0, preferred_length=14.0,
+            max_width=16.0, max_length=18.0,
+            privacy_level="semi_private",
+            daylight_requirement="high",
+            exterior_wall_requirement=True,
+            color=ROOM_COLORS["living_room"],
+            rationale="Upper level multipurpose lounge or expansion room."
+        ))
+        rooms.append(Room(
+            id=f"f{floor_num}_common_bath",
+            name="Terrace Bath",
+            type="bathroom",
+            zone="service",
+            floor=floor_num,
+            min_width=4.5, min_length=6.0,
+            preferred_width=5.5, preferred_length=7.5,
+            max_width=7.5, max_length=9.0,
+            privacy_level="intimate",
+            ventilation_requirement="direct_exterior",
+            color=ROOM_COLORS["bathroom"],
+            rationale="Upper level bathroom servicing lounge and terrace."
+        ))
+        rooms.append(Room(
+            id=f"f{floor_num}_terrace",
+            name="Open Terrace",
+            type="balcony",
+            zone="special",
+            floor=floor_num,
+            min_width=8.0, min_length=10.0,
+            preferred_width=12.0, preferred_length=14.0,
+            max_width=20.0, max_length=24.0,
+            privacy_level="semi_private",
+            color=ROOM_COLORS.get("balcony", "#a3e635"),
+            rationale="Rooftop terrace providing outdoor drying, utility, and garden area."
+        ))
+
     # Special rooms (Pooja, Office, Balcony)
     for s in special_rooms:
         s_lower = s.lower()
@@ -786,6 +873,7 @@ def generate_architectural_house_layout(
     champion_validation: Optional[ArchitecturalValidation] = None
     groq_critique_data: Dict[str, Any] = {}
     ground_stair_rect: Optional[Rect] = None
+    ground_wet_rect: Optional[Rect] = None
 
     for floor_idx in range(1, num_floors + 1):
         floor_name = "Ground Floor" if floor_idx == 1 else ("First Floor" if floor_idx == 2 else ("Second Floor" if floor_idx == 3 else f"Level {floor_idx}"))
@@ -814,6 +902,13 @@ def generate_architectural_house_layout(
         pinned_rooms: Dict[str, Rect] = {}
         if floor_idx > 1 and ground_stair_rect:
             pinned_rooms[f"f{floor_idx}_staircase"] = ground_stair_rect
+        if floor_idx > 1 and ground_wet_rect:
+            upper_wet_id = f"f{floor_idx}_common_bath"
+            if any(r.id == upper_wet_id for r in floor_rooms):
+                stair_poly = box(ground_stair_rect.x, ground_stair_rect.y, ground_stair_rect.right, ground_stair_rect.bottom) if ground_stair_rect else None
+                wet_poly = box(ground_wet_rect.x, ground_wet_rect.y, ground_wet_rect.right, ground_wet_rect.bottom)
+                if not (stair_poly and stair_poly.intersects(wet_poly)):
+                    pinned_rooms[upper_wet_id] = ground_wet_rect
 
         solved_candidates = []
         candidate_summaries = []
@@ -825,11 +920,18 @@ def generate_architectural_house_layout(
                 variant_seed=variant_seed
             )
             if not candidate or not candidate.is_valid:
-                if pinned_rooms:
+                if len(pinned_rooms) > 1 and f"f{floor_idx}_staircase" in pinned_rooms:
                     candidate = solve_spatial_layout(
                         floor_rooms, site, s,
+                        pinned_rooms={f"f{floor_idx}_staircase": ground_stair_rect},
                         variant_seed=variant_seed
                     )
+                if not candidate or not candidate.is_valid:
+                    if pinned_rooms:
+                        candidate = solve_spatial_layout(
+                            floor_rooms, site, s,
+                            variant_seed=variant_seed
+                        )
 
             if candidate and candidate.is_valid:
                 # Deduplicate walls with real thickness from ConstructionSpecification
@@ -1011,6 +1113,9 @@ def generate_architectural_house_layout(
         if stair_room and stair_room.rect:
             if floor_idx == 1:
                 ground_stair_rect = stair_room.rect
+                wet_rm = next((r for r in champion_rooms if r.type in ["bathroom", "powder_room"]), None)
+                if wet_rm and wet_rm.rect:
+                    ground_wet_rect = wet_rm.rect
 
             stair_dir = "up" if floor_idx == 1 else "down"
             staircase_obj = Stair(

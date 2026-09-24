@@ -76,6 +76,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     initialPresentationMode || "landscape"
   );
   const [multiFloorStacked, setMultiFloorStacked] = useState(true);
+  const [explodedFloors, setExplodedFloors] = useState(false);
+  const [cameraView, setCameraView] = useState<"iso" | "top" | "front" | "side">("iso");
 
   const [internalShowStructure, setInternalShowStructure] = useState(false);
   const effectiveShowStructure = showStructure !== undefined ? showStructure : internalShowStructure;
@@ -711,6 +713,26 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                 fBot.rotation.y = -angle;
                 floorGroup.add(fTop, fBot);
 
+                // Indian Architectural RCC Chajja (Sunshade)
+                if (isExt) {
+                  const chajjaProj = 1.5;
+                  const chajjaThick = 0.25;
+                  const chajjaW = op.width + 1.0;
+                  const normX = -Math.sin(angle);
+                  const normZ = Math.cos(angle);
+                  const chajjaGeo = new THREE.BoxGeometry(chajjaW, chajjaThick, chajjaProj);
+                  const chajjaMesh = new THREE.Mesh(chajjaGeo, materials.terraceMat);
+                  chajjaMesh.position.set(
+                    op.midX + normX * (chajjaProj / 2 + thickness / 2),
+                    0.5 + headH + chajjaThick / 2,
+                    op.midZ + normZ * (chajjaProj / 2 + thickness / 2)
+                  );
+                  chajjaMesh.rotation.y = -angle;
+                  chajjaMesh.castShadow = true;
+                  chajjaMesh.receiveShadow = true;
+                  floorGroup.add(chajjaMesh);
+                }
+
                 // Curtained Windows in Bedrooms
                 if (!isExteriorView) {
                   const curtainL = new THREE.Mesh(new THREE.BoxGeometry(0.5, renderWinH * 0.95, 0.2), curtainMat);
@@ -970,6 +992,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
     // 3. FLOORS GENERATION (SINGLE FLOOR OR MULTI-FLOOR STACKED)
     const numFloors = Math.max(1, layout.floors?.length || layout.num_floors || 1);
+    const floorSpacing = multiFloorStacked && explodedFloors ? floorElevation + 8.0 : floorElevation;
 
     if (multiFloorStacked) {
       // Stack all floors in full architectural residence mode
@@ -987,7 +1010,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                 windows: layout.windows || [],
               };
 
-        const yOffset = fIdx * floorElevation;
+        const yOffset = fIdx * floorSpacing;
         const flGroup = buildFloorGeometry(
           floorPlan,
           fIdx,
@@ -1035,10 +1058,49 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       rootGroup.add(flGroup);
     }
 
+    // 3b. Column and Beam Structural Layer (when effectiveShowStructure is enabled)
+    if (effectiveShowStructure && layout.structural_planning?.columns) {
+      const colMat = new THREE.MeshStandardMaterial({
+        color: "#374151",
+        roughness: 0.6,
+        metalness: 0.3,
+      });
+      const beamMat = new THREE.MeshStandardMaterial({
+        color: "#4B5563",
+        roughness: 0.7,
+        metalness: 0.2,
+      });
+      layout.structural_planning.columns.forEach((col) => {
+        const colW = col.width || 0.75;
+        const totalColH = floorSpacing * numFloors;
+        const colGeo = new THREE.BoxGeometry(colW, totalColH, colW);
+        const colMesh = new THREE.Mesh(colGeo, colMat);
+        colMesh.position.set(col.x, totalColH / 2 + 0.5, col.y);
+        colMesh.castShadow = true;
+        rootGroup.add(colMesh);
+      });
+      // Ring tie beams at each floor slab level
+      for (let fIdx = 0; fIdx < numFloors; fIdx++) {
+        const beamY = (fIdx + 1) * floorSpacing - 0.3;
+        (layout.exterior_walls || []).forEach((w) => {
+          const bdx = w.x2 - w.x1;
+          const bdz = w.y2 - w.y1;
+          const bLen = Math.hypot(bdx, bdz);
+          if (bLen < 1.0) return;
+          const bAngle = Math.atan2(bdz, bdx);
+          const beamGeo = new THREE.BoxGeometry(bLen, 0.6, 0.75);
+          const beamMesh = new THREE.Mesh(beamGeo, beamMat);
+          beamMesh.position.set((w.x1 + w.x2) / 2, beamY, (w.y1 + w.y2) / 2);
+          beamMesh.rotation.y = -bAngle;
+          rootGroup.add(beamMesh);
+        });
+      }
+    }
+
     // 4. RCC ROOF SLAB, PARAPET & STAIR MUMTY (IN EXTERIOR & LANDSCAPE MODES)
     if (isExteriorView && showRoof) {
       const topFloorY = multiFloorStacked
-        ? (numFloors - 1) * floorElevation + fullWallHeight
+        ? (numFloors - 1) * floorSpacing + fullWallHeight
         : (activeFloorIndex + 1) * floorElevation;
 
       // Cantilevered RCC Roof Slab (1.2ft overhang)
@@ -1153,6 +1215,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     grassTexture,
     paverTexture,
     effectiveShowLandscape,
+    effectiveShowStructure,
+    explodedFloors,
     landscapeCategory,
     lightingPreset,
   ]);
@@ -1346,6 +1410,26 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     }
   };
 
+  const handleCameraPreset = (preset: "iso" | "top" | "front" | "side") => {
+    setCameraView(preset);
+    if (!cameraRef.current || !controlsRef.current) return;
+    isTransitioningCamera.current = true;
+    if (preset === "top") {
+      targetCamPos.current.set(cx, pl * 2.2, cz + 0.01);
+      targetControlsTarget.current.set(cx, 0, cz);
+    } else if (preset === "front") {
+      targetCamPos.current.set(cx, pl * 0.45, cz + pl * 1.55);
+      targetControlsTarget.current.set(cx, 4.0, cz);
+    } else if (preset === "side") {
+      targetCamPos.current.set(cx + pw * 1.6, pl * 0.45, cz);
+      targetControlsTarget.current.set(cx, 4.0, cz);
+    } else {
+      // Iso
+      targetCamPos.current.set(cx + pw * 1.15, pl * 0.95, cz + pl * 1.25);
+      targetControlsTarget.current.set(cx, 3.0, cz);
+    }
+  };
+
   return (
     <div className="relative w-full h-full select-none overflow-hidden bg-[#ECEEF2]">
       {/* FLOATING 3D CONTROLS (TOP LEFT) */}
@@ -1478,6 +1562,55 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
             DUSK
           </button>
         </div>
+
+        {/* Camera Angles: ISO | TOP | FRONT | SIDE */}
+        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
+          {(["iso", "top", "front", "side"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => handleCameraPreset(mode)}
+              className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
+                cameraView === mode
+                  ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
+                  : "hover:text-[#F5F3EF]"
+              }`}
+            >
+              {mode.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Multi-Floor Exploded View Toggle */}
+        {layout.floors && layout.floors.length > 1 && multiFloorStacked && (
+          <button
+            onClick={() => setExplodedFloors((prev) => !prev)}
+            className={`px-3 py-1.5 rounded-full transition-all text-[10px] sm:text-[11px] font-mono border shadow-2xl ${
+              explodedFloors
+                ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446] font-semibold"
+                : "bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border-white/10"
+            }`}
+          >
+            {explodedFloors ? "COLLAPSE" : "EXPLODED"}
+          </button>
+        )}
+
+        {/* Structure (Columns & Beams) Toggle */}
+        <button
+          onClick={() => {
+            if (onToggleStructure) {
+              onToggleStructure();
+            } else {
+              setInternalShowStructure((prev) => !prev);
+            }
+          }}
+          className={`px-3 py-1.5 rounded-full transition-all text-[10px] sm:text-[11px] font-mono border shadow-2xl ${
+            effectiveShowStructure
+              ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446] font-semibold"
+              : "bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border-white/10"
+          }`}
+        >
+          STRUCTURE
+        </button>
 
         {/* Reset Camera Button */}
         <button

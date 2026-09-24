@@ -1,0 +1,373 @@
+{
+  "version": "2024.1",
+  "disclaimer": "PRELIMINARY CONSTRUCTION ESTIMATE. Derived from CPWD Delhi Schedule of Rates (DSR 2023) and State PWD schedules. Real contractor tenders depend on soil conditions, architectural structural design, and live market commodity fluctuations.",
+  "exclusions": [
+    "Plot / Land acquisition cost and registration stamp duty",
+    "Municipal plan sanctions, development charges, and statutory utility connection fees",
+    "Professional fees (Architectural, Structural, MEP consultants)",
+    "Loose interior furniture, soft furnishings, and consumer appliances",
+    "Subsurface rock blasting or pile foundation if required by geotechnical test"
+  ],
+  "plinth_area_benchmarks_inr_per_sqft": {
+    "economy": { "min": 1400, "expected": 1650, "max": 1850 },
+    "standard": { "min": 1800, "expected": 2150, "max": 2500 },
+    "premium": { "min": 2500, "expected": 3050, "max": 3600 },
+    "luxury": { "min": 3600, "expected": 4500, "max": 5800 }
+  },
+  "city_cost_indices": {
+    "baseline": 1.00,
+    "delhi": 1.05,
+    "mumbai": 1.22,
+    "bengaluru": 1.12,
+    "hyderabad": 1.06,
+    "chennai": 1.08,
+    "pune": 1.10,
+    "kolkata": 0.98,
+    "ahmedabad": 1.02
+  },
+  "quality_tier_multipliers": {
+    "economy": 0.85,
+    "basic": 0.85,
+    "standard": 1.00,
+    "premium": 1.35,
+    "luxury": 1.75
+  },
+  "items": {
+    "excavation": {
+      "item_name": "Earthwork excavation in foundation trenches and column pits",
+      "category": "substructure",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 220, "expected": 275, "high": 340 },
+        "standard": { "low": 240, "expected": 300, "high": 380 },
+        "premium": { "low": 260, "expected": 330, "high": 420 },
+        "luxury": { "low": 280, "expected": 360, "high": 460 }
+      },
+      "source": "CPWD DSR 2023 Item 2.8 (Ordinary Soil)",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "pcc": {
+      "item_name": "Plain Cement Concrete (PCC 1:4:8 / M7.5) under footings and plinth",
+      "category": "substructure",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 4200, "expected": 4600, "high": 5100 },
+        "standard": { "low": 4500, "expected": 4900, "high": 5500 },
+        "premium": { "low": 4800, "expected": 5300, "high": 5900 },
+        "luxury": { "low": 5200, "expected": 5700, "high": 6400 }
+      },
+      "source": "CPWD DSR 2023 Item 4.1.8",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "footings": {
+      "item_name": "Reinforced Cement Concrete (RCC M20/M25) in column isolated footings",
+      "category": "substructure",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 5400, "expected": 5900, "high": 6500 },
+        "standard": { "low": 5800, "expected": 6400, "high": 7100 },
+        "premium": { "low": 6400, "expected": 7100, "high": 7900 },
+        "luxury": { "low": 7000, "expected": 7800, "high": 8800 }
+      },
+      "source": "CPWD DSR 2023 Item 5.1.2",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "plinth_beam": {
+      "item_name": "RCC M20/M25 tie and plinth beams at ground level",
+      "category": "substructure",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 5600, "expected": 6200, "high": 6900 },
+        "standard": { "low": 6000, "expected": 6700, "high": 7500 },
+        "premium": { "low": 6600, "expected": 7400, "high": 8300 },
+        "luxury": { "low": 7200, "expected": 8200, "high": 9200 }
+      },
+      "source": "State PWD Schedule of Rates 2023",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "dpc": {
+      "item_name": "Damp Proof Course (DPC 40mm 1:2:4 with waterproofing compound)",
+      "category": "substructure",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 240, "expected": 280, "high": 340 },
+        "standard": { "low": 280, "expected": 330, "high": 400 },
+        "premium": { "low": 320, "expected": 390, "high": 470 },
+        "luxury": { "low": 380, "expected": 460, "high": 560 }
+      },
+      "source": "CPWD DSR 2023 Item 4.11",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "plinth_filling": {
+      "item_name": "Sand / Murrum filling under floor slab and consolidation",
+      "category": "substructure",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 480, "expected": 580, "high": 700 },
+        "standard": { "low": 520, "expected": 640, "high": 780 },
+        "premium": { "low": 580, "expected": 720, "high": 880 },
+        "luxury": { "low": 650, "expected": 800, "high": 980 }
+      },
+      "source": "Regional Market Contractor Rates",
+      "rate_date": "2024-01-01",
+      "needs_verification": true
+    },
+    "columns_beams_slabs": {
+      "item_name": "Superstructure RCC M20/M25 in columns, roof slabs, and lintel beams",
+      "category": "structural",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 6200, "expected": 6900, "high": 7700 },
+        "standard": { "low": 6700, "expected": 7500, "high": 8400 },
+        "premium": { "low": 7400, "expected": 8400, "high": 9400 },
+        "luxury": { "low": 8200, "expected": 9400, "high": 10600 }
+      },
+      "source": "CPWD DSR 2023 Items 5.2.2 & 5.3",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "tmt_reinforcement": {
+      "item_name": "Fe500D / Fe550D High yield strength deformed TMT rebars",
+      "category": "structural",
+      "unit": "kg",
+      "rates": {
+        "economy": { "low": 68, "expected": 76, "high": 85 },
+        "standard": { "low": 72, "expected": 80, "high": 90 },
+        "premium": { "low": 78, "expected": 88, "high": 98 },
+        "luxury": { "low": 85, "expected": 96, "high": 108 }
+      },
+      "source": "Steel Mill Primary Wholesale Index (Tata / SAIL / JSW)",
+      "rate_date": "2024-02-01",
+      "needs_verification": false
+    },
+    "lintels_sunshades": {
+      "item_name": "RCC M20 lintels and cantilevered window sunshades (Chajja)",
+      "category": "structural",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 6400, "expected": 7100, "high": 7900 },
+        "standard": { "low": 6900, "expected": 7700, "high": 8600 },
+        "premium": { "low": 7600, "expected": 8600, "high": 9700 },
+        "luxury": { "low": 8500, "expected": 9700, "high": 11000 }
+      },
+      "source": "CPWD DSR 2023 Item 5.12",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "staircase": {
+      "item_name": "RCC dog-legged staircase with waist slab, steps and landing",
+      "category": "structural",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 7000, "expected": 7800, "high": 8700 },
+        "standard": { "low": 7500, "expected": 8400, "high": 9400 },
+        "premium": { "low": 8200, "expected": 9300, "high": 10500 },
+        "luxury": { "low": 9200, "expected": 10500, "high": 12000 }
+      },
+      "source": "CPWD DSR 2023 Item 5.10",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "masonry": {
+      "item_name": "Brickwork / AAC blockwork in cement mortar 1:6 in superstructure",
+      "category": "masonry",
+      "unit": "cum",
+      "rates": {
+        "economy": { "low": 4200, "expected": 4800, "high": 5500 },
+        "standard": { "low": 4600, "expected": 5300, "high": 6100 },
+        "premium": { "low": 5200, "expected": 6000, "high": 7000 },
+        "luxury": { "low": 5800, "expected": 6800, "high": 8000 }
+      },
+      "source": "CPWD DSR 2023 Item 6.1.1 (Red Clay Brick) / 6.26 (AAC)",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "plaster": {
+      "item_name": "Internal 12mm & External 18mm double-coat weatherproof plaster",
+      "category": "finishes",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 240, "expected": 290, "high": 350 },
+        "standard": { "low": 280, "expected": 340, "high": 410 },
+        "premium": { "low": 330, "expected": 410, "high": 500 },
+        "luxury": { "low": 390, "expected": 490, "high": 600 }
+      },
+      "source": "CPWD DSR 2023 Item 13.1 & 13.11",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "waterproofing": {
+      "item_name": "Terrace & wet room elastomeric membrane waterproofing",
+      "category": "finishes",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 380, "expected": 460, "high": 550 },
+        "standard": { "low": 450, "expected": 550, "high": 680 },
+        "premium": { "low": 560, "expected": 700, "high": 880 },
+        "luxury": { "low": 720, "expected": 920, "high": 1180 }
+      },
+      "source": "Specialist Waterproofing Agency Schedule",
+      "rate_date": "2024-01-15",
+      "needs_verification": true
+    },
+    "flooring": {
+      "item_name": "Vitrified tiles / Italian marble / Granite flooring with skirting",
+      "category": "finishes",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 850, "expected": 1100, "high": 1400 },
+        "standard": { "low": 1200, "expected": 1600, "high": 2100 },
+        "premium": { "low": 2200, "expected": 3100, "high": 4200 },
+        "luxury": { "low": 4500, "expected": 6800, "high": 9800 }
+      },
+      "source": "Kajaria / Somany / Imported Marble Index",
+      "rate_date": "2024-02-01",
+      "needs_verification": false
+    },
+    "doors_windows": {
+      "item_name": "Factory-finished flush / teakwood doors and UPVC / aluminum windows",
+      "category": "openings",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 2400, "expected": 3000, "high": 3800 },
+        "standard": { "low": 3200, "expected": 4200, "high": 5400 },
+        "premium": { "low": 5200, "expected": 7000, "high": 9200 },
+        "luxury": { "low": 8500, "expected": 12000, "high": 16500 }
+      },
+      "source": "Fenesta / Greenpanel / Teakwood Mill Rates",
+      "rate_date": "2024-01-20",
+      "needs_verification": false
+    },
+    "kitchen_platform": {
+      "item_name": "Granite kitchen counter slab with SS sink and ceramic dado tiles",
+      "category": "fixtures",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 1800, "expected": 2300, "high": 2900 },
+        "standard": { "low": 2400, "expected": 3100, "high": 4000 },
+        "premium": { "low": 3800, "expected": 5000, "high": 6600 },
+        "luxury": { "low": 6500, "expected": 9000, "high": 12500 }
+      },
+      "source": "Kitchen Contractor Schedule",
+      "rate_date": "2024-01-10",
+      "needs_verification": true
+    },
+    "sanitaryware": {
+      "item_name": "Wall-hung / floor-mounted EWC, wash basins, and CP brass fittings",
+      "category": "mep",
+      "unit": "point",
+      "rates": {
+        "economy": { "low": 4800, "expected": 6200, "high": 7900 },
+        "standard": { "low": 7500, "expected": 10500, "high": 14000 },
+        "premium": { "low": 14000, "expected": 20000, "high": 28000 },
+        "luxury": { "low": 28000, "expected": 42000, "high": 60000 }
+      },
+      "source": "Jaquar / Kohler / Hindware Market Schedule",
+      "rate_date": "2024-02-01",
+      "needs_verification": false
+    },
+    "electrical_points": {
+      "item_name": "Concealed copper wiring (FRLS) with modular switches per point",
+      "category": "mep",
+      "unit": "point",
+      "rates": {
+        "economy": { "low": 650, "expected": 820, "high": 1050 },
+        "standard": { "low": 850, "expected": 1100, "high": 1400 },
+        "premium": { "low": 1300, "expected": 1750, "high": 2300 },
+        "luxury": { "low": 2000, "expected": 2800, "high": 3800 }
+      },
+      "source": "Havells / Legrand / Polycab Rate List",
+      "rate_date": "2024-01-15",
+      "needs_verification": false
+    },
+    "septic_tank": {
+      "item_name": "Masonry/RCC 3-chamber septic tank with soak pit",
+      "category": "external",
+      "unit": "unit",
+      "rates": {
+        "economy": { "low": 45000, "expected": 55000, "high": 68000 },
+        "standard": { "low": 55000, "expected": 70000, "high": 88000 },
+        "premium": { "low": 72000, "expected": 92000, "high": 118000 },
+        "luxury": { "low": 95000, "expected": 125000, "high": 165000 }
+      },
+      "source": "Sanitary Drainage Standard Rates",
+      "rate_date": "2023-12-01",
+      "needs_verification": true
+    },
+    "painting": {
+      "item_name": "Interior acrylic emulsion & exterior weather-proof apex painting",
+      "category": "finishes",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 140, "expected": 180, "high": 230 },
+        "standard": { "low": 190, "expected": 250, "high": 320 },
+        "premium": { "low": 290, "expected": 380, "high": 490 },
+        "luxury": { "low": 440, "expected": 600, "high": 800 }
+      },
+      "source": "Asian Paints Apex Royale Schedule 2024",
+      "rate_date": "2024-01-20",
+      "needs_verification": false
+    },
+    "false_ceiling": {
+      "item_name": "Gypsum board false ceiling with cove lighting channel",
+      "category": "finishes",
+      "unit": "sqm",
+      "rates": {
+        "economy": { "low": 550, "expected": 700, "high": 880 },
+        "standard": { "low": 750, "expected": 980, "high": 1250 },
+        "premium": { "low": 1150, "expected": 1500, "high": 1950 },
+        "luxury": { "low": 1700, "expected": 2300, "high": 3100 }
+      },
+      "source": "Saint-Gobain Gyproc Contractor Rate",
+      "rate_date": "2024-01-25",
+      "needs_verification": true
+    },
+    "boundary_wall": {
+      "item_name": "Compound masonry boundary wall (1.5m height) with coping and MS gate",
+      "category": "external",
+      "unit": "rm",
+      "rates": {
+        "economy": { "low": 3200, "expected": 3900, "high": 4800 },
+        "standard": { "low": 4000, "expected": 5000, "high": 6200 },
+        "premium": { "low": 5400, "expected": 6800, "high": 8500 },
+        "luxury": { "low": 7200, "expected": 9200, "high": 11800 }
+      },
+      "source": "State PWD External Works Schedule",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "contractor_profit": {
+      "item_name": "Contractor Overhead and Profit Margin",
+      "category": "commercial",
+      "unit": "percent",
+      "rates": {
+        "economy": { "low": 8.0, "expected": 10.0, "high": 12.0 },
+        "standard": { "low": 10.0, "expected": 12.0, "high": 15.0 },
+        "premium": { "low": 12.0, "expected": 15.0, "high": 18.0 },
+        "luxury": { "low": 15.0, "expected": 18.0, "high": 22.0 }
+      },
+      "source": "CPWD Standard Contract Norms (10-15%)",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    },
+    "contingency": {
+      "item_name": "Unforeseen site contingency and escalation buffer",
+      "category": "commercial",
+      "unit": "percent",
+      "rates": {
+        "economy": { "low": 3.0, "expected": 5.0, "high": 7.0 },
+        "standard": { "low": 3.0, "expected": 5.0, "high": 8.0 },
+        "premium": { "low": 4.0, "expected": 6.0, "high": 9.0 },
+        "luxury": { "low": 5.0, "expected": 7.5, "high": 10.0 }
+      },
+      "source": "Standard Project Finance Allowance",
+      "rate_date": "2023-11-01",
+      "needs_verification": false
+    }
+  }
+}

@@ -21,6 +21,15 @@ from models import MaterialRate, MaterialRateContext
 
 
 DEFAULT_RATES: Dict[str, Dict[str, Any]] = {
+    "excavation_earthwork": {
+        "material_name": "Earthwork Excavation for Footings and Trenches",
+        "category": "earthwork",
+        "unit": "cu m",
+        "low_rate": 220.0,
+        "expected_rate": 280.0,
+        "high_rate": 360.0,
+        "source": "CPWD Schedule of Rates (Ordinary Soil Excavation)"
+    },
     "red_brick": {
         "material_name": "Modular Red Clay Bricks / AAC Blocks",
         "category": "masonry",
@@ -161,10 +170,14 @@ def get_material_rate_context(
     scaled by quality tier and regional factor.
     """
     multiplier = 1.0
-    if quality_tier == "premium":
+    if quality_tier == "luxury":
+        multiplier = 1.65
+    elif quality_tier == "premium":
         multiplier = 1.30
-    elif quality_tier == "basic":
+    elif quality_tier in ["economy", "basic"]:
         multiplier = 0.85
+    else:
+        multiplier = 1.0
 
     rate_dict: Dict[str, MaterialRate] = {}
     for mat_id, data in DEFAULT_RATES.items():
