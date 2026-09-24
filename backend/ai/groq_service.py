@@ -19,7 +19,7 @@ from typing import Dict, Any, Optional, List, Tuple, Literal
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-from llm import get_llm_client, LLMResult
+from llm import get_llm_client, get_ai_provider, LLMResult
 from models import ArchitecturalRequirements, DreamHomeStructuredRequirements, LandscapePreferences
 
 load_dotenv()
@@ -226,12 +226,12 @@ def _deterministic_requirement_fallback(prompt: str) -> ArchitecturalRequirement
 def interpret_requirements_with_groq(prompt: str) -> ArchitecturalRequirements:
     """
     Parses natural language requirements into structured ArchitecturalRequirements.
-    Uses Groq LLM with Pydantic JSON schema when available; falls back to smart rule parser.
+    Uses Groq LLM as fast interaction layer with Gemini fallback and smart rule parser.
     """
     if not prompt or len(prompt.strip()) < 3:
         return _deterministic_requirement_fallback(prompt)
 
-    client = get_llm_client()
+    provider = get_ai_provider()
     system_prompt = (
         "You are a Principal Residential Architect. "
         "Extract structured architectural parameters from the user's design request. "
@@ -239,12 +239,12 @@ def interpret_requirements_with_groq(prompt: str) -> ArchitecturalRequirements:
         "parking spaces, architectural style, special rooms, and vastu preferences."
     )
 
-    res: LLMResult = client.chat_json(
+    res: LLMResult = provider.execute_interaction(
         task="requirements",
         system=system_prompt,
         user=prompt,
         schema=ArchitecturalRequirements,
-        fallback_fn=lambda: _deterministic_requirement_fallback(prompt),
+        deterministic_fallback=lambda: _deterministic_requirement_fallback(prompt),
         temperature=0.15
     )
 
@@ -426,7 +426,7 @@ def interpret_dream_home_prompt(
     if not prompt or len(prompt.strip()) < 3:
         return _deterministic_dream_home_fallback(prompt, existing_context)
 
-    client = get_llm_client()
+    provider = get_ai_provider()
     system_prompt = (
         "You are a Principal Residential Architect. "
         "Extract structured architectural requirements from the user's natural language dream home description. "
@@ -441,12 +441,12 @@ def interpret_dream_home_prompt(
     if existing_context:
         user_payload += f"\nExisting context: {json.dumps(existing_context)}"
 
-    res: LLMResult = client.chat_json(
+    res: LLMResult = provider.execute_interaction(
         task="requirements",
         system=system_prompt,
         user=user_payload,
         schema=DreamHomeStructuredRequirements,
-        fallback_fn=lambda: _deterministic_dream_home_fallback(prompt, existing_context),
+        deterministic_fallback=lambda: _deterministic_dream_home_fallback(prompt, existing_context),
         temperature=0.15
     )
     return res.data
@@ -525,10 +525,11 @@ def _deterministic_concepts_fallback(req: ArchitecturalRequirements) -> Architec
 def generate_architectural_concepts_with_groq(req: ArchitecturalRequirements) -> ArchitecturalConceptsResult:
     """
     Generates 2-3 distinct architectural spatial strategies.
-    The LLM reasons about zoning hierarchy, circulation spines, and privacy gradients.
+    The architectural reasoning layer (Gemini with Groq fallback) reasons about zoning hierarchy,
+    circulation spines, and privacy gradients.
     Does NOT generate raw coordinates; generates topological placement constraints for CP-SAT.
     """
-    client = get_llm_client()
+    provider = get_ai_provider()
     system_prompt = (
         "You are a Chief Residential Architect. "
         "Formulate 2-3 distinct architectural layout strategies for a house plot. "
@@ -544,12 +545,12 @@ def generate_architectural_concepts_with_groq(req: ArchitecturalRequirements) ->
         "special_rooms": req.special_rooms
     }
 
-    res: LLMResult = client.chat_json(
+    res: LLMResult = provider.execute_reasoning(
         task="concepts",
         system=system_prompt,
         user=json.dumps(context),
         schema=ArchitecturalConceptsResult,
-        fallback_fn=lambda: _deterministic_concepts_fallback(req),
+        deterministic_fallback=lambda: _deterministic_concepts_fallback(req),
         temperature=0.0
     )
 
@@ -652,19 +653,19 @@ def run_groq_architectural_critic(layout_summary: Dict[str, Any]) -> GroqCriticR
     Evaluates layout metrics and returns structured advisory issues and suggestions.
     Advisory only: suggestions are evaluated and applied only if re-validation passes.
     """
-    client = get_llm_client()
+    provider = get_ai_provider()
     system_prompt = (
         "You are a Principal Architectural Critic evaluating a mathematically solved residential layout. "
         "Review the structured numeric data (dimensions, aspect ratios, daylight, circulation, privacy). "
         "Return structured issues and advisory suggestions. "
         "Do NOT return chain-of-thought; return strictly JSON matching the GroqCriticReport schema."
     )
-    res: LLMResult = client.chat_json(
-        task="critic",
+    res: LLMResult = provider.execute_reasoning(
+        task="critique",
         system=system_prompt,
         user=json.dumps(layout_summary),
         schema=GroqCriticReport,
-        fallback_fn=lambda: _deterministic_critic_report_fallback(layout_summary),
+        deterministic_fallback=lambda: _deterministic_critic_report_fallback(layout_summary),
         temperature=0.0
     )
     report: GroqCriticReport = res.data
@@ -685,7 +686,7 @@ def critique_architectural_candidates_with_groq(
         return _deterministic_critique_fallback(candidate_summaries)
 
     sorted_summaries = sorted(candidate_summaries, key=lambda c: str(c.get("scheme_id", "")))
-    client = get_llm_client()
+    provider = get_ai_provider()
     system_prompt = (
         "You are a Principal Residential Architect and critic. "
         "You are evaluating multiple mathematically solved architectural layout candidates. "
@@ -697,12 +698,12 @@ def critique_architectural_candidates_with_groq(
         "candidates": sorted_summaries
     }
 
-    res: LLMResult = client.chat_json(
+    res: LLMResult = provider.execute_reasoning(
         task="critique",
         system=system_prompt,
         user=json.dumps(context),
         schema=ArchitecturalCritique,
-        fallback_fn=lambda: _deterministic_critique_fallback(sorted_summaries),
+        deterministic_fallback=lambda: _deterministic_critique_fallback(sorted_summaries),
         temperature=0.0
     )
 
@@ -815,9 +816,9 @@ def interpret_modification_with_groq(
 ) -> NaturalLanguageModificationCommand:
     """
     Parses natural language modification prompts into structured mathematical instructions
-    for localized cluster re-optimization.
+    for localized cluster re-optimization using Groq with Gemini fallback.
     """
-    client = get_llm_client()
+    provider = get_ai_provider()
     system_prompt = (
         "You are an Architectural Systems Engineer. "
         "Convert natural language modification requests into structured geometric modification parameters. "
@@ -829,12 +830,12 @@ def interpret_modification_with_groq(
         "existing_rooms": current_layout_summary.get("rooms", [])
     }
 
-    res: LLMResult = client.chat_json(
+    res: LLMResult = provider.execute_interaction(
         task="edit_parsing",
         system=system_prompt,
         user=json.dumps(context),
         schema=NaturalLanguageModificationCommand,
-        fallback_fn=lambda: _deterministic_modification_fallback(instruction),
+        deterministic_fallback=lambda: _deterministic_modification_fallback(instruction),
         temperature=0.1
     )
 
@@ -999,12 +1000,13 @@ def generate_construction_advice_with_groq(
     )
 
     fallback = lambda: _deterministic_construction_advice_fallback(quantities, cost_estimate, layout)
+    provider = get_ai_provider()
 
-    res: LLMResult = client.chat_json(
+    res: LLMResult = provider.execute_reasoning(
         task="advisor",
         system=system_prompt,
         user=json.dumps(context, default=str),
-        fallback_fn=fallback,
+        deterministic_fallback=fallback,
         temperature=0.2
     )
 

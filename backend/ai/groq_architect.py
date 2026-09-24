@@ -195,10 +195,11 @@ def formulate_design_intent_with_groq(
     site: Optional[Site] = None
 ) -> DesignIntent:
     """
-    Calls Groq to act as Principal Architect, reasoning about family demographics,
+    Acts as Architectural Reasoning Layer (Gemini primary, Groq fallback), reasoning about family demographics,
     lifestyle, privacy, and typology selection, with automatic deterministic fallback.
     """
-    client = get_llm_client()
+    from llm import get_ai_provider
+    provider = get_ai_provider()
     system_prompt = (
         "You are an Indian Residential Architect. Reason about the family demographics, "
         "lifestyle, Indian residential spaces (foyer, pooja, utility, verandah), "
@@ -216,12 +217,12 @@ def formulate_design_intent_with_groq(
         "special_rooms": req.special_rooms or []
     }
 
-    res: LLMResult = client.chat_json(
-        task="concepts",
+    res: LLMResult = provider.execute_reasoning(
+        task="design_intent",
         system=system_prompt,
         user=json.dumps(context),
         schema=DesignIntent,
-        fallback_fn=lambda: create_deterministic_design_intent(req, site),
+        deterministic_fallback=lambda: create_deterministic_design_intent(req, site),
         temperature=0.0
     )
 

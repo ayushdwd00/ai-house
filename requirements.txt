@@ -8,3 +8,5 @@ networkx
 python-multipart
 httpx
 Pillow
+google-genai
+groq

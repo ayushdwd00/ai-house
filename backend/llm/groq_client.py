@@ -92,7 +92,7 @@ class GroqClient(LLMClient):
         if self._api_key and self._api_key != "your_groq_api_key_here":
             try:
                 from groq import Groq
-                self._raw_client = Groq(api_key=self._api_key)
+                self._raw_client = Groq(api_key=self._api_key, max_retries=0)
             except Exception as e:
                 logger.warning(f"Failed to initialize Groq SDK client: {_safe_str(e)}")
                 self._raw_client = None
@@ -240,6 +240,8 @@ class GroqClient(LLMClient):
                 attempt_error = _safe_str(e)
                 err_lower = attempt_error.lower()
                 is_transient = any(code in err_lower for code in ["429", "500", "502", "503", "504", "timeout", "rate limit"])
+                if any(k in err_lower for k in ["tokens per day", "tpd", "quota", "rate_limit_exceeded"]):
+                    is_transient = False
                 if attempt < MAX_HTTP_RETRIES and is_transient:
                     logger.info(f"[GROQ RETRY] Transient error on {task} attempt {attempt+1} ({attempt_error}); sleeping {backoff:.1f}s...")
                     time.sleep(backoff)

@@ -40,6 +40,7 @@ from ai.groq_service import (
     analyze_floorplan_image,
     generate_construction_advice_with_groq
 )
+from ai.gemini_architect import review_layout_with_gemini
 
 app = FastAPI(title="AI House Design Generator Professional Architectural Backend", version="2.5.0")
 
@@ -80,18 +81,54 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health_check():
-    from llm import get_llm_client
-    client = get_llm_client()
+    from llm import get_ai_provider, get_groq_client, get_gemini_client
+    groq_c = get_groq_client()
+    gemini_c = get_gemini_client()
+    groq_mod = os.getenv("GROQ_MODEL", os.getenv("GROQ_TEXT_MODEL", "openai/gpt-oss-120b"))
+    gemini_mod = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     return {
         "status": "healthy",
         "service": "AI House Architectural Planning & Construction Intelligence Engine",
-        "engine": "CP-SAT + Shapely + NetworkX + Groq Reasoning + Construction Engine",
-        "has_groq_key": bool(os.getenv("GROQ_API_KEY") and os.getenv("GROQ_API_KEY") != "your_groq_api_key_here"),
-        "llm_online": client.is_available(),
-        "task_models": getattr(client, "_verified_task_models", {}),
-        "text_model": os.getenv("GROQ_TEXT_MODEL", "openai/gpt-oss-120b"),
+        "engine": "CP-SAT + Shapely + NetworkX + Gemini Reasoning + Groq Interaction + Construction Engine",
+        "has_groq_key": groq_c.is_available(),
+        "groq_online": groq_c.is_available(),
+        "groq_model": groq_mod,
+        "has_gemini_key": gemini_c.is_available(),
+        "gemini_online": gemini_c.is_available(),
+        "gemini_model": gemini_mod,
+        "ai_pipeline": {
+            "interaction_layer": "groq",
+            "reasoning_layer": "gemini",
+            "spatial_solver": "or-tools_cp-sat",
+            "validation": "shapely"
+        },
+        "llm_online": groq_c.is_available() or gemini_c.is_available(),
+        "task_models": getattr(groq_c, "_verified_task_models", {}),
+        "text_model": groq_mod,
         "vision_model": os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-3.2-11b-vision-instruct")
     }
+
+@app.post("/api/architectural-review")
+def architectural_review_endpoint(req: Dict[str, Any]):
+    """
+    Gemini Architectural Review Layer:
+    Reviews a generated layout or layout summary and identifies:
+    - poor circulation
+    - weak adjacency
+    - privacy problems
+    - poor room relationships
+    - poor daylight opportunities
+    - poor ventilation opportunities
+    - problematic zoning
+    - staircase issues
+    - parking issues
+    - Vastu conflicts when Vastu is enabled
+    Returns structured issues without exposing chain-of-thought.
+    """
+    layout_summary = req.get("layout_summary") or req.get("layout") or req
+    vastu_enabled = bool(req.get("vastu_compliant", False))
+    report = review_layout_with_gemini(layout_summary, vastu_enabled=vastu_enabled)
+    return report.model_dump()
 
 from architecture.dimension_recommender import (
     DimensionRecommendationRequest,

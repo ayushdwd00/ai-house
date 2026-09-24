@@ -37,6 +37,11 @@ from ai.groq_service import (
     ArchitecturalRequirements,
     ArchitecturalCritique
 )
+from ai.gemini_architect import (
+    generate_architectural_concepts_with_gemini,
+    critique_architectural_candidates_with_gemini,
+    review_layout_with_gemini
+)
 
 ROOM_COLORS = {
     "living_room": "#F8F4EE",
@@ -857,12 +862,12 @@ def generate_architectural_house_layout(
         room_allocations=room_allocations
     )
 
-    # 4. Formulate Architectural Concept Strategies via Groq Active Reasoning Layer (with caching)
+    # 4. Formulate Architectural Concept Strategies via Gemini Reasoning Layer (with Groq fallback)
     concepts_key = f"{plot_width}_{plot_length}_{num_floors}_{bedrooms}_{bathrooms}_{road_side}_{style}_{vastu_compliant}_{open_concept}_{sorted(special_rooms or [])}_{user_prompt}"
     if concepts_key in _CONCEPTS_CACHE:
         ai_concepts = _CONCEPTS_CACHE[concepts_key]
     else:
-        ai_concepts_res = generate_architectural_concepts_with_groq(arch_req)
+        ai_concepts_res = generate_architectural_concepts_with_gemini(arch_req)
         ai_concepts = ai_concepts_res.concepts if ai_concepts_res else []
         if ai_concepts:
             _CONCEPTS_CACHE[concepts_key] = ai_concepts
@@ -1081,11 +1086,11 @@ def generate_architectural_house_layout(
             if critique_key in _CRITIQUE_CACHE:
                 groq_critique_data = _CRITIQUE_CACHE[critique_key]
             else:
-                groq_critique_obj = critique_architectural_candidates_with_groq(
+                gemini_critique_obj = critique_architectural_candidates_with_gemini(
                     candidate_summaries=candidate_summaries,
                     user_prompt=prompt_with_context
                 )
-                groq_critique_data = groq_critique_obj.model_dump() if hasattr(groq_critique_obj, "model_dump") else groq_critique_obj
+                groq_critique_data = gemini_critique_obj.model_dump() if hasattr(gemini_critique_obj, "model_dump") else gemini_critique_obj
                 _CRITIQUE_CACHE[critique_key] = groq_critique_data
 
             winner_id = groq_critique_data.get("selected_candidate", solved_candidates[0]["summary"]["scheme_id"])
@@ -1215,6 +1220,13 @@ def generate_architectural_house_layout(
         construction_spec=active_spec,
         floors=floors_list,
         metadata={
+            "ai_pipeline": {
+                "interaction_layer": "groq",
+                "reasoning_layer": "gemini",
+                "spatial_solver": "or-tools_cp-sat",
+                "validation": "shapely"
+            },
+            "gemini_critique": groq_critique_data,
             "groq_critique": groq_critique_data,
             "style": style,
             "vastu_compliant": vastu_compliant,
