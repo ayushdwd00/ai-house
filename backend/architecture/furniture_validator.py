@@ -58,26 +58,28 @@ def validate_and_place_furniture(
                 return True
         return False
 
-    # 1. Master Bedroom Program (King Bed, 2 Side Tables, Wardrobe)
+    # 1. Master Bedroom Program (King/Queen Bed, 2 Side Tables, Wardrobe)
     if room.type == "master_bedroom":
-        bed_w, bed_l = 6.5, 6.5
-        nightstand_w, nightstand_l = 1.6, 1.6
-        wardrobe_w, wardrobe_d = min(7.5, max(4.5, rw - 3.0)), 2.0
+        is_compact = rw < 11.5 or rl < 12.0
+        bed_w, bed_l = (5.0, 6.5) if is_compact else (6.5, 6.5)
+        bed_type = "queen_bed" if is_compact else "king_bed"
+        nightstand_w, nightstand_l = (1.3, 1.3) if is_compact else (1.6, 1.6)
+        wardrobe_w, wardrobe_d = min(7.5, max(3.5, rw - 2.0)), (1.8 if is_compact else 2.0)
 
         # Pattern A: Bed on Top (North) wall facing South
         pos_a_x = rx + (rw - bed_w) / 2.0
-        pos_a_y = ry + 0.4
+        pos_a_y = ry + 0.3
         
         # Pattern B: Bed on Left (West) wall facing East
-        pos_b_x = rx + 0.4
+        pos_b_x = rx + 0.3
         pos_b_y = ry + (rl - bed_w) / 2.0
 
         # Check door clearance for pattern A vs B
-        if not is_in_door_swing(pos_a_x, pos_a_y, bed_w, bed_l) and rl >= 10.5:
+        if not is_in_door_swing(pos_a_x, pos_a_y, bed_w, bed_l) and rl >= 9.5:
             # Place Bed against North wall
             items.append(FurnitureItem(
                 id=f"{room.id}_bed",
-                type="king_bed",
+                type=bed_type,
                 floor_id=getattr(room, "floor_id", "floor_1"),
                 room_id=room.id,
                 x=round(pos_a_x + bed_w / 2.0, 2),
@@ -88,38 +90,53 @@ def validate_and_place_furniture(
                 height=2.8,
                 rotation=0.0,
                 orientation="north",
-                clearance_requirements={"front": 3.0, "sides": 2.0}
+                clearance_requirements={"front": 2.5 if is_compact else 3.0, "sides": 1.5 if is_compact else 2.0}
             ))
-            # Two Symmetrical Nightstands
-            items.append(FurnitureItem(
-                id=f"{room.id}_nightstand_1",
-                type="side_table",
-                floor_id=getattr(room, "floor_id", "floor_1"),
-                room_id=room.id,
-                x=round(pos_a_x - nightstand_w / 2.0 - 0.2, 2),
-                y=round(pos_a_y + nightstand_l / 2.0, 2),
-                width=nightstand_w,
-                length=nightstand_l,
-                depth=nightstand_l,
-                height=1.8,
-                rotation=0.0
-            ))
-            items.append(FurnitureItem(
-                id=f"{room.id}_nightstand_2",
-                type="side_table",
-                floor_id=getattr(room, "floor_id", "floor_1"),
-                room_id=room.id,
-                x=round(pos_a_x + bed_w + nightstand_w / 2.0 + 0.2, 2),
-                y=round(pos_a_y + nightstand_l / 2.0, 2),
-                width=nightstand_w,
-                length=nightstand_l,
-                depth=nightstand_l,
-                height=1.8,
-                rotation=0.0
-            ))
+            # Two Symmetrical Nightstands (or 1 if space is tight)
+            if rw >= (bed_w + nightstand_w * 2 + 0.6):
+                items.append(FurnitureItem(
+                    id=f"{room.id}_nightstand_1",
+                    type="side_table",
+                    floor_id=getattr(room, "floor_id", "floor_1"),
+                    room_id=room.id,
+                    x=round(pos_a_x - nightstand_w / 2.0 - 0.15, 2),
+                    y=round(pos_a_y + nightstand_l / 2.0, 2),
+                    width=nightstand_w,
+                    length=nightstand_l,
+                    depth=nightstand_l,
+                    height=1.8,
+                    rotation=0.0
+                ))
+                items.append(FurnitureItem(
+                    id=f"{room.id}_nightstand_2",
+                    type="side_table",
+                    floor_id=getattr(room, "floor_id", "floor_1"),
+                    room_id=room.id,
+                    x=round(pos_a_x + bed_w + nightstand_w / 2.0 + 0.15, 2),
+                    y=round(pos_a_y + nightstand_l / 2.0, 2),
+                    width=nightstand_w,
+                    length=nightstand_l,
+                    depth=nightstand_l,
+                    height=1.8,
+                    rotation=0.0
+                ))
+            elif rw >= (bed_w + nightstand_w + 0.4):
+                items.append(FurnitureItem(
+                    id=f"{room.id}_nightstand_1",
+                    type="side_table",
+                    floor_id=getattr(room, "floor_id", "floor_1"),
+                    room_id=room.id,
+                    x=round(pos_a_x + bed_w + nightstand_w / 2.0 + 0.15, 2),
+                    y=round(pos_a_y + nightstand_l / 2.0, 2),
+                    width=nightstand_w,
+                    length=nightstand_l,
+                    depth=nightstand_l,
+                    height=1.8,
+                    rotation=0.0
+                ))
             # Wardrobe aligned against opposite or lateral wall
-            wardrobe_y = ry + rl - wardrobe_d - 0.4
-            wardrobe_x = rx + 1.0
+            wardrobe_y = ry + rl - wardrobe_d - 0.3
+            wardrobe_x = rx + 0.5
             if not is_in_door_swing(wardrobe_x, wardrobe_y, wardrobe_w, wardrobe_d):
                 items.append(FurnitureItem(
                     id=f"{room.id}_wardrobe",
@@ -133,13 +150,13 @@ def validate_and_place_furniture(
                     depth=wardrobe_d,
                     height=7.0,
                     rotation=0.0,
-                    clearance_requirements={"front": 2.5}
+                    clearance_requirements={"front": 2.0 if is_compact else 2.5}
                 ))
         else:
             # Place Bed against West wall
             items.append(FurnitureItem(
                 id=f"{room.id}_bed",
-                type="king_bed",
+                type=bed_type,
                 floor_id=getattr(room, "floor_id", "floor_1"),
                 room_id=room.id,
                 x=round(pos_b_x + bed_l / 2.0, 2),
@@ -150,7 +167,7 @@ def validate_and_place_furniture(
                 height=2.8,
                 rotation=90.0,
                 orientation="west",
-                clearance_requirements={"front": 3.0, "sides": 2.0}
+                clearance_requirements={"front": 2.5 if is_compact else 3.0, "sides": 1.5 if is_compact else 2.0}
             ))
             # Nightstands on lateral sides
             items.append(FurnitureItem(
@@ -159,41 +176,44 @@ def validate_and_place_furniture(
                 floor_id=getattr(room, "floor_id", "floor_1"),
                 room_id=room.id,
                 x=round(pos_b_x + nightstand_w / 2.0, 2),
-                y=round(pos_b_y - nightstand_l / 2.0 - 0.2, 2),
+                y=round(pos_b_y - nightstand_l / 2.0 - 0.15, 2),
                 width=nightstand_w,
                 length=nightstand_l,
                 depth=nightstand_l,
                 height=1.8,
                 rotation=90.0
             ))
-            items.append(FurnitureItem(
-                id=f"{room.id}_nightstand_2",
-                type="side_table",
-                floor_id=getattr(room, "floor_id", "floor_1"),
-                room_id=room.id,
-                x=round(pos_b_x + nightstand_w / 2.0, 2),
-                y=round(pos_b_y + bed_w + nightstand_l / 2.0 + 0.2, 2),
-                width=nightstand_w,
-                length=nightstand_l,
-                depth=nightstand_l,
-                height=1.8,
-                rotation=90.0
-            ))
+            if rl >= (bed_w + nightstand_w * 2 + 0.6):
+                items.append(FurnitureItem(
+                    id=f"{room.id}_nightstand_2",
+                    type="side_table",
+                    floor_id=getattr(room, "floor_id", "floor_1"),
+                    room_id=room.id,
+                    x=round(pos_b_x + nightstand_w / 2.0, 2),
+                    y=round(pos_b_y + bed_w + nightstand_l / 2.0 + 0.15, 2),
+                    width=nightstand_w,
+                    length=nightstand_l,
+                    depth=nightstand_l,
+                    height=1.8,
+                    rotation=90.0
+                ))
 
-    # 2. Standard Bedroom / Guest Bedroom Program (Queen Bed, 1 Side Table, Wardrobe)
+    # 2. Standard Bedroom / Guest Bedroom Program (Queen/Double Bed, 1 Side Table, Wardrobe)
     elif room.type in ["bedroom", "guest_bedroom"]:
-        bed_w, bed_l = 5.0, 6.5
-        nightstand_w, nightstand_l = 1.5, 1.5
-        wardrobe_w, wardrobe_d = min(6.0, max(3.5, rw - 3.0)), 2.0
+        is_compact = rw < 10.0 or rl < 10.5
+        bed_w, bed_l = (4.5, 6.0) if is_compact else (5.0, 6.5)
+        bed_type = "double_bed" if is_compact else "queen_bed"
+        nightstand_w, nightstand_l = (1.2, 1.2) if is_compact else (1.5, 1.5)
+        wardrobe_w, wardrobe_d = min(6.0, max(3.0, rw - 2.0)), (1.6 if is_compact else 2.0)
 
-        pos_x = rx + 0.8
-        pos_y = ry + 0.4
+        pos_x = rx + 0.5
+        pos_y = ry + 0.3
         if is_in_door_swing(pos_x, pos_y, bed_w + nightstand_w, bed_l):
-            pos_x = rx + rw - bed_w - nightstand_w - 0.8
+            pos_x = rx + rw - bed_w - nightstand_w - 0.5
 
         items.append(FurnitureItem(
             id=f"{room.id}_bed",
-            type="queen_bed",
+            type=bed_type,
             floor_id=getattr(room, "floor_id", "floor_1"),
             room_id=room.id,
             x=round(pos_x + bed_w / 2.0, 2),
@@ -204,14 +224,14 @@ def validate_and_place_furniture(
             height=2.6,
             rotation=0.0,
             orientation="north",
-            clearance_requirements={"front": 2.5, "sides": 1.5}
+            clearance_requirements={"front": 2.0 if is_compact else 2.5, "sides": 1.2 if is_compact else 1.5}
         ))
         items.append(FurnitureItem(
             id=f"{room.id}_nightstand",
             type="side_table",
             floor_id=getattr(room, "floor_id", "floor_1"),
             room_id=room.id,
-            x=round(pos_x + bed_w + nightstand_w / 2.0 + 0.2, 2),
+            x=round(pos_x + bed_w + nightstand_w / 2.0 + 0.1, 2),
             y=round(pos_y + nightstand_l / 2.0, 2),
             width=nightstand_w,
             length=nightstand_l,
@@ -290,7 +310,8 @@ def validate_and_place_furniture(
 
     # 4. Dining Room Program (Dining Table, Chairs)
     elif room.type == "dining":
-        dt_w, dt_l = 5.2, 3.2
+        is_compact = rw < 9.0 or rl < 9.0
+        dt_w, dt_l = (4.0, 2.6) if is_compact else (5.2, 3.2)
         dt_x = rx + (rw - dt_w) / 2.0
         dt_y = ry + (rl - dt_l) / 2.0
         items.append(FurnitureItem(
@@ -305,22 +326,23 @@ def validate_and_place_furniture(
             depth=dt_l,
             height=2.5,
             rotation=0.0,
-            clearance_requirements={"all_around": 2.5}
+            clearance_requirements={"all_around": 2.0 if is_compact else 2.5}
         ))
 
     # 5. Kitchen Program (Countertop, Cooktop/Hob, Sink, Refrigerator)
     elif room.type == "kitchen":
-        counter_len = max(6.0, rw - 1.0)
+        is_compact = rw < 7.5 or rl < 8.0
+        counter_len = max(4.5, rw - 0.8)
         items.append(FurnitureItem(
             id=f"{room.id}_counter",
             type="kitchen_counter",
             floor_id=getattr(room, "floor_id", "floor_1"),
             room_id=room.id,
-            x=round(rx + 0.4 + counter_len / 2.0, 2),
-            y=round(ry + 1.0, 2),
+            x=round(rx + 0.3 + counter_len / 2.0, 2),
+            y=round(ry + (0.9 if is_compact else 1.0), 2),
             width=round(counter_len, 2),
-            length=2.0,
-            depth=2.0,
+            length=1.8 if is_compact else 2.0,
+            depth=1.8 if is_compact else 2.0,
             height=2.8
         ))
         # 3-burner gas hob
@@ -329,11 +351,11 @@ def validate_and_place_furniture(
             type="cooktop",
             floor_id=getattr(room, "floor_id", "floor_1"),
             room_id=room.id,
-            x=round(rx + 1.8, 2),
-            y=round(ry + 1.0, 2),
-            width=2.5,
-            length=1.8,
-            depth=1.8,
+            x=round(rx + 1.5, 2),
+            y=round(ry + (0.9 if is_compact else 1.0), 2),
+            width=2.2 if is_compact else 2.5,
+            length=1.6 if is_compact else 1.8,
+            depth=1.6 if is_compact else 1.8,
             height=0.3
         ))
         # Stainless steel sink with drainboard
@@ -342,17 +364,18 @@ def validate_and_place_furniture(
             type="kitchen_sink",
             floor_id=getattr(room, "floor_id", "floor_1"),
             room_id=room.id,
-            x=round(rx + counter_len - 1.8, 2),
-            y=round(ry + 1.0, 2),
-            width=2.5,
-            length=1.8,
-            depth=1.8,
+            x=round(rx + counter_len - 1.5, 2),
+            y=round(ry + (0.9 if is_compact else 1.0), 2),
+            width=2.2 if is_compact else 2.5,
+            length=1.6 if is_compact else 1.8,
+            depth=1.6 if is_compact else 1.8,
             height=0.8
         ))
         # Refrigerator
-        fridge_x = rx + rw - 1.8
-        fridge_y = ry + rl - 1.8
-        if not is_in_door_swing(fridge_x - 1.4, fridge_y - 1.4, 2.8, 2.8):
+        fridge_w, fridge_l = (2.2, 2.2) if is_compact else (2.8, 2.8)
+        fridge_x = rx + rw - fridge_w / 2.0 - 0.3
+        fridge_y = ry + rl - fridge_l / 2.0 - 0.3
+        if not is_in_door_swing(fridge_x - fridge_w / 2.0, fridge_y - fridge_l / 2.0, fridge_w, fridge_l):
             items.append(FurnitureItem(
                 id=f"{room.id}_fridge",
                 type="refrigerator",
@@ -360,26 +383,30 @@ def validate_and_place_furniture(
                 room_id=room.id,
                 x=round(fridge_x, 2),
                 y=round(fridge_y, 2),
-                width=2.8,
-                length=2.8,
-                depth=2.8,
+                width=fridge_w,
+                length=fridge_l,
+                depth=fridge_l,
                 height=6.0,
-                clearance_requirements={"front": 2.5}
+                clearance_requirements={"front": 2.0 if is_compact else 2.5}
             ))
 
     # 6. Bathroom Program (WC, Vanity Basin, Shower)
     elif room.type in ["bathroom", "powder_room"]:
+        is_compact = rw < 5.0 or rl < 6.5
+        basin_w, basin_d = (1.8, 1.4) if is_compact else (2.2, 1.6)
+        toilet_w, toilet_d = (1.6, 2.0) if is_compact else (1.8, 2.2)
+
         # Vanity Basin
         items.append(FurnitureItem(
             id=f"{room.id}_basin",
             type="basin",
             floor_id=getattr(room, "floor_id", "floor_1"),
             room_id=room.id,
-            x=round(rx + 1.3, 2),
-            y=round(ry + 1.0, 2),
-            width=2.2,
-            length=1.6,
-            depth=1.6,
+            x=round(rx + basin_w / 2.0 + 0.3, 2),
+            y=round(ry + basin_d / 2.0 + 0.3, 2),
+            width=basin_w,
+            length=basin_d,
+            depth=basin_d,
             height=2.8
         ))
         # WC toilet
@@ -388,26 +415,28 @@ def validate_and_place_furniture(
             type="toilet",
             floor_id=getattr(room, "floor_id", "floor_1"),
             room_id=room.id,
-            x=round(rx + 1.3, 2),
-            y=round(ry + rl - 1.5, 2),
-            width=1.8,
-            length=2.2,
-            depth=2.2,
+            x=round(rx + toilet_w / 2.0 + 0.3, 2),
+            y=round(ry + rl - toilet_d / 2.0 - 0.3, 2),
+            width=toilet_w,
+            length=toilet_d,
+            depth=toilet_d,
             height=2.5,
-            clearance_requirements={"front": 2.0}
+            clearance_requirements={"front": 1.8 if is_compact else 2.0}
         ))
-        if room.type == "bathroom" and rw >= 6.0:
+        if room.type == "bathroom" and (rw >= 4.0 and rl >= 5.5):
             # Shower stall
+            shower_w = min(2.8, max(2.4, rw - 1.2))
+            shower_d = min(2.8, max(2.4, rl - 2.8))
             items.append(FurnitureItem(
                 id=f"{room.id}_shower",
                 type="shower",
                 floor_id=getattr(room, "floor_id", "floor_1"),
                 room_id=room.id,
-                x=round(rx + rw - 1.6, 2),
-                y=round(ry + 1.6, 2),
-                width=3.0,
-                length=3.0,
-                depth=3.0,
+                x=round(rx + rw - shower_w / 2.0 - 0.2, 2),
+                y=round(ry + shower_d / 2.0 + 0.2, 2),
+                width=round(shower_w, 2),
+                length=round(shower_d, 2),
+                depth=round(shower_d, 2),
                 height=6.5
             ))
 

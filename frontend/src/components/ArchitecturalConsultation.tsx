@@ -865,6 +865,16 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
   const [step, setStep] = useState<number>(1);
   const [jumpBackFromSummary, setJumpBackFromSummary] = useState(false);
 
+  // Dedicated scroll container reference to control and reset scrolling
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll to absolute top whenever step changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+  }, [step]);
+
   const questionsList = useMemo(() => {
     const list: { id: number; title: string; subtitle: string }[] = [
       {
@@ -1033,7 +1043,7 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
       <SubtleAtmosphere3D />
 
       {/* Top Header Bar */}
-      <div className="relative z-10 w-full px-8 py-5 flex items-center justify-between border-b border-white/5 bg-[#0A0B0E]/70 backdrop-blur-sm">
+      <div className="relative z-10 w-full px-8 py-5 flex items-center justify-between border-b border-white/5 bg-[#0A0B0E]/70 backdrop-blur-sm shrink-0">
         <button
           onClick={handleBack}
           className="flex items-center gap-2 text-xs font-mono tracking-widest text-[#9E9C98] hover:text-[#F5F3EF] transition-colors group"
@@ -1063,7 +1073,7 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
       </div>
 
       {/* Hairline Progress Bar */}
-      <div className="relative z-10 w-full h-[2px] bg-white/5">
+      <div className="relative z-10 w-full h-[2px] bg-white/5 shrink-0">
         <motion.div
           className="h-full bg-[#C48446]"
           initial={{ width: 0 }}
@@ -1072,9 +1082,13 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
         />
       </div>
 
-      {/* Main Consultation Canvas */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-start md:justify-center px-6 md:px-12 py-6 max-w-4xl mx-auto w-full overflow-y-auto">
-        <AnimatePresence mode="wait">
+      {/* Main Consultation Canvas - Dedicated Single Scroll Container */}
+      <div
+        ref={scrollContainerRef}
+        className="relative z-10 flex-1 w-full overflow-y-auto overflow-x-hidden min-h-0"
+      >
+        <div className="w-full min-h-full flex flex-col items-center justify-start px-4 sm:px-6 md:px-12 py-8 md:py-12">
+          <AnimatePresence mode="wait">
           {/* STEP 1: MANUAL PLOT DIMENSIONS & UNIT SELECTION */}
           {step === 1 && (
             <motion.div
@@ -2429,10 +2443,11 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* Footer Details */}
-      <div className="relative z-10 w-full px-8 py-4 flex items-center justify-between text-[11px] font-mono text-[#6B6964] border-t border-white/5">
+      <div className="relative z-10 w-full px-8 py-4 flex items-center justify-between text-[11px] font-mono text-[#6B6964] border-t border-white/5 bg-[#0A0B0E]/70 backdrop-blur-sm shrink-0">
         <span>ARCHITECTURAL INTELLIGENCE CORE // CP-SAT + SHAPELY</span>
         <span>ATELIER ARCHAI v2.5</span>
       </div>

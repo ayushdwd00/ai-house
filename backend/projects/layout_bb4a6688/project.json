@@ -1,0 +1,161 @@
+{
+  "id": "layout_bb4a6688",
+  "project_id": "layout_bb4a6688",
+  "version_number": 1,
+  "title": "Design Constraint Conflict",
+  "designer_rationale": "The requested room program exceeds the buildable envelope of the plot. Please increase plot size or reduce bedroom count.",
+  "plot_width": 25.0,
+  "plot_length": 40.0,
+  "num_floors": 1,
+  "site": {
+    "plot_width": 25.0,
+    "plot_length": 40.0,
+    "total_plot_area": 1000.0,
+    "road_side": "south",
+    "frontage_ft": 25.0,
+    "setbacks": {
+      "front": 3.5,
+      "rear": 2.5,
+      "left": 2.0,
+      "right": 2.0
+    },
+    "setback_profile": {
+      "country": "India",
+      "state": null,
+      "city": null,
+      "authority": null,
+      "front": 3.5,
+      "rear": 2.5,
+      "left": 2.0,
+      "right": 2.0,
+      "source": "Preliminary heuristic planning fallback",
+      "effective_date": "2024-01-01",
+      "confidence": 0.82,
+      "is_user_supplied": false,
+      "disclaimer": "Preliminary planning assumption \u2014 verify with local municipal development authority or licensed architect."
+    },
+    "buildable_envelope": {
+      "x": 2.0,
+      "y": 2.5,
+      "width": 21.0,
+      "length": 34.0
+    },
+    "parking": {
+      "id": "parking_01",
+      "capacity": 1,
+      "is_covered": true,
+      "rect": {
+        "x": 2.0,
+        "y": 23.0,
+        "width": 10.0,
+        "length": 16.0
+      },
+      "vehicle_type": "car",
+      "access_side": "front"
+    },
+    "pedestrian_path": [
+      {
+        "x": 15.0,
+        "y": 40.0
+      },
+      {
+        "x": 15.0,
+        "y": 36.5
+      },
+      {
+        "x": 16.0,
+        "y": 34.5
+      }
+    ],
+    "driveway": {
+      "x": 2.0,
+      "y": 39.0,
+      "width": 10.0,
+      "length": 1.0
+    },
+    "north_direction": 0.0,
+    "city": null
+  },
+  "stats": {
+    "total_area_sqft": 0.0,
+    "living_area_sqft": 0.0,
+    "width_ft": 25.0,
+    "length_ft": 40.0,
+    "num_floors": 1,
+    "bedroom_count": 3,
+    "bathroom_count": 2.0,
+    "aspect_ratio": 0.62,
+    "coverage_percentage": 100.0,
+    "circulation_area_sqft": 0.0
+  },
+  "floors": [],
+  "scores": null,
+  "validation": {
+    "is_valid": false,
+    "passed_checks": [],
+    "hard_failures": [
+      "Plot buildable envelope (21.0x34.0ft) is insufficient for 3 bedrooms and requested spaces."
+    ],
+    "errors": [
+      "Plot buildable envelope (21.0x34.0ft) is insufficient for 3 bedrooms and requested spaces."
+    ],
+    "warnings": [],
+    "recommendations": [],
+    "issues": []
+  },
+  "critic_notes": [],
+  "vastu_result": null,
+  "construction_spec": {
+    "structural_system": "rcc_frame",
+    "external_wall_thickness_in": 9.0,
+    "internal_wall_thickness_in": 4.5,
+    "external_wall_thickness_ft": 0.75,
+    "internal_wall_thickness_ft": 0.375,
+    "clear_ceiling_height_ft": 9.5,
+    "wall_height_ft": 10.0,
+    "floor_to_floor_height_ft": 10.5,
+    "slab_thickness_in": 5.5,
+    "slab_thickness_ft": 0.4583,
+    "quality_tier": "standard",
+    "recommended_value": "RCC Frame + 9\"/4.5\" Masonry, 10.5ft Floor-to-Floor (Standard)",
+    "reason": "RCC framed structure recommended for open spatial layout; load-bearing masonry is viable for single-story compact footprint.",
+    "assumptions": [
+      "External perimeter walls configured as 9.0\" (229mm) masonry for weatherproofing.",
+      "Internal partition walls configured as 4.5\" (114mm) space-saving masonry.",
+      "Floor-to-floor vertical rise of 10.5' provides 9.5' clear head room after MEP/false ceiling drops.",
+      "Reinforced concrete slab assumed at 5.5\" thickness with grade M20/M25 concrete.",
+      "Quality standard tier: Standard finishes and construction tolerances."
+    ],
+    "confidence": 0.92,
+    "disclaimer": "Preliminary planning recommendation \u2014 verify with licensed structural engineer before construction."
+  },
+  "quantities": null,
+  "cost_estimate": null,
+  "building_services": null,
+  "structural_planning": null,
+  "structural_system": "RCC_FRAME",
+  "landscape": null,
+  "floorplan_source": null,
+  "materials": [],
+  "metadata": {
+    "timing_ms": {
+      "total_ms": 3105.1,
+      "site_ms": 15.0,
+      "solver_ms": 110.0,
+      "validation_ms": 25.0,
+      "quantities_ms": 18.0,
+      "cost_estimate_ms": 12.0
+    }
+  },
+  "rooms": [],
+  "walls": [],
+  "exterior_walls": [],
+  "interior_walls": [],
+  "doors": [],
+  "windows": [],
+  "entry_point": {
+    "x": 0.0,
+    "y": 0.0,
+    "direction": 0.0
+  }
+}

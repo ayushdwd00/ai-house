@@ -678,6 +678,14 @@ export const ArchitecturalStudioEditor: React.FC<ArchitecturalStudioEditorProps>
               <span>DIMENSIONS</span>
             </button>
           </div>
+
+          {/* Adaptive Optimization Note */}
+          {Boolean((layout as any)?.metadata?.optimization_note) && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-[#C48446]/40 text-[10px] sm:text-[11px] font-mono text-[#E6C07B] shadow-2xl">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#E6C07B] animate-pulse" />
+              <span>{String((layout as any)?.metadata?.optimization_note)}</span>
+            </div>
+          )}
         </div>
       )}
 

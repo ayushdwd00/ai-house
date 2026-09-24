@@ -203,6 +203,41 @@ def _execute_generation(req: IntakeRequest) -> HouseLayout:
         room_allocations=allocations
     )
 
+    # Check if the solver determined the requested program is infeasible for the site
+    if layout.validation and not layout.validation.is_valid and len(layout.rooms) == 0:
+        envelope_desc = ""
+        if layout.site and layout.site.buildable_envelope:
+            envelope_desc = f" ({round(layout.site.buildable_envelope.width, 1)} x {round(layout.site.buildable_envelope.length, 1)} ft, {round(layout.site.buildable_envelope.area)} sq ft)"
+
+        primary_reason = (
+            layout.validation.errors[0]
+            if layout.validation.errors
+            else f"Plot buildable envelope{envelope_desc} cannot accommodate {bedrooms} bedrooms on {num_floors} floor(s)."
+        )
+
+        recommendation = (
+            f"Increase to {num_floors + 1} floors to distribute bedrooms vertically, "
+            f"reduce bedroom count, or increase plot dimensions."
+            if num_floors == 1
+            else "Reduce room dimensions or bedroom count to fit within the buildable envelope."
+        )
+
+        infeasible_detail = {
+            "status": "infeasible",
+            "error_code": "PLOT_ENVELOPE_INFEASIBLE",
+            "message": primary_reason,
+            "designer_rationale": layout.designer_rationale or primary_reason,
+            "recommendation": recommendation,
+            "plot_dimensions": f"{plot_w} x {plot_l} ft",
+            "buildable_envelope": f"{round(layout.site.buildable_envelope.width, 1)} x {round(layout.site.buildable_envelope.length, 1)} ft" if layout.site and layout.site.buildable_envelope else "N/A",
+            "bedrooms": bedrooms,
+            "floors": num_floors,
+        }
+        raise HTTPException(
+            status_code=422,
+            detail=infeasible_detail
+        )
+
     t_total_ms = round((time.time() - t0) * 1000, 1)
     layout.metadata["timing_ms"] = {
         "total_ms": t_total_ms,
@@ -231,6 +266,15 @@ def _run_job_worker(job_id: str, req: IntakeRequest):
         JOBS_DB[job_id]["progress"] = 100.0
         JOBS_DB[job_id]["stage"] = "done"
         JOBS_DB[job_id]["result"] = layout.model_dump()
+    except HTTPException as he:
+        JOBS_DB[job_id]["status"] = "failed"
+        JOBS_DB[job_id]["progress"] = 0.0
+        JOBS_DB[job_id]["stage"] = "error"
+        JOBS_DB[job_id]["error"] = he.detail if isinstance(he.detail, dict) else {
+            "status": "infeasible",
+            "error_code": "PLOT_ENVELOPE_INFEASIBLE",
+            "message": str(he.detail),
+        }
     except Exception as e:
         JOBS_DB[job_id]["status"] = "failed"
         JOBS_DB[job_id]["progress"] = 0.0

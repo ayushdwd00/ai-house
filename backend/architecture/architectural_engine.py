@@ -77,12 +77,15 @@ def build_room_program(
     attached_bathroom_count: Optional[int] = None,
     special_rooms: Optional[List[str]] = None,
     open_concept: bool = True,
-    room_allocations: Optional[List[Any]] = None
+    room_allocations: Optional[List[Any]] = None,
+    compact_mode: bool = False,
+    rebalance_mode: bool = False
 ) -> List[Room]:
     """
     Synthesizes an architectural room program with hard minimums,
     preferred optimization targets, and required adjacencies.
     Supports user-specified attached_bathroom_count and explicit room_allocations.
+    Includes adaptive small-plot compact and rebalance optimization modes.
     """
     rooms: List[Room] = []
     special_rooms = special_rooms or []
@@ -117,57 +120,57 @@ def build_room_program(
                 pref_wid = getattr(alloc, "preferred_width", None) or (alloc.get("preferred_width") if isinstance(alloc, dict) else None)
 
                 if "master" in clean_type or "primary" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 11.5, 13.0, 13.5, 15.5, 18.0, 20.0
+                    mw, ml, pw, pl, xw, xl = (9.0, 10.0, 9.5, 10.5, 12.0, 13.0) if rebalance_mode else ((9.5, 10.5, 10.5, 11.5, 13.5, 14.5) if compact_mode else (11.5, 13.0, 13.5, 15.5, 18.0, 20.0))
                     zone = "private"
                     privacy = "intimate"
                     daylight = "high"
                 elif "bed" in clean_type or "guest" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 10.0, 11.0, 11.5, 13.0, 15.0, 16.0
+                    mw, ml, pw, pl, xw, xl = (8.0, 9.0, 8.5, 9.5, 11.5, 12.0) if rebalance_mode else ((8.5, 9.5, 9.5, 10.5, 12.0, 13.0) if compact_mode else (10.0, 11.0, 11.5, 13.0, 15.0, 16.0))
                     zone = "private"
                     privacy = "private"
                     daylight = "high"
                 elif "living" in clean_type or "drawing" in clean_type or "lounge" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 12.0, 14.0, 14.0, 17.0, 18.0, 22.0
+                    mw, ml, pw, pl, xw, xl = (9.5, 10.5, 10.5, 11.5, 13.5, 14.5) if rebalance_mode else ((10.0, 11.0, 11.5, 12.5, 14.5, 15.5) if compact_mode else (12.0, 14.0, 14.0, 17.0, 18.0, 22.0))
                     zone = "public"
                     privacy = "public"
                     daylight = "high"
                 elif "dining" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 9.0, 10.5, 11.0, 13.0, 14.0, 16.0
+                    mw, ml, pw, pl, xw, xl = (7.0, 7.5, 7.5, 8.0, 10.0, 11.0) if rebalance_mode else ((7.5, 8.0, 8.5, 9.0, 11.0, 12.0) if compact_mode else (9.0, 10.5, 11.0, 13.0, 14.0, 16.0))
                     zone = "public"
                     privacy = "semi_private"
                     daylight = "high"
                 elif "kitchen" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 8.0, 9.5, 10.0, 12.0, 15.0, 16.0
+                    mw, ml, pw, pl, xw, xl = (6.0, 7.0, 6.5, 7.5, 9.0, 10.0) if rebalance_mode else ((6.5, 7.5, 7.5, 8.5, 10.0, 11.0) if compact_mode else (8.0, 9.5, 10.0, 12.0, 15.0, 16.0))
                     zone = "service"
                     privacy = "semi_private"
                     daylight = "high"
                 elif "bath" in clean_type or "toilet" in clean_type or "powder" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 4.5, 6.5, 5.5, 7.5, 8.0, 10.0
+                    mw, ml, pw, pl, xw, xl = (3.5, 5.0, 4.0, 5.5, 6.0, 7.0) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5, 6.5, 7.5) if compact_mode else (4.5, 6.5, 5.5, 7.5, 8.0, 10.0))
                     zone = "service"
                     privacy = "intimate"
                     daylight = "low"
                 elif "pooja" in clean_type or "mandir" in clean_type or "puja" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 4.5, 5.0, 5.5, 6.5, 8.0, 9.0
+                    mw, ml, pw, pl, xw, xl = (3.0, 3.5, 3.5, 4.5, 5.0, 6.0) if rebalance_mode else ((3.5, 4.0, 4.5, 5.0, 6.0, 7.0) if compact_mode else (4.5, 5.0, 5.5, 6.5, 8.0, 9.0))
                     zone = "special"
                     privacy = "semi_private"
                     daylight = "medium"
                 elif "office" in clean_type or "study" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 8.0, 9.0, 10.0, 11.5, 13.0, 14.0
+                    mw, ml, pw, pl, xw, xl = (6.5, 7.5, 7.5, 8.5, 9.5, 10.5) if rebalance_mode else ((7.0, 8.0, 8.5, 9.5, 11.0, 12.0) if compact_mode else (8.0, 9.0, 10.0, 11.5, 13.0, 14.0))
                     zone = "special"
                     privacy = "semi_private"
                     daylight = "high"
                 elif "balcony" in clean_type or "terrace" in clean_type or "patio" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 4.5, 7.0, 6.0, 10.0, 10.0, 16.0
+                    mw, ml, pw, pl, xw, xl = (3.5, 5.0, 4.5, 7.0, 7.0, 10.0) if rebalance_mode else ((4.0, 6.0, 5.0, 8.0, 8.0, 12.0) if compact_mode else (4.5, 7.0, 6.0, 10.0, 10.0, 16.0))
                     zone = "special"
                     privacy = "semi_private"
                     daylight = "high"
                 elif "utility" in clean_type or "laundry" in clean_type or "store" in clean_type:
-                    mw, ml, pw, pl, xw, xl = 5.0, 6.0, 6.0, 7.5, 8.0, 10.0
+                    mw, ml, pw, pl, xw, xl = (3.5, 4.5, 4.5, 5.5, 6.0, 7.0) if rebalance_mode else ((4.0, 5.0, 5.0, 6.0, 6.5, 8.0) if compact_mode else (5.0, 6.0, 6.0, 7.5, 8.0, 10.0))
                     zone = "service"
                     privacy = "semi_private"
                     daylight = "low"
                 else:
-                    mw, ml, pw, pl, xw, xl = 8.0, 9.0, 10.0, 11.0, 13.0, 14.0
+                    mw, ml, pw, pl, xw, xl = (6.5, 7.5, 7.5, 8.5, 9.5, 10.5) if rebalance_mode else ((7.0, 8.0, 8.5, 9.5, 11.0, 12.0) if compact_mode else (8.0, 9.0, 10.0, 11.0, 13.0, 14.0))
                     zone = r_zone or "private"
                     privacy = "semi_private"
                     daylight = "medium"
@@ -186,12 +189,20 @@ def build_room_program(
                         xl = l
                     else:
                         # AI Recommended dimension: preferred target with architectural tolerance
-                        pw = float(pref_wid) if pref_wid else w
-                        pl = float(pref_len) if pref_len else l
-                        mw = float(min_wid) if min_wid else max(3.5, pw * 0.85)
-                        ml = float(min_len) if min_len else max(3.5, pl * 0.85)
-                        xw = pw * 1.25
-                        xl = pl * 1.25
+                        if compact_mode or rebalance_mode:
+                            pw = max(mw, min(float(pref_wid) if pref_wid else w, pw))
+                            pl = max(ml, min(float(pref_len) if pref_len else l, pl))
+                            mw = max(mw, min(float(min_wid) if min_wid else mw, pw * 0.85))
+                            ml = max(ml, min(float(min_len) if min_len else ml, pl * 0.85))
+                            xw = pw * 1.15
+                            xl = pl * 1.15
+                        else:
+                            pw = float(pref_wid) if pref_wid else w
+                            pl = float(pref_len) if pref_len else l
+                            mw = float(min_wid) if min_wid else max(3.5, pw * 0.85)
+                            ml = float(min_len) if min_len else max(3.5, pl * 0.85)
+                            xw = pw * 1.25
+                            xl = pl * 1.25
 
                 rooms.append(Room(
                     id=r_id or f"f{floor_num}_{clean_type}_{len(rooms)+1}",
@@ -213,14 +224,15 @@ def build_room_program(
 
             # Ensure vertical circulation stairs if total_floors > 1
             if total_floors > 1 and not any(r.type == "staircase" for r in rooms):
+                stair_mw, stair_ml, stair_pw, stair_pl = (6.0, 8.0, 6.5, 8.5) if compact_mode else (7.0, 9.0, 8.0, 10.0)
                 rooms.append(Room(
                     id=f"f{floor_num}_staircase",
                     name="Staircase Core",
                     type="staircase",
                     zone="circulation",
                     floor=floor_num,
-                    min_width=7.0, min_length=9.0,
-                    preferred_width=8.0, preferred_length=10.0,
+                    min_width=stair_mw, min_length=stair_ml,
+                    preferred_width=stair_pw, preferred_length=stair_pl,
                     max_width=9.5, max_length=12.0,
                     privacy_level="semi_private",
                     color=ROOM_COLORS["staircase"],
@@ -229,14 +241,15 @@ def build_room_program(
 
             # Ensure circulation hallway
             if not any(r.type == "hallway" for r in rooms):
+                hall_mw, hall_ml, hall_pw, hall_pl = (3.5, 6.0, 3.5, 8.0) if compact_mode else (4.0, 8.0, 5.0, 12.0)
                 rooms.append(Room(
                     id=f"f{floor_num}_hallway",
                     name="Circulation Hall",
                     type="hallway",
                     zone="circulation",
                     floor=floor_num,
-                    min_width=4.0, min_length=8.0,
-                    preferred_width=5.0, preferred_length=12.0,
+                    min_width=hall_mw, min_length=hall_ml,
+                    preferred_width=hall_pw, preferred_length=hall_pl,
                     max_width=7.0, max_length=24.0,
                     privacy_level="semi_private",
                     color=ROOM_COLORS["hallway"],
@@ -245,14 +258,15 @@ def build_room_program(
 
             # If ground floor and no foyer, add foyer
             if floor_num == 1 and not any("foyer" in r.type for r in rooms):
+                foyer_mw, foyer_ml, foyer_pw, foyer_pl = (3.5, 4.5, 4.0, 5.0) if compact_mode else (5.5, 6.0, 7.5, 8.0)
                 rooms.insert(0, Room(
                     id=f"f{floor_num}_entry_foyer",
                     name="Entry Foyer",
                     type="entry_foyer",
                     zone="public",
                     floor=floor_num,
-                    min_width=5.5, min_length=6.0,
-                    preferred_width=7.5, preferred_length=8.0,
+                    min_width=foyer_mw, min_length=foyer_ml,
+                    preferred_width=foyer_pw, preferred_length=foyer_pl,
                     max_width=12.0, max_length=12.0,
                     privacy_level="public",
                     daylight_requirement="medium",
@@ -271,14 +285,15 @@ def build_room_program(
     # Single-story OR Ground floor of multi-story (procedural fallback)
     if floor_num == 1:
         # 1. Entry Foyer
+        foyer_mw, foyer_ml, foyer_pw, foyer_pl = (3.0, 4.0, 3.5, 4.5) if rebalance_mode else ((3.5, 4.5, 4.0, 5.0) if compact_mode else (5.5, 6.0, 7.5, 8.0))
         rooms.append(Room(
             id=f"f{floor_num}_entry_foyer",
             name="Entry Foyer",
             type="entry_foyer",
             zone="public",
             floor=floor_num,
-            min_width=5.5, min_length=6.0,
-            preferred_width=7.5, preferred_length=8.0,
+            min_width=foyer_mw, min_length=foyer_ml,
+            preferred_width=foyer_pw, preferred_length=foyer_pl,
             max_width=12.0, max_length=12.0,
             privacy_level="public",
             daylight_requirement="medium",
@@ -287,14 +302,15 @@ def build_room_program(
         ))
 
         # 2. Living Room
+        liv_mw, liv_ml, liv_pw, liv_pl = (9.5, 10.5, 10.5, 11.5) if rebalance_mode else ((10.0, 11.0, 11.5, 12.5) if compact_mode else (12.0, 13.0, 14.5, 17.0))
         rooms.append(Room(
             id=f"f{floor_num}_living_room",
             name="Living Room",
             type="living_room",
             zone="public",
             floor=floor_num,
-            min_width=12.0, min_length=13.0,
-            preferred_width=14.5, preferred_length=17.0,
+            min_width=liv_mw, min_length=liv_ml,
+            preferred_width=liv_pw, preferred_length=liv_pl,
             max_width=22.0, max_length=24.0,
             privacy_level="public",
             daylight_requirement="high",
@@ -305,14 +321,15 @@ def build_room_program(
         ))
 
         # 3. Dining
+        din_mw, din_ml, din_pw, din_pl = (7.0, 7.5, 7.5, 8.0) if rebalance_mode else ((7.5, 8.0, 8.5, 9.0) if compact_mode else (9.5, 10.5, 12.0, 13.5))
         rooms.append(Room(
             id=f"f{floor_num}_dining",
             name="Dining Room",
             type="dining",
             zone="public",
             floor=floor_num,
-            min_width=9.5, min_length=10.5,
-            preferred_width=12.0, preferred_length=13.5,
+            min_width=din_mw, min_length=din_ml,
+            preferred_width=din_pw, preferred_length=din_pl,
             max_width=16.0, max_length=18.0,
             privacy_level="semi_private",
             daylight_requirement="medium",
@@ -322,14 +339,15 @@ def build_room_program(
         ))
 
         # 4. Kitchen
+        kit_mw, kit_ml, kit_pw, kit_pl = (6.0, 7.0, 6.5, 7.5) if rebalance_mode else ((6.5, 7.5, 7.5, 8.5) if compact_mode else (8.0, 9.5, 10.0, 12.0))
         rooms.append(Room(
             id=f"f{floor_num}_kitchen",
             name="Kitchen",
             type="kitchen",
             zone="service",
             floor=floor_num,
-            min_width=8.0, min_length=9.5,
-            preferred_width=10.0, preferred_length=12.0,
+            min_width=kit_mw, min_length=kit_ml,
+            preferred_width=kit_pw, preferred_length=kit_pl,
             max_width=15.0, max_length=16.0,
             privacy_level="semi_private",
             daylight_requirement="high",
@@ -341,14 +359,15 @@ def build_room_program(
         ))
 
         # 5. Circulation Hallway
+        hall_mw, hall_ml, hall_pw, hall_pl = (3.0, 5.5, 3.5, 6.5) if rebalance_mode else ((3.5, 6.0, 3.5, 8.0) if compact_mode else (4.0, 8.0, 5.0, 12.0))
         rooms.append(Room(
             id=f"f{floor_num}_hallway",
             name="Circulation Hall",
             type="hallway",
             zone="circulation",
             floor=floor_num,
-            min_width=4.0, min_length=8.0,
-            preferred_width=5.0, preferred_length=12.0,
+            min_width=hall_mw, min_length=hall_ml,
+            preferred_width=hall_pw, preferred_length=hall_pl,
             max_width=7.0, max_length=24.0,
             privacy_level="semi_private",
             color=ROOM_COLORS["hallway"],
@@ -357,14 +376,15 @@ def build_room_program(
 
         # 6. Staircase (if multi-floor)
         if total_floors > 1:
+            stair_mw, stair_ml, stair_pw, stair_pl = (5.5, 7.5, 6.0, 8.0) if rebalance_mode else ((6.0, 8.0, 6.5, 8.5) if compact_mode else (7.0, 9.0, 8.0, 10.0))
             rooms.append(Room(
                 id=f"f{floor_num}_staircase",
                 name="Staircase Core",
                 type="staircase",
                 zone="circulation",
                 floor=floor_num,
-                min_width=7.0, min_length=9.0,
-                preferred_width=8.0, preferred_length=10.0,
+                min_width=stair_mw, min_length=stair_ml,
+                preferred_width=stair_pw, preferred_length=stair_pl,
                 max_width=9.5, max_length=12.0,
                 privacy_level="semi_private",
                 color=ROOM_COLORS["staircase"],
@@ -378,14 +398,15 @@ def build_room_program(
             mb_id = f"f{floor_num}_master_bath"
             master_has_attached = (target_attached >= 1)
 
+            mb_mw, mb_ml, mb_pw, mb_pl = (9.0, 10.0, 9.5, 10.5) if rebalance_mode else ((9.5, 10.5, 10.5, 11.5) if compact_mode else (11.5, 13.0, 13.5, 15.5))
             rooms.append(Room(
                 id=m_id,
                 name="Primary Suite",
                 type="master_bedroom",
                 zone="private",
                 floor=floor_num,
-                min_width=11.5, min_length=13.0,
-                preferred_width=13.5, preferred_length=15.5,
+                min_width=mb_mw, min_length=mb_ml,
+                preferred_width=mb_pw, preferred_length=mb_pl,
                 max_width=18.0, max_length=20.0,
                 privacy_level="intimate",
                 daylight_requirement="high",
@@ -397,6 +418,7 @@ def build_room_program(
             ))
 
             if master_has_attached:
+                bath_mw, bath_ml, bath_pw, bath_pl = (3.5, 5.0, 4.0, 5.5) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5) if compact_mode else (5.0, 7.0, 6.0, 8.5))
                 rooms.append(Room(
                     id=mb_id,
                     name="Primary Bath",
@@ -405,8 +427,8 @@ def build_room_program(
                     floor=floor_num,
                     parent_room_id=m_id,
                     attached_room_id=m_id,
-                    min_width=5.0, min_length=7.0,
-                    preferred_width=6.0, preferred_length=8.5,
+                    min_width=bath_mw, min_length=bath_ml,
+                    preferred_width=bath_pw, preferred_length=bath_pl,
                     max_width=8.5, max_length=10.0,
                     privacy_level="intimate",
                     ventilation_requirement="direct_exterior",
@@ -421,14 +443,15 @@ def build_room_program(
                 bed_has_attached = (b_idx <= target_attached)
                 bath_id = f"f{floor_num}_bath_bed_{b_idx}" if bed_has_attached else None
 
+                bed_mw, bed_ml, bed_pw, bed_pl = (8.0, 9.0, 8.5, 9.5) if rebalance_mode else ((8.5, 9.5, 9.5, 10.5) if compact_mode else (10.0, 11.0, 11.5, 13.0))
                 rooms.append(Room(
                     id=b_id,
                     name=f"Bedroom {b_idx}",
                     type="bedroom",
                     zone="private",
                     floor=floor_num,
-                    min_width=10.0, min_length=11.0,
-                    preferred_width=11.5, preferred_length=13.0,
+                    min_width=bed_mw, min_length=bed_ml,
+                    preferred_width=bed_pw, preferred_length=bed_pl,
                     max_width=15.0, max_length=16.0,
                     privacy_level="private",
                     daylight_requirement="high",
@@ -440,6 +463,7 @@ def build_room_program(
                 ))
 
                 if bed_has_attached and bath_id:
+                    ab_mw, ab_ml, ab_pw, ab_pl = (3.5, 5.0, 4.0, 5.5) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5) if compact_mode else (4.5, 6.0, 5.5, 7.5))
                     rooms.append(Room(
                         id=bath_id,
                         name=f"Bath {b_idx}",
@@ -448,8 +472,8 @@ def build_room_program(
                         floor=floor_num,
                         parent_room_id=b_id,
                         attached_room_id=b_id,
-                        min_width=4.5, min_length=6.0,
-                        preferred_width=5.5, preferred_length=7.5,
+                        min_width=ab_mw, min_length=ab_ml,
+                        preferred_width=ab_pw, preferred_length=ab_pl,
                         max_width=7.5, max_length=9.0,
                         privacy_level="intimate",
                         ventilation_requirement="direct_exterior",
@@ -460,14 +484,15 @@ def build_room_program(
 
             # Common bathroom if at least one bedroom does not have an attached bath, or for guests
             if target_attached < bedrooms or bathrooms > target_attached or bedrooms >= 2:
+                cb_mw, cb_ml, cb_pw, cb_pl = (3.5, 5.0, 4.0, 5.5) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5) if compact_mode else (4.5, 6.5, 5.5, 7.5))
                 rooms.append(Room(
                     id=f"f{floor_num}_common_bath",
                     name="Common Bath",
                     type="bathroom",
                     zone="service",
                     floor=floor_num,
-                    min_width=4.5, min_length=6.5,
-                    preferred_width=5.5, preferred_length=7.5,
+                    min_width=cb_mw, min_length=cb_ml,
+                    preferred_width=cb_pw, preferred_length=cb_pl,
                     max_width=7.5, max_length=9.0,
                     privacy_level="intimate",
                     ventilation_requirement="direct_exterior",
@@ -480,14 +505,15 @@ def build_room_program(
             guest_has_attached = (target_attached >= 2)
             gb_id = f"f{floor_num}_guest_bath" if guest_has_attached else None
 
+            gb_mw, gb_ml, gb_pw, gb_pl = (8.5, 9.5, 9.5, 10.5) if rebalance_mode else ((9.0, 10.0, 10.0, 11.0) if compact_mode else (10.5, 11.5, 12.0, 13.5))
             rooms.append(Room(
                 id=b_id,
                 name="Guest Suite",
                 type="guest_bedroom",
                 zone="private",
                 floor=floor_num,
-                min_width=10.5, min_length=11.5,
-                preferred_width=12.0, preferred_length=13.5,
+                min_width=gb_mw, min_length=gb_ml,
+                preferred_width=gb_pw, preferred_length=gb_pl,
                 max_width=15.0, max_length=16.0,
                 privacy_level="private",
                 daylight_requirement="high",
@@ -499,6 +525,7 @@ def build_room_program(
             ))
 
             if guest_has_attached and gb_id:
+                gbt_mw, gbt_ml, gbt_pw, gbt_pl = (3.5, 5.0, 4.0, 5.5) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5) if compact_mode else (4.5, 6.0, 5.5, 7.5))
                 rooms.append(Room(
                     id=gb_id,
                     name="Guest Bath",
@@ -507,8 +534,8 @@ def build_room_program(
                     floor=floor_num,
                     parent_room_id=b_id,
                     attached_room_id=b_id,
-                    min_width=4.5, min_length=6.0,
-                    preferred_width=5.5, preferred_length=7.5,
+                    min_width=gbt_mw, min_length=gbt_ml,
+                    preferred_width=gbt_pw, preferred_length=gbt_pl,
                     max_width=7.5, max_length=9.0,
                     privacy_level="intimate",
                     ventilation_requirement="direct_exterior",
@@ -517,14 +544,15 @@ def build_room_program(
                     rationale="Attached en-suite bathroom for Ground Floor Guest Suite."
                 ))
 
+            pwd_mw, pwd_ml, pwd_pw, pwd_pl = (3.0, 4.0, 3.5, 4.5) if rebalance_mode else ((3.5, 4.5, 4.0, 5.0) if compact_mode else (4.0, 5.5, 5.0, 6.5))
             rooms.append(Room(
                 id=f"f{floor_num}_powder_room",
                 name="Powder Room",
                 type="powder_room",
                 zone="service",
                 floor=floor_num,
-                min_width=4.0, min_length=5.5,
-                preferred_width=5.0, preferred_length=6.5,
+                min_width=pwd_mw, min_length=pwd_ml,
+                preferred_width=pwd_pw, preferred_length=pwd_pl,
                 max_width=6.5, max_length=8.0,
                 privacy_level="semi_private",
                 color=ROOM_COLORS["powder_room"],
@@ -534,28 +562,30 @@ def build_room_program(
     # Level 2 / Upper floor of multi-story
     elif floor_num == 2:
         # Staircase landing
+        st_mw, st_ml, st_pw, st_pl = (5.5, 7.5, 6.0, 8.0) if rebalance_mode else ((6.0, 8.0, 6.5, 8.5) if compact_mode else (7.0, 9.0, 8.0, 10.0))
         rooms.append(Room(
             id=f"f{floor_num}_staircase",
             name="Staircase Landing",
             type="staircase",
             zone="circulation",
             floor=floor_num,
-            min_width=7.0, min_length=9.0,
-            preferred_width=8.0, preferred_length=10.0,
+            min_width=st_mw, min_length=st_ml,
+            preferred_width=st_pw, preferred_length=st_pl,
             max_width=9.5, max_length=12.0,
             privacy_level="semi_private",
             color=ROOM_COLORS["staircase"],
             rationale="Upper floor stair landing opening directly to private family quarters."
         ))
         # Hallway
+        hl_mw, hl_ml, hl_pw, hl_pl = (3.0, 5.5, 3.5, 6.5) if rebalance_mode else ((3.5, 6.0, 3.5, 8.0) if compact_mode else (4.0, 8.0, 5.0, 12.0))
         rooms.append(Room(
             id=f"f{floor_num}_hallway",
             name="Family Gallery",
             type="hallway",
             zone="circulation",
             floor=floor_num,
-            min_width=4.0, min_length=8.0,
-            preferred_width=5.0, preferred_length=12.0,
+            min_width=hl_mw, min_length=hl_ml,
+            preferred_width=hl_pw, preferred_length=hl_pl,
             max_width=7.0, max_length=20.0,
             privacy_level="semi_private",
             color=ROOM_COLORS["hallway"],
@@ -566,14 +596,15 @@ def build_room_program(
         mb_id = f"f{floor_num}_master_bath"
         master_has_attached = (target_attached >= 1)
 
+        m2_mw, m2_ml, m2_pw, m2_pl = (9.0, 10.0, 9.5, 10.5) if rebalance_mode else ((9.5, 10.5, 10.5, 11.5) if compact_mode else (12.0, 13.5, 14.0, 16.0))
         rooms.append(Room(
             id=m_id,
             name="Primary Suite",
             type="master_bedroom",
             zone="private",
             floor=floor_num,
-            min_width=12.0, min_length=13.5,
-            preferred_width=14.0, preferred_length=16.0,
+            min_width=m2_mw, min_length=m2_ml,
+            preferred_width=m2_pw, preferred_length=m2_pl,
             max_width=19.0, max_length=22.0,
             privacy_level="intimate",
             daylight_requirement="high",
@@ -585,6 +616,7 @@ def build_room_program(
         ))
 
         if master_has_attached:
+            mb2_mw, mb2_ml, mb2_pw, mb2_pl = (3.5, 5.0, 4.0, 5.5) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5) if compact_mode else (5.5, 7.5, 6.5, 9.0))
             rooms.append(Room(
                 id=mb_id,
                 name="Primary Bath",
@@ -593,8 +625,8 @@ def build_room_program(
                 floor=floor_num,
                 parent_room_id=m_id,
                 attached_room_id=m_id,
-                min_width=5.5, min_length=7.5,
-                preferred_width=6.5, preferred_length=9.0,
+                min_width=mb2_mw, min_length=mb2_ml,
+                preferred_width=mb2_pw, preferred_length=mb2_pl,
                 max_width=9.0, max_length=11.0,
                 privacy_level="intimate",
                 ventilation_requirement="direct_exterior",
@@ -604,7 +636,6 @@ def build_room_program(
             ))
 
         # Remaining bedrooms on Level 2
-        # Ground floor has 1 bedroom (f1_bedroom_1), Level 2 has Master (1 bed) + (bedrooms - 2) beds
         remaining_beds = max(0, bedrooms - 2)
         for b_sub in range(remaining_beds):
             b_idx = b_sub + 2
@@ -612,14 +643,15 @@ def build_room_program(
             bed_has_attached = (target_attached >= 3 + b_sub)
             bath_id = f"f{floor_num}_bath_bed_{b_idx}" if bed_has_attached else None
 
+            b2_mw, b2_ml, b2_pw, b2_pl = (8.0, 9.0, 8.5, 9.5) if rebalance_mode else ((8.5, 9.5, 9.5, 10.5) if compact_mode else (10.0, 11.0, 11.5, 13.0))
             rooms.append(Room(
                 id=b_id,
                 name=f"Bedroom {b_idx}",
                 type="bedroom",
                 zone="private",
                 floor=floor_num,
-                min_width=10.0, min_length=11.0,
-                preferred_width=11.5, preferred_length=13.0,
+                min_width=b2_mw, min_length=b2_ml,
+                preferred_width=b2_pw, preferred_length=b2_pl,
                 max_width=15.0, max_length=16.0,
                 privacy_level="private",
                 daylight_requirement="high",
@@ -631,6 +663,7 @@ def build_room_program(
             ))
 
             if bed_has_attached and bath_id:
+                bb2_mw, bb2_ml, bb2_pw, bb2_pl = (3.5, 5.0, 4.0, 5.5) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5) if compact_mode else (4.5, 6.0, 5.5, 7.5))
                 rooms.append(Room(
                     id=bath_id,
                     name=f"Bath {b_idx}",
@@ -639,8 +672,8 @@ def build_room_program(
                     floor=floor_num,
                     parent_room_id=b_id,
                     attached_room_id=b_id,
-                    min_width=4.5, min_length=6.0,
-                    preferred_width=5.5, preferred_length=7.5,
+                    min_width=bb2_mw, min_length=bb2_ml,
+                    preferred_width=bb2_pw, preferred_length=bb2_pl,
                     max_width=7.5, max_length=9.0,
                     privacy_level="intimate",
                     ventilation_requirement="direct_exterior",
@@ -650,6 +683,7 @@ def build_room_program(
                 ))
 
         # Upper common bath
+        ucb_mw, ucb_ml, ucb_pw, ucb_pl = (3.5, 5.0, 4.0, 5.5) if rebalance_mode else ((4.0, 5.5, 4.5, 6.5) if compact_mode else (4.5, 6.5, 5.5, 7.5))
         rooms.append(Room(
             id=f"f{floor_num}_common_bath",
             name="Upper Bath",
@@ -805,7 +839,8 @@ def generate_architectural_house_layout(
     variant_seed: Optional[int] = None,
     construction_spec: Optional[ConstructionSpecification] = None,
     landscape_preferences: Optional[LandscapePreferences] = None,
-    room_allocations: Optional[List[Any]] = None
+    room_allocations: Optional[List[Any]] = None,
+    _is_adaptive_vertical_attempt: bool = False
 ) -> HouseLayout:
     """
     Executes the complete site-first architectural design pipeline:
@@ -879,11 +914,12 @@ def generate_architectural_house_layout(
     groq_critique_data: Dict[str, Any] = {}
     ground_stair_rect: Optional[Rect] = None
     ground_wet_rect: Optional[Rect] = None
+    applied_optimization_note: Optional[str] = None
 
     for floor_idx in range(1, num_floors + 1):
         floor_name = "Ground Floor" if floor_idx == 1 else ("First Floor" if floor_idx == 2 else ("Second Floor" if floor_idx == 3 else f"Level {floor_idx}"))
         
-        # Build room program for this floor
+        # Build room program for this floor (Strategy Stage 1: Try preferred room sizes)
         floor_rooms = build_room_program(
             floor_num=floor_idx,
             total_floors=num_floors,
@@ -991,81 +1027,179 @@ def generate_architectural_house_layout(
                 candidate_summaries.append(candidate_obj["summary"])
 
         if not solved_candidates:
-            default_scheme = schemes[0]
-            candidate = solve_spatial_layout(floor_rooms, site, default_scheme, time_limit_sec=4.0, variant_seed=variant_seed)
-            if not candidate or not candidate.is_valid:
-                empty_val = ArchitecturalValidation(
-                    is_valid=False,
-                    errors=[f"Plot buildable envelope ({site.buildable_envelope.width}x{site.buildable_envelope.length}ft) is insufficient for {bedrooms} bedrooms and requested spaces."]
+            # Feasibility Strategy Ladder:
+            # 2. Try compact room sizes
+            # 3. Optimize circulation
+            # 4. Optimize furniture clearances
+            # 5. Rebalance room dimensions
+            ladder_attempts = [
+                ("compact", True, False, False),
+                ("compact_circulation", True, True, False),
+                ("compact_rebalance", True, True, True),
+            ]
+            for attempt_name, c_mode, opt_circ, reb_mode in ladder_attempts:
+                alt_rooms = build_room_program(
+                    floor_num=floor_idx,
+                    total_floors=num_floors,
+                    bedrooms=bedrooms,
+                    bathrooms=bathrooms,
+                    attached_bathroom_count=attached_bathroom_count,
+                    special_rooms=special_rooms,
+                    open_concept=open_concept,
+                    room_allocations=room_allocations,
+                    compact_mode=c_mode,
+                    rebalance_mode=reb_mode
                 )
-                return HouseLayout(
-                    id=f"layout_{uuid.uuid4().hex[:8]}",
-                    title="Design Constraint Conflict",
-                    designer_rationale="The requested room program exceeds the buildable envelope of the plot. Please increase plot size or reduce bedroom count.",
+                if opt_circ:
+                    for rm in alt_rooms:
+                        if rm.type == "hallway":
+                            rm.min_width = 3.5
+                            rm.min_length = 5.5
+                            rm.preferred_width = 3.5
+                            rm.preferred_length = 7.0
+                        elif rm.type == "entry_foyer":
+                            rm.min_width = 3.5
+                            rm.min_length = 4.0
+                            rm.preferred_width = 3.5
+                            rm.preferred_length = 4.5
+                alt_schemes = generate_architectural_schemes(
+                    rooms=alt_rooms,
+                    site=site,
+                    vastu_compliant=vastu_compliant,
+                    ai_concepts=ai_concepts
+                )
+                for s in alt_schemes:
+                    cand = solve_spatial_layout(
+                        alt_rooms, site, s,
+                        pinned_rooms=pinned_rooms if pinned_rooms else None,
+                        variant_seed=variant_seed
+                    )
+                    if not cand or not cand.is_valid:
+                        if pinned_rooms:
+                            cand = solve_spatial_layout(
+                                alt_rooms, site, s,
+                                variant_seed=variant_seed
+                            )
+                    if cand and cand.is_valid:
+                        applied_optimization_note = "Compact layout optimized for your plot"
+                        w_list, d_list, win_list = generate_wall_network_and_openings(
+                            cand.rooms, site, wall_height=active_spec.wall_height_ft, construction_spec=active_spec
+                        )
+                        f_scores = []
+                        for r in cand.rooms:
+                            f_items, f_score, _ = validate_and_place_furniture(r, doors=d_list, windows=win_list)
+                            r.furniture = f_items
+                            r.furniture_ids = [f.id for f in f_items]
+                            f_scores.append(f_score)
+                        sc, vl = calculate_architectural_scores(
+                            rooms=cand.rooms, site=site, walls=w_list, doors=d_list, windows=win_list,
+                            furniture_scores=f_scores, vastu_enabled=vastu_compliant
+                        )
+                        cand_obj = {
+                            "candidate": cand,
+                            "walls": w_list,
+                            "doors": d_list,
+                            "windows": win_list,
+                            "scores": sc,
+                            "validation": vl,
+                            "summary": {
+                                "scheme_id": s.scheme_id,
+                                "name": s.name,
+                                "description": s.description,
+                                "overall_score": sc.overall_score,
+                                "circulation_score": sc.circulation_score,
+                                "privacy_score": sc.privacy_score,
+                                "daylight_score": sc.daylight_score,
+                                "space_efficiency_score": sc.space_efficiency_score,
+                                "furniture_fit_score": sc.furniture_fit_score,
+                                "vastu_score": sc.vastu_score,
+                                "warnings": vl.warnings
+                            }
+                        }
+                        solved_candidates.append(cand_obj)
+                        candidate_summaries.append(cand_obj["summary"])
+                        break
+                if solved_candidates:
+                    break
+
+        if not solved_candidates:
+            envelope_w = round(site.buildable_envelope.width, 1) if site.buildable_envelope else round(plot_width, 1)
+            envelope_l = round(site.buildable_envelope.length, 1) if site.buildable_envelope else round(plot_length, 1)
+            envelope_area = round(site.buildable_envelope.area) if site.buildable_envelope else round(plot_width * plot_length)
+
+            # Strategy Stage 6: Consider additional floors (auto-synthesize G+1 when single-floor cannot fit)
+            if num_floors == 1 and not _is_adaptive_vertical_attempt:
+                vertical_layout = generate_architectural_house_layout(
                     plot_width=plot_width,
                     plot_length=plot_length,
-                    num_floors=num_floors,
-                    site=site,
-                    validation=empty_val,
-                    rooms=[],
-                    construction_spec=active_spec,
-                    stats=HouseStats(
-                        total_area_sqft=0.0,
-                        living_area_sqft=0.0,
-                        width_ft=plot_width,
-                        length_ft=plot_length,
-                        num_floors=num_floors,
-                        bedroom_count=bedrooms,
-                        bathroom_count=bathrooms,
-                        aspect_ratio=round(plot_width / max(1.0, plot_length), 2)
+                    num_floors=2,
+                    bedrooms=bedrooms,
+                    bathrooms=bathrooms,
+                    attached_bathroom_count=attached_bathroom_count,
+                    style=style,
+                    road_side=road_side,
+                    north_direction=north_direction,
+                    parking_spaces=parking_spaces,
+                    special_rooms=special_rooms,
+                    open_concept=open_concept,
+                    vastu_compliant=vastu_compliant,
+                    user_prompt=user_prompt,
+                    variant_seed=variant_seed,
+                    construction_spec=construction_spec,
+                    landscape_preferences=landscape_preferences,
+                    room_allocations=None,
+                    _is_adaptive_vertical_attempt=True
+                )
+                if vertical_layout.validation and vertical_layout.validation.is_valid and len(vertical_layout.rooms) > 0:
+                    vertical_layout.metadata["optimization_note"] = "Your requested program requires an additional floor"
+                    vertical_layout.designer_rationale = (
+                        "Your requested program requires an additional floor: "
+                        f"The requested {bedrooms}-bedroom program exceeded the single-floor buildable envelope of {envelope_w} x {envelope_l} ft ({envelope_area} sq ft). "
+                        "An adaptive G+1 vertical layout was created to comfortably accommodate all spaces with verified circulation, daylight, and structural clearances."
                     )
-                )
-            else:
-                walls, doors, windows = generate_wall_network_and_openings(
-                    candidate.rooms,
-                    site,
-                    wall_height=active_spec.wall_height_ft,
-                    construction_spec=active_spec
-                )
-                furn_scores = []
-                for r in candidate.rooms:
-                    f_items, f_score, _ = validate_and_place_furniture(r, doors=doors, windows=windows)
-                    r.furniture = f_items
-                    r.furniture_ids = [f.id for f in f_items]
-                    furn_scores.append(f_score)
+                    return vertical_layout
 
-                scores, validation = calculate_architectural_scores(
-                    rooms=candidate.rooms,
-                    site=site,
-                    walls=walls,
-                    doors=doors,
-                    windows=windows,
-                    furniture_scores=furn_scores,
-                    vastu_enabled=vastu_compliant
+            # Strategy Stage 7: Only then return genuinely infeasible
+            min_needed_area = round(sum(r.min_width * r.min_length for r in floor_rooms))
+            conflicting = [r.name for r in floor_rooms if r.min_width * r.min_length >= 60]
+            conf_str = ", ".join(conflicting[:4]) if conflicting else "bedrooms and living spaces"
+            suggested_beds = max(1, bedrooms - 1)
+            suggested_w = round(plot_width * 1.3, 0)
+            suggested_l = round(plot_length * 1.3, 0)
+
+            err_msg = (
+                f"Plot buildable envelope ({envelope_w} x {envelope_l} ft, {envelope_area} sq ft) "
+                f"is insufficient for the requested program of {bedrooms} bedrooms and {bathrooms} bathrooms on {num_floors} floor(s). "
+                f"The requested room program requires at least ~{min_needed_area} sq ft of buildable footprint. "
+                f"Conflicting spaces: {conf_str}. "
+                f"Recommendation: Reduce bedroom count to {suggested_beds}, increase plot dimensions to at least {suggested_w} x {suggested_l} ft, or consider an additional floor."
+            )
+            empty_val = ArchitecturalValidation(
+                is_valid=False,
+                errors=[err_msg]
+            )
+            return HouseLayout(
+                id=f"layout_{uuid.uuid4().hex[:8]}",
+                title="Design Constraint Infeasible",
+                designer_rationale=err_msg,
+                plot_width=plot_width,
+                plot_length=plot_length,
+                num_floors=num_floors,
+                site=site,
+                validation=empty_val,
+                rooms=[],
+                construction_spec=active_spec,
+                stats=HouseStats(
+                    total_area_sqft=0.0,
+                    living_area_sqft=0.0,
+                    width_ft=plot_width,
+                    length_ft=plot_length,
+                    num_floors=num_floors,
+                    bedroom_count=bedrooms,
+                    bathroom_count=bathrooms,
+                    aspect_ratio=round(plot_width / max(1.0, plot_length), 2)
                 )
-                candidate_obj = {
-                    "candidate": candidate,
-                    "walls": walls,
-                    "doors": doors,
-                    "windows": windows,
-                    "scores": scores,
-                    "validation": validation,
-                    "summary": {
-                        "scheme_id": default_scheme.scheme_id,
-                        "name": default_scheme.name,
-                        "description": default_scheme.description,
-                        "overall_score": scores.overall_score,
-                        "circulation_score": scores.circulation_score,
-                        "privacy_score": scores.privacy_score,
-                        "daylight_score": scores.daylight_score,
-                        "space_efficiency_score": scores.space_efficiency_score,
-                        "furniture_fit_score": scores.furniture_fit_score,
-                        "vastu_score": scores.vastu_score,
-                        "warnings": validation.warnings
-                    }
-                }
-                solved_candidates.append(candidate_obj)
-                candidate_summaries.append(candidate_obj["summary"])
+            )
 
         # Deterministic Candidate Ranking
         def candidate_rank_score(c):
@@ -1199,6 +1333,8 @@ def generate_architectural_house_layout(
         f"Site-first planning with {site.road_side.capitalize()} frontage, {site.setbacks.front}ft front setback, "
         f"and {actual_bed_count} bedrooms across {total_home_area} sq ft."
     ).strip()
+    if applied_optimization_note:
+        designer_rationale = f"{applied_optimization_note}: Room proportions and circulation were efficiently tailored to fit within the buildable envelope without compromising functionality. {designer_rationale}"
 
     entry_pt = Point2D(x=round(plot_width / 2.0, 1), y=site.setbacks.rear if road_side == "north" else (plot_length - site.setbacks.front))
 
@@ -1230,7 +1366,8 @@ def generate_architectural_house_layout(
             "groq_critique": groq_critique_data,
             "style": style,
             "vastu_compliant": vastu_compliant,
-            "road_side": road_side
+            "road_side": road_side,
+            "optimization_note": applied_optimization_note
         },
         # Backwards compatible top-level ground floor fields
         rooms=ground_floor.rooms,

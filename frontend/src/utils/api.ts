@@ -13,14 +13,14 @@ export function formatApiError(err: unknown): string {
     return "Unable to connect to the architectural synthesis backend. Please verify the backend server is active and accessible.";
   }
   if (err instanceof Error) {
-    if (err.message.includes("422") || err.message.toLowerCase().includes("unprocessable")) {
+    if (err.message === "Generation failed (HTTP 422)" || err.message.toLowerCase() === "unprocessable entity") {
       return "Some architectural specifications could not be processed. Please review your plot dimensions and requirements.";
     }
     if (err.message.includes("504") || err.message.toLowerCase().includes("timeout")) {
-      return "Architectural synthesis timed out. The spatial solver or critic took longer than expected. Please try again.";
+      return "Architectural synthesis timed out. The spatial solver took longer than expected. Please try again.";
     }
-    if (err.message.includes("500")) {
-      return "The architectural solver encountered an unexpected constraint condition. Please adjust room counts or setbacks and retry.";
+    if (err.message === "Generation failed (HTTP 500)") {
+      return "The architectural solver encountered an unexpected condition. Please adjust room counts or setbacks and retry.";
     }
     return err.message;
   }
@@ -44,7 +44,15 @@ export async function generateHouseLayout(req: IntakeRequest): Promise<HouseLayo
       try {
         const errJson = await res.json();
         if (errJson.detail) {
-          detail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+          if (typeof errJson.detail === "string") {
+            detail = errJson.detail;
+          } else if (typeof errJson.detail === "object") {
+            const d = errJson.detail;
+            detail = d.message || d.designer_rationale || JSON.stringify(d);
+            if (d.recommendation) {
+              detail += `\n\nRecommendation: ${d.recommendation}`;
+            }
+          }
         }
       } catch (_) {}
       throw new Error(detail);

@@ -14,7 +14,7 @@ import { VastuAuditModal } from "@/components/VastuAuditModal";
 import { CreateChoiceModal } from "@/components/CreateChoiceModal";
 import { ProjectsModal } from "@/components/ProjectsModal";
 import { useProject } from "@/context/ProjectContext";
-import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
+import { validateAndSanitizeHouseLayout, validateAndSanitizeHouseLayoutDetailed } from "@/utils/layoutValidator";
 import { generateHouseLayout, refineHouseLayout, editRoomLayout } from "@/utils/api";
 import { Loader2 } from "lucide-react";
 
@@ -196,9 +196,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
     try {
       const rawData = await generateHouseLayout(req);
+
+      if (!rawData || !rawData.rooms || rawData.rooms.length === 0) {
+        const valErrors = (rawData as any)?.validation?.errors;
+        const rationale = (rawData as any)?.designer_rationale;
+        const msg = (valErrors && valErrors.length > 0)
+          ? valErrors.join("\n")
+          : (rationale || "The requested room program exceeds the buildable envelope of the plot.");
+        throw new Error(msg);
+      }
+
       const sanitized = validateAndSanitizeHouseLayout(rawData);
       if (!sanitized) {
-        throw new Error("Received an incomplete architectural layout from solver.");
+        const detailed = validateAndSanitizeHouseLayoutDetailed(rawData);
+        const reason = detailed.errors?.[0] || "Received an unrenderable architectural layout from solver.";
+        throw new Error(reason);
       }
 
       setIsGenerating(false);
@@ -299,6 +311,16 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           onOpenVastuAudit={() => setIsVastuAuditOpen(true)}
           hasVastuResult={Boolean(layout?.scores?.vastu_result)}
         />
+      )}
+
+      {/* FLOATING ADAPTIVE OPTIMIZATION NOTICE */}
+      {!isConsultationOpen && Boolean((layout as any)?.metadata?.optimization_note) && (
+        <div className="fixed top-16 sm:top-18 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#12141A]/95 text-amber-200 border border-amber-500/30 text-[11px] font-mono tracking-wide shadow-2xl backdrop-blur-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>{String((layout as any)?.metadata?.optimization_note)}</span>
+          </div>
+        </div>
       )}
 
       {/* VIEWPORT CANVAS */}

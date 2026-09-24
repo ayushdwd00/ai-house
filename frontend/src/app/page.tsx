@@ -9,7 +9,7 @@ import { CreateChoiceModal } from "@/components/CreateChoiceModal";
 import { ProjectsModal } from "@/components/ProjectsModal";
 import { useProject } from "@/context/ProjectContext";
 import { HouseLayout, IntakeRequest } from "@/types/house";
-import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
+import { validateAndSanitizeHouseLayout, validateAndSanitizeHouseLayoutDetailed } from "@/utils/layoutValidator";
 import { generateHouseLayout } from "@/utils/api";
 
 // Code splitting: Heavy modals and consultation loaded on demand only
@@ -91,9 +91,22 @@ export default function HomePage() {
 
     try {
       const rawData = await generateHouseLayout(req);
+
+      // Check if backend returned an empty/infeasible layout directly (fallback for 200 OK responses)
+      if (!rawData || !rawData.rooms || rawData.rooms.length === 0) {
+        const valErrors = (rawData as any)?.validation?.errors;
+        const rationale = (rawData as any)?.designer_rationale;
+        const msg = (valErrors && valErrors.length > 0)
+          ? valErrors.join("\n")
+          : (rationale || "The requested room program exceeds the buildable envelope of the plot. Try increasing floors or adjusting room sizes.");
+        throw new Error(msg);
+      }
+
       const sanitized = validateAndSanitizeHouseLayout(rawData);
       if (!sanitized) {
-        throw new Error("Received an incomplete or unrenderable architectural layout from the solver.");
+        const detailed = validateAndSanitizeHouseLayoutDetailed(rawData);
+        const reason = detailed.errors?.[0] || "Received an unrenderable architectural layout from the solver.";
+        throw new Error(reason);
       }
 
       setIsGenerating(false);

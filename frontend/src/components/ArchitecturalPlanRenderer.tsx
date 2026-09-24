@@ -1613,6 +1613,14 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             </span>
           </div>
 
+          {/* Adaptive Small Plot Optimization Note */}
+          {Boolean((layout as any)?.metadata?.optimization_note) && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#12141A]/90 text-amber-200 border border-amber-500/30 text-[11px] font-mono tracking-wide shadow-lg">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>{String((layout as any)?.metadata?.optimization_note)}</span>
+            </div>
+          )}
+
           {/* Floor Level Switcher (If multi-story) */}
           {layout.floors && layout.floors.length > 1 && onSelectFloor && (
             <div className="flex items-center p-0.5 rounded-full bg-[#12141A]/90 border border-white/10 shadow-lg text-[10px] font-mono text-[#9E9C98]">
