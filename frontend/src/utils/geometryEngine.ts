@@ -178,8 +178,39 @@ export function synchronizeOpeningsWithWalls(
     const orientation: "north" | "south" | "east" | "west" =
       dirCode === "N" ? "north" : dirCode === "S" ? "south" : dirCode === "E" ? "east" : "west";
 
+    // Project opening directly onto host wall to eliminate floating doors
+    let newX1 = d.x1;
+    let newY1 = d.y1;
+    let newX2 = d.x2;
+    let newY2 = d.y2;
+
+    if (hostWall) {
+      const wdx = hostWall.x2 - hostWall.x1;
+      const wdy = hostWall.y2 - hostWall.y1;
+      const wlen = Math.hypot(wdx, wdy);
+      if (wlen > 0.5) {
+        const ux = wdx / wlen;
+        const uy = wdy / wlen;
+        const t = ((dmx - hostWall.x1) * wdx + (dmz - hostWall.y1) * wdy) / (wlen * wlen);
+        const doorW = Math.min(d.width || 3.0, wlen * 0.8);
+        const halfW = doorW / 2;
+        const clampedDist = Math.max(halfW + 0.2, Math.min(wlen - halfW - 0.2, t * wlen));
+        const cx = hostWall.x1 + ux * clampedDist;
+        const cy = hostWall.y1 + uy * clampedDist;
+
+        newX1 = cx - ux * halfW;
+        newY1 = cy - uy * halfW;
+        newX2 = cx + ux * halfW;
+        newY2 = cy + uy * halfW;
+      }
+    }
+
     return {
       ...d,
+      x1: newX1,
+      y1: newY1,
+      x2: newX2,
+      y2: newY2,
       wall_id: hostWall?.id || d.wall_id,
       host_wall_id: hostWall?.id || d.wall_id,
       direction_label: `${doorNumber} · ${dirCode}`,
@@ -207,8 +238,39 @@ export function synchronizeOpeningsWithWalls(
     const orientation: "north" | "south" | "east" | "west" =
       dirCode === "N" ? "north" : dirCode === "S" ? "south" : dirCode === "E" ? "east" : "west";
 
+    // Project opening directly onto host wall so window is embedded in wall
+    let newX1 = w.x1;
+    let newY1 = w.y1;
+    let newX2 = w.x2;
+    let newY2 = w.y2;
+
+    if (hostWall) {
+      const wdx = hostWall.x2 - hostWall.x1;
+      const wdy = hostWall.y2 - hostWall.y1;
+      const wlen = Math.hypot(wdx, wdy);
+      if (wlen > 0.5) {
+        const ux = wdx / wlen;
+        const uy = wdy / wlen;
+        const winW = Math.min(w.width || 4.0, wlen * 0.8);
+        const halfW = winW / 2;
+        const t = ((wmx - hostWall.x1) * wdx + (wmz - hostWall.y1) * wdy) / (wlen * wlen);
+        const clampedDist = Math.max(halfW + 0.25, Math.min(wlen - halfW - 0.25, t * wlen));
+        const cx = hostWall.x1 + ux * clampedDist;
+        const cy = hostWall.y1 + uy * clampedDist;
+
+        newX1 = cx - ux * halfW;
+        newY1 = cy - uy * halfW;
+        newX2 = cx + ux * halfW;
+        newY2 = cy + uy * halfW;
+      }
+    }
+
     return {
       ...w,
+      x1: newX1,
+      y1: newY1,
+      x2: newX2,
+      y2: newY2,
       wall_id: hostWall?.id || w.wall_id,
       host_wall_id: hostWall?.id || w.wall_id,
       direction_label: `${winNumber} · ${dirCode}`,

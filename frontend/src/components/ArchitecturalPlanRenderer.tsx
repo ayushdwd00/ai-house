@@ -105,6 +105,20 @@ export function getRoomMinimumDimensions(type: string): { minWidth: number; minL
   return { minWidth: 5.0, minLength: 5.0 };
 }
 
+export function getRoomBackgroundFill(type: string, isSelected: boolean, isHovered: boolean): string {
+  if (isSelected) return "#EFF6FF";
+  if (isHovered) return "#F8FAFC";
+  const clean = (type || "").toLowerCase();
+  if (clean.includes("bed") || clean.includes("primary") || clean.includes("master")) return "#FDFCF7";
+  if (clean.includes("bath") || clean.includes("toilet") || clean.includes("powder") || clean.includes("wc")) return "#F1F5F9";
+  if (clean.includes("kitchen") || clean.includes("utility") || clean.includes("store")) return "#F8FAFC";
+  if (clean.includes("pooja") || clean.includes("mandir")) return "#FFFDF5";
+  if (clean.includes("balcony") || clean.includes("terrace") || clean.includes("sitout") || clean.includes("verandah")) return "#F5F5F0";
+  if (clean.includes("stair")) return "#F3F4F6";
+  if (clean.includes("living") || clean.includes("dining") || clean.includes("hall") || clean.includes("drawing") || clean.includes("lounge")) return "#FAFAF8";
+  return "#FAF9F5";
+}
+
 export interface ArchitecturalPlanRendererProps {
   layout: HouseLayout;
   mode?: PlanMode;
@@ -434,45 +448,74 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       : generateFallbackLandscape(layout);
   }, [layout]);
 
+  // Architectural Canonical Wall Network:
+  // Guarantees every single room is 100% enclosed by connected walls with no missing partitions
+  const canonicalWallNet = useMemo(() => {
+    const hasFullWalls =
+      currentFloor.exterior_walls &&
+      currentFloor.exterior_walls.length >= 4 &&
+      currentFloor.interior_walls &&
+      currentFloor.interior_walls.length > 0;
+
+    if (hasFullWalls && mode !== "edit") {
+      return {
+        walls: [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])],
+        exteriorWalls: currentFloor.exterior_walls || [],
+        interiorWalls: currentFloor.interior_walls || [],
+      };
+    }
+    return generateCanonicalWallNetwork(currentFloor.rooms || [], layout.site);
+  }, [currentFloor.exterior_walls, currentFloor.interior_walls, currentFloor.rooms, layout.site, mode]);
+
+  // Synchronize doors and windows so they are physically embedded into host walls
+  const synchedOpenings = useMemo(() => {
+    return synchronizeOpeningsWithWalls(
+      currentFloor.doors || [],
+      currentFloor.windows || [],
+      canonicalWallNet.walls,
+      0
+    );
+  }, [currentFloor.doors, currentFloor.windows, canonicalWallNet.walls]);
+
   // Wall Cuts, Doors, Windows, Dimensions
   const cutExteriorWalls = useMemo(
     () =>
       computeCutWalls(
-        currentFloor.exterior_walls || [],
-        currentFloor.doors || [],
-        currentFloor.windows || [],
+        canonicalWallNet.exteriorWalls,
+        synchedOpenings.doors,
+        synchedOpenings.windows,
         SCALE,
         true
       ),
-    [currentFloor.exterior_walls, currentFloor.doors, currentFloor.windows, SCALE]
+    [canonicalWallNet.exteriorWalls, synchedOpenings.doors, synchedOpenings.windows, SCALE]
   );
 
   const cutInteriorWalls = useMemo(
     () =>
       computeCutWalls(
-        currentFloor.interior_walls || [],
-        currentFloor.doors || [],
-        currentFloor.windows || [],
+        canonicalWallNet.interiorWalls,
+        synchedOpenings.doors,
+        synchedOpenings.windows,
         SCALE,
         false
       ),
-    [currentFloor.interior_walls, currentFloor.doors, currentFloor.windows, SCALE]
+    [canonicalWallNet.interiorWalls, synchedOpenings.doors, synchedOpenings.windows, SCALE]
   );
 
   const doorGeometries = useMemo(
     () =>
-      (currentFloor.doors || []).map((door, idx) =>
+      synchedOpenings.doors.map((door, idx) =>
         computeDoorGeometry(door, idx, SCALE)
       ),
-    [currentFloor.doors, SCALE]
+    [synchedOpenings.doors, SCALE]
   );
 
   const windowGeometries = useMemo(
     () =>
-      (currentFloor.windows || []).map((win, idx) =>
+      synchedOpenings.windows.map((win, idx) =>
         computeWindowGeometry(win, idx, SCALE)
       ),
-    [currentFloor.windows, SCALE]
+    [synchedOpenings.windows, SCALE]
   );
 
   const dimensionChains = useMemo(
@@ -2823,13 +2866,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   }}
                   className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
                 >
-                  {/* Room Fill Floor Slab */}
+                  {/* Room Fill Floor Slab with Distinct Architectural Zoning Tint */}
                   <rect
                     x={0}
                     y={0}
                     width={rw}
                     height={rl}
-                    fill={isSelected ? "#FFFDF9" : isHovered ? "#F8FAFC" : "#FFFFFF"}
+                    fill={getRoomBackgroundFill(room.type, isSelected, isHovered)}
                     stroke={isSelected ? "#C48446" : mode === "edit" ? "#94A3B8" : "#CBD5E1"}
                     strokeWidth={isSelected ? 2 : 1}
                     strokeDasharray={isSelected ? "none" : mode === "edit" ? "4 2" : "none"}
@@ -2838,7 +2881,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
                   {/* Staircase Step Treads */}
                   {(room.type === "staircase" || room.name.toLowerCase().includes("stair")) && (
-                    <g pointerEvents="none" opacity={0.65}>
+                    <g pointerEvents="none" opacity={0.75}>
                       {Array.from({ length: 8 }).map((_, sIdx) => {
                         const stepY = (rl / 9) * (sIdx + 1);
                         return (
@@ -2859,26 +2902,83 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                     </g>
                   )}
 
-                  {/* Room Name & Dimensions */}
-                  <text
-                    x={rw / 2}
-                    y={rl / 2 - 6}
-                    textAnchor="middle"
-                    fill={isSelected ? "#92400E" : "#0F172A"}
-                    className="font-mono text-[11px] font-semibold tracking-wider pointer-events-none select-none"
-                  >
-                    {room.name.toUpperCase()}
-                  </text>
-
-                  <text
-                    x={rw / 2}
-                    y={rl / 2 + 10}
-                    textAnchor="middle"
-                    fill={isSelected ? "#C48446" : "#64748B"}
-                    className="font-mono text-[9px] font-medium pointer-events-none select-none"
-                  >
-                    {room.rect.width}&apos; × {room.rect.length}&apos; ({room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT)
-                  </text>
+                  {/* Centered Readable Architectural Room Label */}
+                  <g pointerEvents="none" className="select-none">
+                    {(rw < 90 || rl < 70) ? (
+                      /* Compact Frosted Pill Label for Small Rooms */
+                      <g transform={`translate(${rw / 2}, ${rl / 2})`}>
+                        <rect
+                          x={-Math.min(rw * 0.45, 42)}
+                          y={-18}
+                          width={Math.min(rw * 0.9, 84)}
+                          height={36}
+                          rx={3}
+                          fill="#FFFFFF"
+                          fillOpacity={0.88}
+                          stroke="#E2E8F0"
+                          strokeWidth={0.5}
+                        />
+                        <text
+                          x={0}
+                          y={-6}
+                          textAnchor="middle"
+                          fill={isSelected ? "#92400E" : "#0F172A"}
+                          className="font-sans text-[8.5px] font-bold tracking-wider"
+                        >
+                          {room.name.toUpperCase()}
+                        </text>
+                        <text
+                          x={0}
+                          y={4}
+                          textAnchor="middle"
+                          fill={isSelected ? "#C48446" : "#334155"}
+                          className="font-mono text-[7.5px] font-semibold"
+                        >
+                          {feetToArchitectural(room.rect.width)} × {feetToArchitectural(room.rect.length)}
+                        </text>
+                        <text
+                          x={0}
+                          y={14}
+                          textAnchor="middle"
+                          fill={isSelected ? "#D97706" : "#64748B"}
+                          className="font-mono text-[7px] font-medium"
+                        >
+                          {room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT
+                        </text>
+                      </g>
+                    ) : (
+                      /* Standard Clean 3-Line Centered Architectural Room Label */
+                      <g transform={`translate(${rw / 2}, ${rl / 2})`}>
+                        <text
+                          x={0}
+                          y={-9}
+                          textAnchor="middle"
+                          fill={isSelected ? "#92400E" : "#0F172A"}
+                          className="font-sans text-[11px] font-bold tracking-wider"
+                        >
+                          {room.name.toUpperCase()}
+                        </text>
+                        <text
+                          x={0}
+                          y={5}
+                          textAnchor="middle"
+                          fill={isSelected ? "#C48446" : "#334155"}
+                          className="font-mono text-[9px] font-semibold"
+                        >
+                          {feetToArchitectural(room.rect.width)} × {feetToArchitectural(room.rect.length)}
+                        </text>
+                        <text
+                          x={0}
+                          y={17}
+                          textAnchor="middle"
+                          fill={isSelected ? "#D97706" : "#64748B"}
+                          className="font-mono text-[8px] font-medium"
+                        >
+                          {room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT
+                        </text>
+                      </g>
+                    )}
+                  </g>
 
                   {/* Corner & Edge Resize Handles in Edit Mode */}
                   {mode === "edit" && isSelected && (
@@ -3095,7 +3195,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             )}
 
             {/* ARCHITECTURAL CUT WALLS (CLEAN CAD DRAFTING LINEWORK) */}
-            {/* 1. Exterior Walls */}
+            {/* 1. Exterior Walls (Strong line weight: 2.8px, #1E293B, square joins) */}
             {cutExteriorWalls.segments.map((seg) => {
               const baseWallId = seg.id.split("_seg_")[0];
               const isSelected = selectedWallId === seg.id || selectedWallId === baseWallId;
@@ -3106,14 +3206,14 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   y1={seg.y1}
                   x2={seg.x2}
                   y2={seg.y2}
-                  stroke={isSelected ? "#C48446" : "#525866"}
-                  strokeWidth={isSelected ? 3.5 : 2.4}
-                  strokeLinecap="round"
+                  stroke={isSelected ? "#C48446" : "#1E293B"}
+                  strokeWidth={isSelected ? 3.5 : 2.8}
+                  strokeLinecap="square"
                 />
               );
             })}
 
-            {/* 2. Interior Partition Walls */}
+            {/* 2. Interior Partition Walls (Lighter line weight: 1.8px, #475569, square joins) */}
             {cutInteriorWalls.segments.map((seg) => {
               const baseWallId = seg.id.split("_seg_")[0];
               const isSelected = selectedWallId === seg.id || selectedWallId === baseWallId;
@@ -3124,9 +3224,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   y1={seg.y1}
                   x2={seg.x2}
                   y2={seg.y2}
-                  stroke={isSelected ? "#C48446" : "#717885"}
-                  strokeWidth={isSelected ? 3.0 : 1.6}
-                  strokeLinecap="round"
+                  stroke={isSelected ? "#C48446" : "#475569"}
+                  strokeWidth={isSelected ? 3.0 : 1.8}
+                  strokeLinecap="square"
                 />
               );
             })}
@@ -3139,14 +3239,15 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 y1={jamb.y - jamb.ny * 2}
                 x2={jamb.x + jamb.nx * 2}
                 y2={jamb.y + jamb.ny * 2}
-                stroke="#717885"
-                strokeWidth={1.0}
+                stroke="#475569"
+                strokeWidth={1.2}
+                strokeLinecap="square"
               />
             ))}
 
             {/* 4. Interactive Wall Selection Hit Areas & Endpoint Handles (in EDIT mode) */}
             {mode === "edit" &&
-              [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])].map((wall) => {
+              [...canonicalWallNet.exteriorWalls, ...canonicalWallNet.interiorWalls].map((wall) => {
                 const isSelected = selectedWallId === wall.id;
                 const wx1 = wall.x1 * SCALE;
                 const wy1 = wall.y1 * SCALE;
@@ -3440,8 +3541,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               <text x={10} y={14} fill="#0F172A" className="font-mono text-[10px] font-extrabold tracking-wider">
                 {currentFloor.floor_name ? currentFloor.floor_name.toUpperCase() : "GROUND FLOOR"} BLUEPRINT
               </text>
-              <text x={270} y={14} textAnchor="end" fill="#DC2626" className="font-mono text-[8px] font-bold tracking-widest">
-                DK-STYLE ARCH
+              <text x={270} y={14} textAnchor="end" fill="#C48446" className="font-mono text-[8px] font-bold tracking-widest">
+                ARCHITECTURAL DRAFTING
               </text>
               <text x={10} y={32} fill="#64748B" className="font-mono text-[8px]">
                 PLOT: <tspan fill="#0F172A" fontWeight="bold">{layout.plot_width}&apos; × {layout.plot_length}&apos;</tspan> ({(layout.plot_width * layout.plot_length).toLocaleString()} SQ FT)

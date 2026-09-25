@@ -85,7 +85,7 @@ export default function HomePage() {
   const handleStartGeneration = async (req: IntakeRequest) => {
     if (isGenerating) return;
     setLastIntakeRequest(req);
-    setIsConsultationOpen(false);
+    // Keep consultation open behind generation screen or transition immediately
     setIsGenerating(true);
     setGenerationError(null);
 
@@ -109,8 +109,12 @@ export default function HomePage() {
         throw new Error(reason);
       }
 
-      setIsGenerating(false);
+      // Close consultation modals now that generation is successful
+      setIsConsultationOpen(false);
+      setIsCreateChoiceOpen(false);
+      setIsDreamHomeOpen(false);
       const newProjectId = createProject(sanitized);
+      // Navigate directly to plan without unmounting loading overlay beforehand
       router.push(`/project/${newProjectId}/plan`);
     } catch (err) {
       console.error("[GENERATION ERROR]", err);

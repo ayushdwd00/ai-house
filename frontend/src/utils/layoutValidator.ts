@@ -1,5 +1,6 @@
 import { HouseLayout, Room, FloorPlan } from "@/types/house";
 import { generateFallbackLandscape } from "./landscapeFallback";
+import { generateCanonicalWallNetwork, synchronizeOpeningsWithWalls } from "./geometryEngine";
 
 export interface LayoutValidationResult {
   isValid: boolean;
@@ -193,15 +194,36 @@ export function validateAndSanitizeHouseLayoutDetailed(
           width: Number(w.width) || 4.0,
         }));
 
+    let floorExtWalls = sanitizeWallList(rawFloor.exterior_walls || []);
+    let floorIntWalls = sanitizeWallList(rawFloor.interior_walls || []);
+
+    // Ensure every room has clean, connected architectural walls with proper hierarchy
+    if (floorExtWalls.length < 4 || floorIntWalls.length === 0) {
+      const canonical = generateCanonicalWallNetwork(sanitizedRooms, layout.site);
+      floorExtWalls = canonical.exteriorWalls;
+      floorIntWalls = canonical.interiorWalls;
+    }
+
+    const rawDoors = sanitizeDoors(rawFloor.doors || []);
+    const rawWindows = sanitizeWindows(rawFloor.windows || []);
+
+    // Synchronize openings with host walls so openings are embedded without floating
+    const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
+      rawDoors,
+      rawWindows,
+      [...floorExtWalls, ...floorIntWalls],
+      layout.site?.north_direction || 0
+    );
+
     sanitizedFloors.push({
       floor_number: fIdx + 1,
       floor_name: rawFloor.floor_name || (fIdx === 0 ? "Ground Floor" : `Level ${fIdx + 1}`),
       rooms: sanitizedRooms,
-      walls: sanitizeWallList(rawFloor.walls || []),
-      exterior_walls: sanitizeWallList(rawFloor.exterior_walls || []),
-      interior_walls: sanitizeWallList(rawFloor.interior_walls || []),
-      doors: sanitizeDoors(rawFloor.doors || []),
-      windows: sanitizeWindows(rawFloor.windows || []),
+      walls: [...floorExtWalls, ...floorIntWalls],
+      exterior_walls: floorExtWalls,
+      interior_walls: floorIntWalls,
+      doors: syncedDoors,
+      windows: syncedWindows,
       staircase: rawFloor.staircase,
       circulation: rawFloor.circulation,
     });

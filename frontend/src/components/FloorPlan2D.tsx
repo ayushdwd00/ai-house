@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { HouseLayout, FloorPlan, Room, FurnitureItem } from "@/types/house";
+import { HouseLayout, FloorPlan, Room, FurnitureItem, Wall } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
 import {
   computeCutWalls,
@@ -10,6 +10,10 @@ import {
   computeWindowGeometry,
   generateDimensionChains,
 } from "@/utils/blueprint2D";
+import {
+  generateCanonicalWallNetwork,
+  synchronizeOpeningsWithWalls,
+} from "@/utils/geometryEngine";
 import {
   ZoomIn,
   ZoomOut,
@@ -28,6 +32,27 @@ import {
   ShieldCheck,
   Trees,
 } from "lucide-react";
+
+export function feetToArchitectural(feet: number): string {
+  const totalInches = Math.round(feet * 12);
+  const ft = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${ft}'-${inches}"`;
+}
+
+export function getRoomBackgroundFill(type: string, isSelected: boolean, isHovered: boolean): string {
+  if (isSelected) return "#EFF6FF";
+  if (isHovered) return "#F8FAFC";
+  const clean = (type || "").toLowerCase();
+  if (clean.includes("bed") || clean.includes("primary") || clean.includes("master")) return "#FDFCF7";
+  if (clean.includes("bath") || clean.includes("toilet") || clean.includes("powder") || clean.includes("wc")) return "#F1F5F9";
+  if (clean.includes("kitchen") || clean.includes("utility") || clean.includes("store")) return "#F8FAFC";
+  if (clean.includes("pooja") || clean.includes("mandir")) return "#FFFDF5";
+  if (clean.includes("balcony") || clean.includes("terrace") || clean.includes("sitout") || clean.includes("verandah")) return "#F5F5F0";
+  if (clean.includes("stair")) return "#F3F4F6";
+  if (clean.includes("living") || clean.includes("dining") || clean.includes("hall") || clean.includes("drawing") || clean.includes("lounge")) return "#FAFAF8";
+  return "#FAF9F5";
+}
 
 interface FloorPlan2DProps {
   layout: HouseLayout;
@@ -118,45 +143,75 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
       ? layout.landscape
       : generateFallbackLandscape(layout);
 
+  // Architectural Canonical Wall Network:
+  // Guarantees every single room is 100% enclosed by connected walls with no missing partitions
+  const canonicalWallNet = useMemo(() => {
+    const hasExistingFullWalls =
+      !isEditMode &&
+      currentFloor.exterior_walls &&
+      currentFloor.exterior_walls.length >= 4 &&
+      currentFloor.interior_walls &&
+      currentFloor.interior_walls.length > 0;
+
+    if (hasExistingFullWalls) {
+      return {
+        walls: [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])],
+        exteriorWalls: currentFloor.exterior_walls || [],
+        interiorWalls: currentFloor.interior_walls || [],
+      };
+    }
+    return generateCanonicalWallNetwork(displayRooms, layout.site);
+  }, [currentFloor.exterior_walls, currentFloor.interior_walls, displayRooms, layout.site, isEditMode]);
+
+  // Synchronize doors and windows so they are physically embedded into host walls
+  const synchedOpenings = useMemo(() => {
+    return synchronizeOpeningsWithWalls(
+      currentFloor.doors || [],
+      currentFloor.windows || [],
+      canonicalWallNet.walls,
+      0
+    );
+  }, [currentFloor.doors, currentFloor.windows, canonicalWallNet.walls]);
+
   // Architectural cut walls, doors, windows & dimension chains
   const cutExteriorWalls = useMemo(
     () =>
       computeCutWalls(
-        currentFloor.exterior_walls || [],
-        currentFloor.doors || [],
-        currentFloor.windows || [],
+        canonicalWallNet.exteriorWalls,
+        synchedOpenings.doors,
+        synchedOpenings.windows,
         SCALE,
         true
       ),
-    [currentFloor.exterior_walls, currentFloor.doors, currentFloor.windows, SCALE]
+    [canonicalWallNet.exteriorWalls, synchedOpenings.doors, synchedOpenings.windows, SCALE]
   );
 
   const cutInteriorWalls = useMemo(
     () =>
       computeCutWalls(
-        currentFloor.interior_walls || [],
-        currentFloor.doors || [],
-        currentFloor.windows || [],
+        canonicalWallNet.interiorWalls,
+        synchedOpenings.doors,
+        synchedOpenings.windows,
         SCALE,
         false
       ),
-    [currentFloor.interior_walls, currentFloor.doors, currentFloor.windows, SCALE]
+    [canonicalWallNet.interiorWalls, synchedOpenings.doors, synchedOpenings.windows, SCALE]
   );
 
   const doorGeometries = useMemo(
     () =>
-      (currentFloor.doors || []).map((door, idx) =>
+      synchedOpenings.doors.map((door, idx) =>
         computeDoorGeometry(door, idx, SCALE)
       ),
-    [currentFloor.doors, SCALE]
+    [synchedOpenings.doors, SCALE]
   );
 
   const windowGeometries = useMemo(
     () =>
-      (currentFloor.windows || []).map((win, idx) =>
+      synchedOpenings.windows.map((win, idx) =>
         computeWindowGeometry(win, idx, SCALE)
       ),
-    [currentFloor.windows, SCALE]
+    [synchedOpenings.windows, SCALE]
   );
 
   const dimensionChains = useMemo(
@@ -356,12 +411,27 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
     }
   };
 
-  // Render individual 2D CAD furniture symbols
-  const renderFurniture = (item: FurnitureItem) => {
-    const ix = item.x * SCALE;
-    const iy = item.y * SCALE;
-    const iw = item.width * SCALE;
-    const il = (item.depth || item.length) * SCALE;
+  // Render individual 2D CAD furniture symbols (guaranteed to respect room boundaries)
+  const renderFurniture = (item: FurnitureItem, hostRoom?: Room) => {
+    let itemX = item.x;
+    let itemY = item.y;
+    const itemW = item.width || 3;
+    const itemL = item.depth || item.length || 3;
+
+    if (hostRoom && hostRoom.rect) {
+      const minX = hostRoom.rect.x + itemW / 2 + 0.25;
+      const maxX = hostRoom.rect.x + hostRoom.rect.width - itemW / 2 - 0.25;
+      const minY = hostRoom.rect.y + itemL / 2 + 0.25;
+      const maxY = hostRoom.rect.y + hostRoom.rect.length - itemL / 2 - 0.25;
+
+      if (maxX >= minX) itemX = Math.max(minX, Math.min(maxX, itemX));
+      if (maxY >= minY) itemY = Math.max(minY, Math.min(maxY, itemY));
+    }
+
+    const ix = itemX * SCALE;
+    const iy = itemY * SCALE;
+    const iw = itemW * SCALE;
+    const il = itemL * SCALE;
     const isSelected = selectedFurnitureId === item.id;
 
     const strokeCol = isSelected ? "#2563EB" : "#334155";
@@ -1515,30 +1585,30 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                   }}
                   className={`${isEditMode ? "cursor-move" : "cursor-pointer"}`}
                 >
-                  {/* Room Fill Floor Slab */}
+                  {/* Room Fill Floor Slab with Distinct Architectural Zoning Tint */}
                   <rect
                     x={0}
                     y={0}
                     width={rw}
                     height={rl}
-                    fill={isSelected ? "#EFF6FF" : isHovered ? "#F8FAFC" : "#FFFFFF"}
+                    fill={getRoomBackgroundFill(room.type, isSelected, isHovered)}
                     stroke={
                       isEditMode
                         ? isSelected
                           ? "#2563EB"
-                          : "#CBD5E1"
+                          : "#94A3B8"
                         : isSelected
                         ? "#2563EB"
-                        : "#E2E8F0"
+                        : "#CBD5E1"
                     }
-                    strokeWidth={isSelected ? 1.5 : 0.8}
+                    strokeWidth={isSelected ? 1.5 : 1.0}
                     strokeDasharray={isEditMode ? "4 2" : "none"}
                     className="transition-colors duration-150"
                   />
 
                   {/* Clear Stair Tread Lines for Staircases */}
                   {(room.type === "staircase" || room.name.toLowerCase().includes("stair")) && (
-                    <g pointerEvents="none" opacity={0.65}>
+                    <g pointerEvents="none" opacity={0.75}>
                       {Array.from({ length: 8 }).map((_, sIdx) => {
                         const stepY = (rl / 9) * (sIdx + 1);
                         return (
@@ -1559,26 +1629,83 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                     </g>
                   )}
 
-                  {/* Room Name & Dimensions */}
-                  <text
-                    x={rw / 2}
-                    y={rl / 2 - 6}
-                    textAnchor="middle"
-                    fill={isSelected ? "#1D4ED8" : "#0F172A"}
-                    className="font-mono text-[11px] font-semibold tracking-wider pointer-events-none select-none"
-                  >
-                    {room.name.toUpperCase()}
-                  </text>
-
-                  <text
-                    x={rw / 2}
-                    y={rl / 2 + 10}
-                    textAnchor="middle"
-                    fill={isSelected ? "#2563EB" : "#64748B"}
-                    className="font-mono text-[9px] font-medium pointer-events-none select-none"
-                  >
-                    {room.rect.width}&apos; × {room.rect.length}&apos; ({room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT)
-                  </text>
+                  {/* Centered Readable Architectural Room Label */}
+                  <g pointerEvents="none" className="select-none">
+                    {(rw < 90 || rl < 70) ? (
+                      /* Compact Frosted Pill Label for Small Rooms (Pooja, Toilet, Bath) */
+                      <g transform={`translate(${rw / 2}, ${rl / 2})`}>
+                        <rect
+                          x={-Math.min(rw * 0.45, 42)}
+                          y={-18}
+                          width={Math.min(rw * 0.9, 84)}
+                          height={36}
+                          rx={3}
+                          fill="#FFFFFF"
+                          fillOpacity={0.88}
+                          stroke="#E2E8F0"
+                          strokeWidth={0.5}
+                        />
+                        <text
+                          x={0}
+                          y={-6}
+                          textAnchor="middle"
+                          fill={isSelected ? "#1D4ED8" : "#0F172A"}
+                          className="font-sans text-[8.5px] font-bold tracking-wider"
+                        >
+                          {room.name.toUpperCase()}
+                        </text>
+                        <text
+                          x={0}
+                          y={4}
+                          textAnchor="middle"
+                          fill={isSelected ? "#2563EB" : "#334155"}
+                          className="font-mono text-[7.5px] font-semibold"
+                        >
+                          {feetToArchitectural(room.rect.width)} × {feetToArchitectural(room.rect.length)}
+                        </text>
+                        <text
+                          x={0}
+                          y={14}
+                          textAnchor="middle"
+                          fill={isSelected ? "#3B82F6" : "#64748B"}
+                          className="font-mono text-[7px] font-medium"
+                        >
+                          {room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT
+                        </text>
+                      </g>
+                    ) : (
+                      /* Standard Clean 3-Line Centered Architectural Room Label */
+                      <g transform={`translate(${rw / 2}, ${rl / 2})`}>
+                        <text
+                          x={0}
+                          y={-9}
+                          textAnchor="middle"
+                          fill={isSelected ? "#1D4ED8" : "#0F172A"}
+                          className="font-sans text-[11px] font-bold tracking-wider"
+                        >
+                          {room.name.toUpperCase()}
+                        </text>
+                        <text
+                          x={0}
+                          y={5}
+                          textAnchor="middle"
+                          fill={isSelected ? "#2563EB" : "#334155"}
+                          className="font-mono text-[9px] font-semibold"
+                        >
+                          {feetToArchitectural(room.rect.width)} × {feetToArchitectural(room.rect.length)}
+                        </text>
+                        <text
+                          x={0}
+                          y={17}
+                          textAnchor="middle"
+                          fill={isSelected ? "#3B82F6" : "#64748B"}
+                          className="font-mono text-[8px] font-medium"
+                        >
+                          {room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT
+                        </text>
+                      </g>
+                    )}
+                  </g>
 
                   {/* Drag Icon Indicator in Edit Mode */}
                   {isEditMode && (
@@ -1588,12 +1715,14 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
               );
             })}
 
-            {/* Furniture Symbols (Only visible when not actively dragging edit mode) */}
+            {/* Furniture Symbols (Only visible when not actively dragging edit mode; clamped to host room) */}
             {!isEditMode &&
-              displayRooms.flatMap((r) => r.furniture || []).map((item) => renderFurniture(item))}
+              displayRooms.flatMap((r) =>
+                (r.furniture || []).map((item) => renderFurniture(item, r))
+              )}
 
-            {/* Architectural Walls (Clean CAD Drafting Hierarchy: Medium Neutral Lines) */}
-            {/* 1. Exterior Walls (Clear medium-weight architectural drafting lines) */}
+            {/* Architectural Walls (Watertight Drafting Linework with Proper Hierarchy) */}
+            {/* 1. Exterior Walls (Strong line weight: 2.8px, #1E293B, square joins) */}
             {cutExteriorWalls.segments.map((seg) => (
               <line
                 key={seg.id}
@@ -1601,13 +1730,13 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                 y1={seg.y1}
                 x2={seg.x2}
                 y2={seg.y2}
-                stroke="#525866"
-                strokeWidth={2.4}
-                strokeLinecap="round"
+                stroke="#1E293B"
+                strokeWidth={2.8}
+                strokeLinecap="square"
               />
             ))}
 
-            {/* 2. Interior Partition Walls (Clean, precise partition drafting lines) */}
+            {/* 2. Interior Partition Walls (Lighter line weight: 1.8px, #475569, square joins) */}
             {cutInteriorWalls.segments.map((seg) => (
               <line
                 key={seg.id}
@@ -1615,9 +1744,9 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                 y1={seg.y1}
                 x2={seg.x2}
                 y2={seg.y2}
-                stroke="#717885"
-                strokeWidth={1.6}
-                strokeLinecap="round"
+                stroke="#475569"
+                strokeWidth={1.8}
+                strokeLinecap="square"
               />
             ))}
 
@@ -1629,8 +1758,9 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                 y1={jamb.y - jamb.ny * 2}
                 x2={jamb.x + jamb.nx * 2}
                 y2={jamb.y + jamb.ny * 2}
-                stroke="#717885"
-                strokeWidth={1.0}
+                stroke="#475569"
+                strokeWidth={1.2}
+                strokeLinecap="square"
               />
             ))}
 
@@ -1760,9 +1890,12 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                   x2={dGeom.leafEndX}
                   y2={dGeom.leafEndY}
                   stroke="#78350F"
-                  strokeWidth={3}
+                  strokeWidth={2.4}
                   strokeLinecap="round"
                 />
+
+                {/* Hinge Pivot Indicator */}
+                <circle cx={dGeom.hingeX} cy={dGeom.hingeY} r={2.5} fill="#78350F" />
 
                 {/* Direction Badge Pill (e.g. D01 · S) */}
                 <g transform={`translate(${dGeom.badgeX}, ${dGeom.badgeY})`}>

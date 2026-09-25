@@ -9,11 +9,11 @@ interface GenerationProgressModalProps {
 }
 
 const STAGES = [
-  { label: "Site & Setback Analysis", desc: "Calculating buildable envelope & road frontage", icon: Compass },
-  { label: "Topological Spatial Synthesis", desc: "Formulating acoustic privacy & daylight zones", icon: Layers },
-  { label: "OR-Tools CP-SAT Geometric Solver", desc: "Computing zero room overlaps with deterministic search", icon: Ruler },
-  { label: "Architectural Opening & Wall Network", desc: "Deriving load-bearing walls, windows & doors", icon: Box },
-  { label: "Groq Architectural Critic Evaluation", desc: "Selecting optimal design concept & scoring metrics", icon: Sparkles },
+  { label: "Understanding requirements", desc: "Analyzing plot orientation, road frontage & setbacks", icon: Compass },
+  { label: "Planning spaces", desc: "Formulating daylight, privacy zones & functional adjacencies", icon: Layers },
+  { label: "Generating layout", desc: "Computing zero room overlaps with deterministic search", icon: Ruler },
+  { label: "Validating architecture", desc: "Deriving load-bearing walls, doors, windows & structure", icon: Box },
+  { label: "Preparing floor plan", desc: "Rendering professional 2D blueprints & opening sheets", icon: Sparkles },
 ];
 
 export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = ({
@@ -26,7 +26,7 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
 
     const interval = setInterval(() => {
       setCurrentStepIndex((prev) => (prev < STAGES.length - 1 ? prev + 1 : prev));
-    }, 850);
+    }, 1100);
 
     return () => clearInterval(interval);
   }, [isOpen]);
@@ -34,13 +34,23 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#0A0B0E]/85 backdrop-blur-xl">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#0A0B0E]">
+      {/* Subtle Background Architectural Grid Motion */}
+      <div 
+        className="absolute inset-0 opacity-15 pointer-events-none"
+        style={{
+          backgroundImage: "radial-gradient(#C48446 1px, transparent 1px), radial-gradient(white 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+          backgroundPosition: "0 0, 14px 14px",
+        }}
+      />
+
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
         transition={{ duration: 0.28, ease: "easeOut" }}
-        className="relative w-full max-w-lg bg-[#12141A] border border-white/10 rounded-3xl p-8 sm:p-10 shadow-2xl text-center flex flex-col items-center overflow-hidden"
+        className="relative w-full max-w-lg bg-[#12141A] border border-white/10 rounded-3xl p-8 sm:p-10 shadow-2xl text-center flex flex-col items-center overflow-hidden z-10"
       >
         {/* Dynamic Architectural Wireframe Skeleton Box */}
         <div className="relative w-full h-24 mb-6 rounded-2xl bg-[#0A0B0E] border border-white/10 p-3 overflow-hidden flex items-center justify-center">
@@ -69,13 +79,13 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
         </div>
 
         <span className="text-[10px] font-mono tracking-widest text-[#C48446] uppercase mb-1">
-          ATELIER SOLVER ACTIVE
+          ATELIER ARCHITECTURAL SYNTHESIS
         </span>
         <h3 className="text-xl sm:text-2xl font-serif font-light text-[#F5F3EF] tracking-tight mb-2">
-          Synthesizing Architectural Geometry
+          DESIGNING YOUR HOME
         </h3>
         <p className="text-xs text-[#9E9C98] font-light mb-6 max-w-sm">
-          Formulating site-specific setbacks, functional zoning, and CP-SAT deterministic spatial optimization.
+          Synthesizing site-specific setbacks, functional zoning, watertight wall networks, and deterministic spatial layout.
         </p>
 
         {/* Progress Stages */}
