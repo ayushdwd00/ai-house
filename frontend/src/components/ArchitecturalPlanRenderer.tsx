@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { HouseLayout, FloorPlan, Room, FurnitureItem, Door, Window } from "@/types/house";
+import { HouseLayout, FloorPlan, Room, FurnitureItem, Door, Window, Wall } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
 import {
   computeCutWalls,
@@ -12,6 +12,10 @@ import {
 } from "@/utils/blueprint2D";
 import { refineHouseLayout, editRoomLayoutFull } from "@/utils/api";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
+import {
+  generateCanonicalWallNetwork,
+  synchronizeOpeningsWithWalls,
+} from "@/utils/geometryEngine";
 import {
   ZoomIn,
   ZoomOut,
@@ -36,6 +40,8 @@ import {
   Send,
   Sliders,
   AlertTriangle,
+  Hand,
+  Move,
 } from "lucide-react";
 
 export type PlanMode = "view" | "edit";
@@ -138,6 +144,33 @@ interface ResizingRoomState {
   initialRect: { x: number; y: number; width: number; length: number };
 }
 
+interface DraggingWallState {
+  wallId: string;
+  startMouseX: number;
+  startMouseY: number;
+  initialX1: number;
+  initialY1: number;
+  initialX2: number;
+  initialY2: number;
+  affectedRoomIds: string[];
+  initialRooms: Room[];
+  initialDoors: Door[];
+  initialWindows: Window[];
+}
+
+interface ResizingWallEndpointState {
+  wallId: string;
+  endpoint: "start" | "end";
+  startMouseX: number;
+  startMouseY: number;
+  initialX1: number;
+  initialY1: number;
+  initialX2: number;
+  initialY2: number;
+  initialWalls: Wall[];
+  initialRooms: Room[];
+}
+
 export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps> = ({
   layout: initialLayout,
   mode = "view",
@@ -206,6 +239,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // Selections
   const [internalSelectedRoomId, setInternalSelectedRoomId] = useState<string | null>(null);
   const [internalSelectedFurnitureId, setInternalSelectedFurnitureId] = useState<string | null>(null);
+  const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
 
@@ -221,6 +255,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     if (id) {
       if (externalOnSelectFurniture) externalOnSelectFurniture(null);
       setInternalSelectedFurnitureId(null);
+      setSelectedWallId(null);
       setSelectedDoorId(null);
       setSelectedWindowId(null);
     }
@@ -234,6 +269,17 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     }
     if (id) {
       handleSelectRoom(null);
+      setSelectedWallId(null);
+      setSelectedDoorId(null);
+      setSelectedWindowId(null);
+    }
+  };
+
+  const handleSelectWall = (id: string | null) => {
+    setSelectedWallId(id);
+    if (id) {
+      handleSelectRoom(null);
+      handleSelectFurniture(null);
       setSelectedDoorId(null);
       setSelectedWindowId(null);
     }
@@ -243,6 +289,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [isPanMode, setIsPanMode] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   // Overlays
@@ -264,6 +311,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [draggingRoom, setDraggingRoom] = useState<DraggingRoomState | null>(null);
   const [draggingFurniture, setDraggingFurniture] = useState<DraggingFurnitureState | null>(null);
   const [resizingRoom, setResizingRoom] = useState<ResizingRoomState | null>(null);
+  const [draggingWall, setDraggingWall] = useState<DraggingWallState | null>(null);
+  const [resizingWallEndpoint, setResizingWallEndpoint] = useState<ResizingWallEndpointState | null>(null);
+  const [invalidMoveNotice, setInvalidMoveNotice] = useState<string | null>(null);
 
   // Contextual Exact Dimension Inputs & Notices
   const [exactWidthInput, setExactWidthInput] = useState("");
@@ -288,6 +338,73 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           doors: layout.doors || [],
           windows: layout.windows || [],
         };
+
+  // Selected Wall Entity
+  const selectedWall = useMemo(() => {
+    if (!selectedWallId) return null;
+    return (
+      (currentFloor.exterior_walls || []).find((w) => w.id === selectedWallId) ||
+      (currentFloor.interior_walls || []).find((w) => w.id === selectedWallId) ||
+      null
+    );
+  }, [currentFloor.exterior_walls, currentFloor.interior_walls, selectedWallId]);
+
+  // Selected Door Entity
+  const selectedDoor = useMemo(() => {
+    if (!selectedDoorId) return null;
+    return (currentFloor.doors || []).find((d) => d.id === selectedDoorId) || null;
+  }, [currentFloor.doors, selectedDoorId]);
+
+  // Selected Window Entity
+  const selectedWindow = useMemo(() => {
+    if (!selectedWindowId) return null;
+    return (currentFloor.windows || []).find((w) => w.id === selectedWindowId) || null;
+  }, [currentFloor.windows, selectedWindowId]);
+
+  const handleToggleWallThickness = () => {
+    if (!selectedWall) return;
+    const newThickness = selectedWall.thickness > 0.5 ? 0.375 : 0.75;
+    setLayout((prev) => {
+      const nextFloors = prev.floors ? [...prev.floors] : [];
+      if (nextFloors[activeFloorIndex]) {
+        const floor = nextFloors[activeFloorIndex];
+        const updateWall = (w: Wall) => (w.id === selectedWall.id ? { ...w, thickness: newThickness } : w);
+        nextFloors[activeFloorIndex] = {
+          ...floor,
+          exterior_walls: (floor.exterior_walls || []).map(updateWall),
+          interior_walls: (floor.interior_walls || []).map(updateWall),
+        };
+        const updated = { ...prev, floors: nextFloors };
+        pushSnapshot(updated);
+        return updated;
+      }
+      return prev;
+    });
+  };
+
+  const handleDeleteWall = () => {
+    if (!selectedWall) return;
+    if (selectedWall.is_exterior) {
+      setInvalidMoveNotice("Perimeter exterior wall cannot be deleted.");
+      setTimeout(() => setInvalidMoveNotice(null), 3000);
+      return;
+    }
+    setLayout((prev) => {
+      const nextFloors = prev.floors ? [...prev.floors] : [];
+      if (nextFloors[activeFloorIndex]) {
+        const floor = nextFloors[activeFloorIndex];
+        nextFloors[activeFloorIndex] = {
+          ...floor,
+          interior_walls: (floor.interior_walls || []).filter((w) => w.id !== selectedWall.id),
+        };
+        const updated = { ...prev, floors: nextFloors };
+        pushSnapshot(updated);
+        return updated;
+      }
+      return prev;
+    });
+    setSelectedWallId(null);
+  };
 
   const svgWidth = (layout.plot_width || 50) * SCALE;
   const svgHeight = (layout.plot_length || 70) * SCALE;
@@ -420,23 +537,174 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   }, [canUndo, canRedo, undo, redo]);
 
   // Global Mouse Handlers
+  // Global Mouse Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only pan if middle click or background left click
-    if (e.button === 1 || (e.button === 0 && !draggingRoom && !draggingFurniture && !resizingRoom)) {
+    // Only pan if middle click or pan mode active or background left click
+    if (
+      e.button === 1 ||
+      isPanMode ||
+      (e.button === 0 &&
+        !draggingRoom &&
+        !draggingFurniture &&
+        !resizingRoom &&
+        !draggingWall &&
+        !resizingWallEndpoint)
+    ) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning && !draggingRoom && !draggingFurniture && !resizingRoom) {
+    if (isPanning && !draggingRoom && !draggingFurniture && !resizingRoom && !draggingWall && !resizingWallEndpoint) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
       return;
     }
 
     if (mode !== "edit") return;
 
-    // 1. Room Dragging
+    // 1. Wall Dragging (Direct Manipulation with Relationship Updates)
+    if (draggingWall) {
+      const deltaXFeet = (e.clientX - draggingWall.startMouseX) / (SCALE * zoom);
+      const deltaYFeet = (e.clientY - draggingWall.startMouseY) / (SCALE * zoom);
+
+      const isHorizontal = Math.abs(draggingWall.initialY1 - draggingWall.initialY2) < 0.2;
+      const snapDelta = (v: number) => Math.round(v * 2) / 2; // 0.5ft snap increments
+
+      const snappedDeltaX = isHorizontal ? 0 : snapDelta(deltaXFeet);
+      const snappedDeltaY = isHorizontal ? snapDelta(deltaYFeet) : 0;
+
+      setLayout((prev) => {
+        const nextFloors = prev.floors ? [...prev.floors] : [];
+        if (nextFloors[activeFloorIndex]) {
+          const floor = nextFloors[activeFloorIndex];
+
+          const updateWallCoords = (w: Wall) => {
+            if (w.id === draggingWall.wallId) {
+              return {
+                ...w,
+                x1: draggingWall.initialX1 + snappedDeltaX,
+                y1: draggingWall.initialY1 + snappedDeltaY,
+                x2: draggingWall.initialX2 + snappedDeltaX,
+                y2: draggingWall.initialY2 + snappedDeltaY,
+              };
+            }
+            return w;
+          };
+
+          // Adjust affected rooms bound by this wall
+          const updatedRooms = (floor.rooms || []).map((rm) => {
+            const initRm = draggingWall.initialRooms.find((r) => r.id === rm.id);
+            if (!initRm || !initRm.rect) return rm;
+
+            let rx = initRm.rect.x;
+            let ry = initRm.rect.y;
+            let rw = initRm.rect.width;
+            let rl = initRm.rect.length;
+
+            if (isHorizontal) {
+              const wallY = draggingWall.initialY1;
+              if (Math.abs((initRm.rect.y + initRm.rect.length) - wallY) < 0.4) {
+                rl = Math.max(2, initRm.rect.length + snappedDeltaY);
+              } else if (Math.abs(initRm.rect.y - wallY) < 0.4) {
+                ry = initRm.rect.y + snappedDeltaY;
+                rl = Math.max(2, initRm.rect.length - snappedDeltaY);
+              }
+            } else {
+              const wallX = draggingWall.initialX1;
+              if (Math.abs((initRm.rect.x + initRm.rect.width) - wallX) < 0.4) {
+                rw = Math.max(2, initRm.rect.width + snappedDeltaX);
+              } else if (Math.abs(initRm.rect.x - wallX) < 0.4) {
+                rx = initRm.rect.x + snappedDeltaX;
+                rw = Math.max(2, initRm.rect.width - snappedDeltaX);
+              }
+            }
+            return {
+              ...rm,
+              rect: { x: rx, y: ry, width: rw, length: rl },
+              area_sqft: Math.round(rw * rl),
+            };
+          });
+
+          // Move attached doors & windows
+          const updatedDoors = (floor.doors || []).map((d) => {
+            const initD = draggingWall.initialDoors.find((od) => od.id === d.id);
+            if (!initD || (d.wall_id !== draggingWall.wallId && d.host_wall_id !== draggingWall.wallId)) return d;
+            return {
+              ...d,
+              x1: initD.x1 + snappedDeltaX,
+              y1: initD.y1 + snappedDeltaY,
+              x2: initD.x2 + snappedDeltaX,
+              y2: initD.y2 + snappedDeltaY,
+            };
+          });
+
+          const updatedWindows = (floor.windows || []).map((w) => {
+            const initW = draggingWall.initialWindows.find((ow) => ow.id === w.id);
+            if (!initW || (w.wall_id !== draggingWall.wallId && w.host_wall_id !== draggingWall.wallId)) return w;
+            return {
+              ...w,
+              x1: initW.x1 + snappedDeltaX,
+              y1: initW.y1 + snappedDeltaY,
+              x2: initW.x2 + snappedDeltaX,
+              y2: initW.y2 + snappedDeltaY,
+            };
+          });
+
+          nextFloors[activeFloorIndex] = {
+            ...floor,
+            exterior_walls: (floor.exterior_walls || []).map(updateWallCoords),
+            interior_walls: (floor.interior_walls || []).map(updateWallCoords),
+            rooms: updatedRooms,
+            doors: updatedDoors,
+            windows: updatedWindows,
+          };
+          return { ...prev, floors: nextFloors };
+        }
+        return prev;
+      });
+      return;
+    }
+
+    // 2. Wall Endpoint Resizing (Extend / Shorten)
+    if (resizingWallEndpoint) {
+      const deltaXFeet = (e.clientX - resizingWallEndpoint.startMouseX) / (SCALE * zoom);
+      const deltaYFeet = (e.clientY - resizingWallEndpoint.startMouseY) / (SCALE * zoom);
+
+      const isHorizontal = Math.abs(resizingWallEndpoint.initialY1 - resizingWallEndpoint.initialY2) < 0.2;
+      const snapDelta = (v: number) => Math.round(v * 2) / 2;
+
+      setLayout((prev) => {
+        const nextFloors = prev.floors ? [...prev.floors] : [];
+        if (nextFloors[activeFloorIndex]) {
+          const floor = nextFloors[activeFloorIndex];
+          const updateWallEndpoint = (w: Wall) => {
+            if (w.id === resizingWallEndpoint.wallId) {
+              if (resizingWallEndpoint.endpoint === "start") {
+                const nextX = isHorizontal ? resizingWallEndpoint.initialX1 + snapDelta(deltaXFeet) : w.x1;
+                const nextY = isHorizontal ? w.y1 : resizingWallEndpoint.initialY1 + snapDelta(deltaYFeet);
+                return { ...w, x1: nextX, y1: nextY };
+              } else {
+                const nextX = isHorizontal ? resizingWallEndpoint.initialX2 + snapDelta(deltaXFeet) : w.x2;
+                const nextY = isHorizontal ? w.y2 : resizingWallEndpoint.initialY2 + snapDelta(deltaYFeet);
+                return { ...w, x2: nextX, y2: nextY };
+              }
+            }
+            return w;
+          };
+          nextFloors[activeFloorIndex] = {
+            ...floor,
+            exterior_walls: (floor.exterior_walls || []).map(updateWallEndpoint),
+            interior_walls: (floor.interior_walls || []).map(updateWallEndpoint),
+          };
+          return { ...prev, floors: nextFloors };
+        }
+        return prev;
+      });
+      return;
+    }
+
+    // 3. Room Dragging
     if (draggingRoom) {
       const deltaXFeet = (e.clientX - draggingRoom.startMouseX) / (SCALE * zoom);
       const deltaYFeet = (e.clientY - draggingRoom.startMouseY) / (SCALE * zoom);
@@ -472,7 +740,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       });
     }
 
-    // 2. Furniture Dragging
+    // 4. Furniture Dragging
     else if (draggingFurniture) {
       const deltaXFeet = (e.clientX - draggingFurniture.startMouseX) / (SCALE * zoom);
       const deltaYFeet = (e.clientY - draggingFurniture.startMouseY) / (SCALE * zoom);
@@ -508,7 +776,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       });
     }
 
-    // 3. Room Edge / Corner Resizing
+    // 5. Room Edge / Corner Resizing
     else if (resizingRoom) {
       const deltaXFeet = (e.clientX - resizingRoom.startMouseX) / (SCALE * zoom);
       const deltaYFeet = (e.clientY - resizingRoom.startMouseY) / (SCALE * zoom);
@@ -516,7 +784,6 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       const targetRoom = (currentFloor.rooms || []).find((r) => r.id === resizingRoom.roomId);
       const minDims = getRoomMinimumDimensions(targetRoom?.type || "");
 
-      // 6-inch (0.5 ft) standard snap, or 0.1 ft fine snap when holding Shift
       const snapStep = e.shiftKey ? 0.1 : 0.5;
 
       let newX = orig.x;
@@ -589,85 +856,195 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const handleMouseUp = async () => {
     setIsPanning(false);
 
+    // Wall Dragging Completion: Validate and Update Canonical Model
+    if (draggingWall) {
+      const activeDrag = draggingWall;
+      setDraggingWall(null);
+
+      const currentRooms = currentFloor.rooms || [];
+      const hasInvalidRoom = currentRooms.some((r) => {
+        if (!r.rect) return false;
+        return (
+          r.rect.width < 4.0 ||
+          r.rect.length < 4.0 ||
+          r.rect.x < 0 ||
+          r.rect.y < 0 ||
+          r.rect.x + r.rect.width > layout.plot_width ||
+          r.rect.y + r.rect.length > layout.plot_length
+        );
+      });
+
+      if (hasInvalidRoom) {
+        setInvalidMoveNotice("Wall can't be moved here.");
+        setTimeout(() => setInvalidMoveNotice(null), 3000);
+        // Revert to initial
+        setLayout((prev) => {
+          const nextFloors = prev.floors ? [...prev.floors] : [];
+          if (nextFloors[activeFloorIndex]) {
+            nextFloors[activeFloorIndex] = {
+              ...nextFloors[activeFloorIndex],
+              rooms: activeDrag.initialRooms,
+              doors: activeDrag.initialDoors,
+              windows: activeDrag.initialWindows,
+            };
+            return { ...prev, floors: nextFloors };
+          }
+          return prev;
+        });
+        return;
+      }
+
+      // Valid: Synchronize canonical wall network and openings
+      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(
+        currentRooms,
+        undefined,
+        9.5
+      );
+      const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
+        currentFloor.doors || [],
+        currentFloor.windows || [],
+        [...exteriorWalls, ...interiorWalls]
+      );
+
+      setLayout((prev) => {
+        const nextFloors = prev.floors ? [...prev.floors] : [];
+        if (nextFloors[activeFloorIndex]) {
+          nextFloors[activeFloorIndex] = {
+            ...nextFloors[activeFloorIndex],
+            exterior_walls: exteriorWalls,
+            interior_walls: interiorWalls,
+            doors: syncedDoors,
+            windows: syncedWindows,
+          };
+          const updated = { ...prev, floors: nextFloors };
+          pushSnapshot(updated);
+          return updated;
+        }
+        return prev;
+      });
+      return;
+    }
+
+    // Wall Endpoint Resizing Completion: Check Min Length
+    if (resizingWallEndpoint) {
+      const activeEndpoint = resizingWallEndpoint;
+      setResizingWallEndpoint(null);
+
+      const currentWall = [
+        ...(currentFloor.exterior_walls || []),
+        ...(currentFloor.interior_walls || []),
+      ].find((w) => w.id === activeEndpoint.wallId);
+
+      if (currentWall) {
+        const len = Math.hypot(currentWall.x2 - currentWall.x1, currentWall.y2 - currentWall.y1);
+        if (len < 3.0) {
+          setInvalidMoveNotice("Wall cannot be shortened below 3 feet.");
+          setTimeout(() => setInvalidMoveNotice(null), 3000);
+          setLayout((prev) => {
+            const nextFloors = prev.floors ? [...prev.floors] : [];
+            if (nextFloors[activeFloorIndex]) {
+              nextFloors[activeFloorIndex] = {
+                ...nextFloors[activeFloorIndex],
+                exterior_walls: activeEndpoint.initialWalls.filter((w) => w.is_exterior),
+                interior_walls: activeEndpoint.initialWalls.filter((w) => !w.is_exterior),
+              };
+              return { ...prev, floors: nextFloors };
+            }
+            return prev;
+          });
+          return;
+        }
+      }
+      pushSnapshot(layout);
+      return;
+    }
+
+    // Room Resizing Completion: Client-Side Geometry Engine Update
     if (resizingRoom) {
       const activeResizing = resizingRoom;
       setResizingRoom(null);
-      const targetRoom = (currentFloor.rooms || []).find((r) => r.id === activeResizing.roomId);
-      if (targetRoom && targetRoom.rect) {
-        try {
-          const res = await editRoomLayoutFull(
-            layout,
-            targetRoom.id,
-            {
-              x: targetRoom.rect.x,
-              y: targetRoom.rect.y,
-              width: targetRoom.rect.width,
-              length: targetRoom.rect.length,
-            },
-            true
-          );
+      const currentRooms = currentFloor.rooms || [];
+      const hasInvalidRoom = currentRooms.some(
+        (r) => !r.rect || r.rect.width < 4.0 || r.rect.length < 4.0
+      );
 
-          if (res && res.success && res.layout) {
-            setLayout(res.layout);
-            pushSnapshot(res.layout);
-            onSave?.(res.layout);
-            if (res.affected_rooms && res.affected_rooms.length > 0) {
-              setEditNotice(`Adjusted ${res.affected_rooms.join(", ")} along shared boundary.`);
-            }
-          } else if (res && !res.success) {
-            setEditNotice(res.message || "Could not resize room due to minimum or boundary constraints.");
-            // Revert room rect to initial
-            setLayout((prev) => {
-              const nextFloors = prev.floors ? [...prev.floors] : [];
-              if (nextFloors[activeFloorIndex]) {
-                nextFloors[activeFloorIndex] = {
-                  ...nextFloors[activeFloorIndex],
-                  rooms: nextFloors[activeFloorIndex].rooms.map((r) =>
-                    r.id === activeResizing.roomId ? { ...r, rect: activeResizing.initialRect } : r
-                  ),
-                };
-                return { ...prev, floors: nextFloors };
-              }
-              return prev;
-            });
+      if (hasInvalidRoom) {
+        setInvalidMoveNotice("Room dimensions cannot be less than 4 feet.");
+        setTimeout(() => setInvalidMoveNotice(null), 3000);
+        setLayout((prev) => {
+          const nextFloors = prev.floors ? [...prev.floors] : [];
+          if (nextFloors[activeFloorIndex]) {
+            nextFloors[activeFloorIndex] = {
+              ...nextFloors[activeFloorIndex],
+              rooms: nextFloors[activeFloorIndex].rooms.map((r) =>
+                r.id === activeResizing.roomId ? { ...r, rect: activeResizing.initialRect } : r
+              ),
+            };
+            return { ...prev, floors: nextFloors };
           }
-        } catch {
-          pushSnapshot(layout);
-        }
-      } else {
-        pushSnapshot(layout);
+          return prev;
+        });
+        return;
       }
-    } else if (draggingRoom) {
-      const activeDrag = draggingRoom;
+
+      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(currentRooms, undefined, 9.5);
+      const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
+        currentFloor.doors || [],
+        currentFloor.windows || [],
+        [...exteriorWalls, ...interiorWalls]
+      );
+
+      setLayout((prev) => {
+        const nextFloors = prev.floors ? [...prev.floors] : [];
+        if (nextFloors[activeFloorIndex]) {
+          nextFloors[activeFloorIndex] = {
+            ...nextFloors[activeFloorIndex],
+            exterior_walls: exteriorWalls,
+            interior_walls: interiorWalls,
+            doors: syncedDoors,
+            windows: syncedWindows,
+          };
+          const updated = { ...prev, floors: nextFloors };
+          pushSnapshot(updated);
+          return updated;
+        }
+        return prev;
+      });
+      return;
+    }
+
+    // Room Dragging Completion: Client-Side Geometry Engine Update
+    if (draggingRoom) {
       setDraggingRoom(null);
-      const targetRoom = (currentFloor.rooms || []).find((r) => r.id === activeDrag.roomId);
-      if (targetRoom && targetRoom.rect) {
-        try {
-          const res = await editRoomLayoutFull(
-            layout,
-            targetRoom.id,
-            {
-              x: targetRoom.rect.x,
-              y: targetRoom.rect.y,
-              width: targetRoom.rect.width,
-              length: targetRoom.rect.length,
-            },
-            true
-          );
-          if (res && res.success && res.layout) {
-            setLayout(res.layout);
-            pushSnapshot(res.layout);
-            onSave?.(res.layout);
-          } else {
-            pushSnapshot(layout);
-          }
-        } catch {
-          pushSnapshot(layout);
+      const currentRooms = currentFloor.rooms || [];
+      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(currentRooms, undefined, 9.5);
+      const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
+        currentFloor.doors || [],
+        currentFloor.windows || [],
+        [...exteriorWalls, ...interiorWalls]
+      );
+
+      setLayout((prev) => {
+        const nextFloors = prev.floors ? [...prev.floors] : [];
+        if (nextFloors[activeFloorIndex]) {
+          nextFloors[activeFloorIndex] = {
+            ...nextFloors[activeFloorIndex],
+            exterior_walls: exteriorWalls,
+            interior_walls: interiorWalls,
+            doors: syncedDoors,
+            windows: syncedWindows,
+          };
+          const updated = { ...prev, floors: nextFloors };
+          pushSnapshot(updated);
+          return updated;
         }
-      } else {
-        pushSnapshot(layout);
-      }
-    } else if (draggingFurniture) {
+        return prev;
+      });
+      return;
+    }
+
+    // Furniture Dragging Completion
+    if (draggingFurniture) {
       pushSnapshot(layout);
       setDraggingFurniture(null);
     }
@@ -852,24 +1229,39 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       };
       handleSelectFurniture(null);
       pushSnapshot(nextLayout);
+    } else if (selectedWallId) {
+      handleDeleteWall();
     } else if (selectedRoomId) {
-      const nextFloors = layout.floors
-        ? layout.floors.map((f, idx) =>
-            idx === activeFloorIndex
-              ? {
-                  ...f,
-                  rooms: f.rooms.filter((r) => r.id !== selectedRoomId),
-                }
-              : f
-          )
-        : [];
-      const nextLayout: HouseLayout = {
-        ...layout,
-        floors: nextFloors.length > 0 ? nextFloors : (layout.floors || []),
-        rooms: (layout.rooms || []).filter((r) => r.id !== selectedRoomId),
-      };
+      if ((currentFloor.rooms || []).length <= 1) {
+        setInvalidMoveNotice("Cannot delete the only room.");
+        setTimeout(() => setInvalidMoveNotice(null), 3000);
+        return;
+      }
+      const remainingRooms = (currentFloor.rooms || []).filter((r) => r.id !== selectedRoomId);
+      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(remainingRooms, undefined, 9.5);
+      const { doors: sDoors, windows: sWins } = synchronizeOpeningsWithWalls(
+        (currentFloor.doors || []).filter((d) => d.room_id !== selectedRoomId),
+        (currentFloor.windows || []).filter((w) => w.room_id !== selectedRoomId),
+        [...exteriorWalls, ...interiorWalls]
+      );
+      setLayout((prev) => {
+        const nextFloors = prev.floors ? [...prev.floors] : [];
+        if (nextFloors[activeFloorIndex]) {
+          nextFloors[activeFloorIndex] = {
+            ...nextFloors[activeFloorIndex],
+            rooms: remainingRooms,
+            exterior_walls: exteriorWalls,
+            interior_walls: interiorWalls,
+            doors: sDoors,
+            windows: sWins,
+          };
+          const updated = { ...prev, floors: nextFloors };
+          pushSnapshot(updated);
+          return updated;
+        }
+        return prev;
+      });
       handleSelectRoom(null);
-      pushSnapshot(nextLayout);
     } else if (selectedDoorId) {
       const nextDoors = (currentFloor.doors || []).filter((d) => d.id !== selectedDoorId);
       const nextFloors = layout.floors
@@ -897,25 +1289,87 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     }
   };
 
-  // Flip Door Swing
+  // Flip Door Swing (Inward / Outward & Hinge Side)
   const handleFlipDoorSwing = () => {
     if (!selectedDoorId) return;
-    const nextDoors = (currentFloor.doors || []).map((d) => {
-      if (d.id !== selectedDoorId) return d;
-      return {
-        ...d,
-        swing: d.swing === "inward" ? ("outward" as const) : ("inward" as const),
-      };
+    setLayout((prev) => {
+      const nextFloors = prev.floors ? [...prev.floors] : [];
+      if (nextFloors[activeFloorIndex]) {
+        const floor = nextFloors[activeFloorIndex];
+        const nextDoors = (floor.doors || []).map((d) => {
+          if (d.id !== selectedDoorId) return d;
+          return {
+            ...d,
+            swing: d.swing === "inward" ? ("outward" as const) : ("inward" as const),
+            swing_direction: d.swing_direction === "inward" ? ("outward" as const) : ("inward" as const),
+            hinge_side: d.hinge_side === "left" ? ("right" as const) : ("left" as const),
+          };
+        });
+        nextFloors[activeFloorIndex] = { ...floor, doors: nextDoors };
+        const updated = { ...prev, floors: nextFloors };
+        pushSnapshot(updated);
+        return updated;
+      }
+      return prev;
     });
-    const nextFloors = layout.floors
-      ? layout.floors.map((f, idx) => (idx === activeFloorIndex ? { ...f, doors: nextDoors } : f))
-      : [];
-    const nextLayout: HouseLayout = {
-      ...layout,
-      floors: nextFloors.length > 0 ? nextFloors : (layout.floors || []),
-      doors: nextDoors,
-    };
-    pushSnapshot(nextLayout);
+  };
+
+  // Resize Window Width (+1ft / -1ft)
+  const handleResizeWindowWidth = (deltaFt: number) => {
+    if (!selectedWindowId) return;
+    setLayout((prev) => {
+      const nextFloors = prev.floors ? [...prev.floors] : [];
+      if (nextFloors[activeFloorIndex]) {
+        const floor = nextFloors[activeFloorIndex];
+        const updatedWindows = (floor.windows || []).map((w) => {
+          if (w.id === selectedWindowId) {
+            const newW = Math.max(2.5, Math.min(8.0, (w.width || 4.0) + deltaFt));
+            const midX = (w.x1 + w.x2) / 2;
+            const midY = (w.y1 + w.y2) / 2;
+            const isHoriz = Math.abs(w.y1 - w.y2) < 0.2;
+            return {
+              ...w,
+              width: newW,
+              x1: isHoriz ? midX - newW / 2 : w.x1,
+              x2: isHoriz ? midX + newW / 2 : w.x2,
+              y1: isHoriz ? w.y1 : midY - newW / 2,
+              y2: isHoriz ? w.y2 : midY + newW / 2,
+            };
+          }
+          return w;
+        });
+        nextFloors[activeFloorIndex] = { ...floor, windows: updatedWindows };
+        const updated = { ...prev, floors: nextFloors };
+        pushSnapshot(updated);
+        return updated;
+      }
+      return prev;
+    });
+  };
+
+  // Done Editing: Save and Return to Plan
+  const handleDone = async () => {
+    setIsSaving(true);
+    try {
+      await onSave?.(layout);
+    } catch (e) {
+      console.warn("Save callback error", e);
+    }
+    setIsSaving(false);
+    if (onBack) {
+      onBack();
+    } else {
+      router.push(`/project/${layout.id}/plan`);
+    }
+  };
+
+  // Exit Editor: Return to Plan
+  const handleExit = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      router.push(`/project/${layout.id}/plan`);
+    }
   };
 
   // AI Architect Quick Actions & Natural Language Refinement
@@ -1578,23 +2032,33 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const selectedFurniture = (currentFloor.rooms || [])
     .flatMap((r) => r.furniture || [])
     .find((f) => f.id === selectedFurnitureId);
-  const selectedDoor = (currentFloor.doors || []).find((d) => d.id === selectedDoorId);
-  const selectedWindow = (currentFloor.windows || []).find((w) => w.id === selectedWindowId);
 
   return (
     <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#ECEEF2]">
-      {/* 1. MINIMAL ARCHITECTURAL STUDIO TOP BAR */}
+      {/* 1. TOP BAR */}
       <div className="absolute top-4 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
-        {/* Left: Back Link & Minimal Studio Title */}
+        {/* Left: Exit & Minimal Studio Title */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          {onBack ? (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg transition-all"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
-              <span>EXIT</span>
-            </button>
+          {mode === "edit" ? (
+            <>
+              {/* EXIT Button */}
+              <button
+                onClick={handleExit}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg transition-all"
+                title="Exit Edit Mode"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
+                <span className="font-semibold">EXIT</span>
+              </button>
+
+              {/* Title Badge: EDIT YOUR HOME */}
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#12141A]/90 text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg">
+                <span className="w-2 h-2 rounded-full bg-[#C48446] animate-pulse" />
+                <span className="font-bold tracking-widest text-[#F5F3EF] uppercase">
+                  EDIT YOUR HOME
+                </span>
+              </div>
+            </>
           ) : (
             <button
               onClick={() => router.push(`/project/${layout.id}/plan`)}
@@ -1603,22 +2067,6 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
               <span>PLAN</span>
             </button>
-          )}
-
-          {/* Mode Badge */}
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#12141A]/90 text-[#F5F3EF] border border-white/10 text-[11px] font-mono tracking-wider shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-[#C48446] animate-pulse" />
-            <span className="font-semibold text-[#F5F3EF]">
-              {mode === "edit" ? "EDIT MODE" : "BLUEPRINT PRESENTATION"}
-            </span>
-          </div>
-
-          {/* Adaptive Small Plot Optimization Note */}
-          {Boolean((layout as any)?.metadata?.optimization_note) && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#12141A]/90 text-amber-200 border border-amber-500/30 text-[11px] font-mono tracking-wide shadow-lg">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>{String((layout as any)?.metadata?.optimization_note)}</span>
-            </div>
           )}
 
           {/* Floor Level Switcher (If multi-story) */}
@@ -1641,7 +2089,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           )}
         </div>
 
-        {/* Right: Minimal Undo/Redo & Save Controls */}
+        {/* Right: Undo / Redo / DONE Controls */}
         <div className="flex items-center gap-2 pointer-events-auto">
           {mode === "edit" && (
             <>
@@ -1665,25 +2113,19 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 </button>
               </div>
 
-              {/* Save Button */}
+              {/* DONE Button */}
               <button
-                onClick={handleSave}
+                onClick={handleDone}
                 disabled={isSaving}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono tracking-wider shadow-lg transition-all ${
-                  saveSuccessNotice
-                    ? "bg-[#2D6A4F] text-white"
-                    : "bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-semibold"
-                }`}
-                title="Save Architectural Plan Changes"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-mono tracking-wider shadow-lg transition-all bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold"
+                title="Save and finish editing"
               >
                 {isSaving ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : saveSuccessNotice ? (
-                  <Check className="w-3.5 h-3.5" />
                 ) : (
-                  <Save className="w-3.5 h-3.5" />
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                 )}
-                <span>{saveSuccessNotice ? "SAVED" : "SAVE"}</span>
+                <span>DONE</span>
               </button>
             </>
           )}
@@ -1705,8 +2147,47 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       </div>
 
       {/* 2. CONTEXTUAL FLOATING TOOLBAR (APPEARS NEAR SELECTION) */}
-      {mode === "edit" && (selectedRoom || selectedFurniture || selectedDoor || selectedWindow) && (
+      {mode === "edit" && (selectedRoom || selectedFurniture || selectedDoor || selectedWindow || selectedWall) && (
         <div className="absolute top-16 sm:top-18 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1 rounded-full bg-[#12141A]/95 backdrop-blur-md border border-[#C48446]/40 shadow-2xl text-xs font-mono text-[#F5F3EF] animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Wall Selection Controls */}
+          {selectedWall && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="px-2.5 py-1 text-[#C48446] font-bold truncate max-w-[140px]">
+                WALL · {selectedWall.is_exterior ? "EXTERIOR" : "PARTITION"}
+              </div>
+              <div className="h-4 w-px bg-white/10" />
+
+              {/* Thickness Toggle: 4.5" vs 9" */}
+              <button
+                type="button"
+                onClick={handleToggleWallThickness}
+                className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[#F5F3EF] text-[10px] font-mono transition-all flex items-center gap-1"
+                title="Toggle Wall Thickness between 4.5 inch partition and 9 inch structural"
+              >
+                <span>THICKNESS: {Math.round(selectedWall.thickness * 12)}&quot;</span>
+              </button>
+
+              <div className="h-4 w-px bg-white/10" />
+
+              <span className="text-[10px] text-[#9E9C98] hidden sm:inline">
+                Drag wall to move · Drag endpoints to extend/shorten
+              </span>
+
+              {/* AI prompt shortcut */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAiPrompt(`Optimize wall ${selectedWall.id} and connected layout`);
+                  setIsAiOpen(true);
+                }}
+                className="px-2 py-1 rounded-full bg-[#C48446]/20 text-[#C48446] hover:bg-[#C48446]/30 text-[10px] font-mono flex items-center gap-1"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>AI</span>
+              </button>
+            </div>
+          )}
+
           {/* Room Selection Controls: Exact Dimension Inputs & Steppers */}
           {selectedRoom && (
             <div className="flex flex-wrap items-center gap-2">
@@ -1792,6 +2273,22 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               >
                 -1&apos;L
               </button>
+
+              <div className="h-4 w-px bg-white/10" />
+
+              {/* AI Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAiPrompt(`Optimize layout of ${selectedRoom.name}`);
+                  setIsAiOpen(true);
+                }}
+                className="px-2 py-1 rounded-full bg-[#C48446]/20 text-[#C48446] hover:bg-[#C48446]/30 text-[10px] font-mono flex items-center gap-1"
+                title="Ask AI Architect about this room"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>AI</span>
+              </button>
             </div>
           )}
 
@@ -1833,8 +2330,25 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
           {/* Window Controls */}
           {selectedWindow && (
-            <div className="px-3 py-1 text-[#C48446] font-bold uppercase">
-              WINDOW {selectedWindow.id} ({selectedWindow.width}&apos; {selectedWindow.outward_direction || selectedWindow.orientation || "EXT"} WALL)
+            <div className="flex items-center gap-2">
+              <div className="px-3 py-1 text-[#C48446] font-bold uppercase">
+                WINDOW {selectedWindow.id} ({selectedWindow.width}&apos;)
+              </div>
+              <div className="h-4 w-px bg-white/10" />
+              <button
+                onClick={() => handleResizeWindowWidth(1)}
+                className="px-2 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
+                title="Expand Window +1ft"
+              >
+                +1&apos;W
+              </button>
+              <button
+                onClick={() => handleResizeWindowWidth(-1)}
+                className="px-2 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
+                title="Shrink Window -1ft"
+              >
+                -1&apos;W
+              </button>
             </div>
           )}
 
@@ -1854,6 +2368,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             onClick={() => {
               handleSelectRoom(null);
               handleSelectFurniture(null);
+              setSelectedWallId(null);
               setSelectedDoorId(null);
               setSelectedWindowId(null);
             }}
@@ -1861,6 +2376,14 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           >
             <X className="w-3.5 h-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* INVALID OPERATION WARNING (REVERTS & WARNS USER) */}
+      {invalidMoveNotice && (
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full bg-red-950/90 text-red-200 border border-red-500/40 shadow-2xl text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
+          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+          <span>{invalidMoveNotice}</span>
         </div>
       )}
 
@@ -1980,7 +2503,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         onMouseLeave={handleMouseUp}
         onDoubleClick={handleResetView}
         className={`w-full h-full flex items-center justify-center p-4 ${
-          isPanning ? "cursor-grabbing" : "cursor-default"
+          isPanning ? "cursor-grabbing" : isPanMode ? "cursor-grab" : "cursor-default"
         }`}
       >
         <div
@@ -2571,47 +3094,166 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               (r.furniture || []).map((item) => renderFurniture(item, r.id))
             )}
 
-            {/* ARCHITECTURAL CUT WALLS */}
-            {/* Exterior Walls */}
-            {cutExteriorWalls.segments.map((seg) => (
-              <line
-                key={seg.id}
-                x1={seg.x1}
-                y1={seg.y1}
-                x2={seg.x2}
-                y2={seg.y2}
-                stroke="#1E293B"
-                strokeWidth={seg.thickness}
-                strokeLinecap="square"
-              />
-            ))}
+            {/* ARCHITECTURAL CUT WALLS (CLEAN CAD DRAFTING LINEWORK) */}
+            {/* 1. Exterior Walls */}
+            {cutExteriorWalls.segments.map((seg) => {
+              const baseWallId = seg.id.split("_seg_")[0];
+              const isSelected = selectedWallId === seg.id || selectedWallId === baseWallId;
+              return (
+                <line
+                  key={seg.id}
+                  x1={seg.x1}
+                  y1={seg.y1}
+                  x2={seg.x2}
+                  y2={seg.y2}
+                  stroke={isSelected ? "#C48446" : "#525866"}
+                  strokeWidth={isSelected ? 3.5 : 2.4}
+                  strokeLinecap="round"
+                />
+              );
+            })}
 
-            {/* Interior Partition Walls */}
-            {cutInteriorWalls.segments.map((seg) => (
-              <line
-                key={seg.id}
-                x1={seg.x1}
-                y1={seg.y1}
-                x2={seg.x2}
-                y2={seg.y2}
-                stroke="#334155"
-                strokeWidth={seg.thickness}
-                strokeLinecap="square"
-              />
-            ))}
+            {/* 2. Interior Partition Walls */}
+            {cutInteriorWalls.segments.map((seg) => {
+              const baseWallId = seg.id.split("_seg_")[0];
+              const isSelected = selectedWallId === seg.id || selectedWallId === baseWallId;
+              return (
+                <line
+                  key={seg.id}
+                  x1={seg.x1}
+                  y1={seg.y1}
+                  x2={seg.x2}
+                  y2={seg.y2}
+                  stroke={isSelected ? "#C48446" : "#717885"}
+                  strokeWidth={isSelected ? 3.0 : 1.6}
+                  strokeLinecap="round"
+                />
+              );
+            })}
 
-            {/* Jamb Caps */}
+            {/* 3. Opening Jamb End-Caps */}
             {[...cutExteriorWalls.jambs, ...cutInteriorWalls.jambs].map((jamb, jIdx) => (
               <line
                 key={`jamb_${jIdx}`}
-                x1={jamb.x - jamb.nx * jamb.halfThick}
-                y1={jamb.y - jamb.ny * jamb.halfThick}
-                x2={jamb.x + jamb.nx * jamb.halfThick}
-                y2={jamb.y + jamb.ny * jamb.halfThick}
-                stroke="#0F172A"
-                strokeWidth={1.5}
+                x1={jamb.x - jamb.nx * 2}
+                y1={jamb.y - jamb.ny * 2}
+                x2={jamb.x + jamb.nx * 2}
+                y2={jamb.y + jamb.ny * 2}
+                stroke="#717885"
+                strokeWidth={1.0}
               />
             ))}
+
+            {/* 4. Interactive Wall Selection Hit Areas & Endpoint Handles (in EDIT mode) */}
+            {mode === "edit" &&
+              [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])].map((wall) => {
+                const isSelected = selectedWallId === wall.id;
+                const wx1 = wall.x1 * SCALE;
+                const wy1 = wall.y1 * SCALE;
+                const wx2 = wall.x2 * SCALE;
+                const wy2 = wall.y2 * SCALE;
+
+                return (
+                  <g key={`hit_wall_${wall.id}`}>
+                    {/* Transparent thick hit area for easy selection & direct dragging */}
+                    <line
+                      x1={wx1}
+                      y1={wy1}
+                      x2={wx2}
+                      y2={wy2}
+                      stroke="transparent"
+                      strokeWidth={16}
+                      className="cursor-move"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectWall(wall.id);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        handleSelectWall(wall.id);
+
+                        setDraggingWall({
+                          wallId: wall.id,
+                          startMouseX: e.clientX,
+                          startMouseY: e.clientY,
+                          initialX1: wall.x1,
+                          initialY1: wall.y1,
+                          initialX2: wall.x2,
+                          initialY2: wall.y2,
+                          affectedRoomIds: wall.adjacent_room_ids || [],
+                          initialRooms: JSON.parse(JSON.stringify(currentFloor.rooms || [])),
+                          initialDoors: JSON.parse(JSON.stringify(currentFloor.doors || [])),
+                          initialWindows: JSON.parse(JSON.stringify(currentFloor.windows || [])),
+                        });
+                      }}
+                    />
+
+                    {/* Endpoint Handles when Selected: Extend / Shorten */}
+                    {isSelected && (
+                      <g pointerEvents="all">
+                        <circle
+                          cx={wx1}
+                          cy={wy1}
+                          r={6}
+                          fill="#C48446"
+                          stroke="#FFFFFF"
+                          strokeWidth={2}
+                          className="cursor-crosshair hover:scale-125 transition-transform"
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            setResizingWallEndpoint({
+                              wallId: wall.id,
+                              endpoint: "start",
+                              startMouseX: e.clientX,
+                              startMouseY: e.clientY,
+                              initialX1: wall.x1,
+                              initialY1: wall.y1,
+                              initialX2: wall.x2,
+                              initialY2: wall.y2,
+                              initialWalls: JSON.parse(
+                                JSON.stringify([
+                                  ...(currentFloor.exterior_walls || []),
+                                  ...(currentFloor.interior_walls || []),
+                                ])
+                              ),
+                              initialRooms: JSON.parse(JSON.stringify(currentFloor.rooms || [])),
+                            });
+                          }}
+                        />
+                        <circle
+                          cx={wx2}
+                          cy={wy2}
+                          r={6}
+                          fill="#C48446"
+                          stroke="#FFFFFF"
+                          strokeWidth={2}
+                          className="cursor-crosshair hover:scale-125 transition-transform"
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            setResizingWallEndpoint({
+                              wallId: wall.id,
+                              endpoint: "end",
+                              startMouseX: e.clientX,
+                              startMouseY: e.clientY,
+                              initialX1: wall.x1,
+                              initialY1: wall.y1,
+                              initialX2: wall.x2,
+                              initialY2: wall.y2,
+                              initialWalls: JSON.parse(
+                                JSON.stringify([
+                                  ...(currentFloor.exterior_walls || []),
+                                  ...(currentFloor.interior_walls || []),
+                                ])
+                              ),
+                              initialRooms: JSON.parse(JSON.stringify(currentFloor.rooms || [])),
+                            });
+                          }}
+                        />
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
 
             {/* WINDOWS */}
             {windowGeometries.map((wGeom) => {
@@ -2821,22 +3463,22 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       {/* 5. MINIMAL BOTTOM CONTROLS (CLEAN & NON-OBTRUSIVE) */}
       <div className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 z-30 flex items-center p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
         <button
+          onClick={() => setZoom((z) => Math.min(3.5, z * 1.15))}
+          className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
+          title="Zoom In (+)"
+        >
+          <ZoomIn className="w-3.5 h-3.5" />
+        </button>
+        <button
           onClick={() => setZoom((z) => Math.max(0.4, z * 0.85))}
           className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
-          title="Zoom Out"
+          title="Zoom Out (-)"
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
         <span className="px-2 select-none text-[10px] text-[#F5F3EF] font-bold">
           {Math.round(zoom * 100)}%
         </span>
-        <button
-          onClick={() => setZoom((z) => Math.min(3.5, z * 1.15))}
-          className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
-          title="Zoom In"
-        >
-          <ZoomIn className="w-3.5 h-3.5" />
-        </button>
         <div className="h-4 w-px bg-white/10 mx-1" />
         <button
           onClick={handleResetView}
@@ -2844,6 +3486,17 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           title="Fit to Sheet"
         >
           <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => setIsPanMode(!isPanMode)}
+          className={`p-1.5 rounded-full transition-colors ${
+            isPanMode
+              ? "bg-[#C48446] text-black"
+              : "hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF]"
+          }`}
+          title={isPanMode ? "Exit Pan Mode" : "Pan Mode"}
+        >
+          <Hand className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>

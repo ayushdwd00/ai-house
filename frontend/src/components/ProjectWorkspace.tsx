@@ -315,10 +315,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
       {/* FLOATING ADAPTIVE OPTIMIZATION NOTICE */}
       {!isConsultationOpen && Boolean((layout as any)?.metadata?.optimization_note) && (
-        <div className="fixed top-16 sm:top-18 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#12141A]/95 text-amber-200 border border-amber-500/30 text-[11px] font-mono tracking-wide shadow-2xl backdrop-blur-md">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span>{String((layout as any)?.metadata?.optimization_note)}</span>
+        <div className="fixed top-14 sm:top-[70px] left-1/2 -translate-x-1/2 z-40 pointer-events-none transition-all duration-200">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#12141A]/95 text-amber-200 border border-amber-500/30 text-[11px] font-mono tracking-wide shadow-2xl backdrop-blur-md max-w-[calc(100vw-32px)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <span className="truncate">{String((layout as any)?.metadata?.optimization_note)}</span>
           </div>
         </div>
       )}
@@ -396,6 +396,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   }
                   showRoof={showRoof}
                   onToggleRoof={() => setShowRoof((r) => !r)}
+                  hasNotification={Boolean((layout as any)?.metadata?.optimization_note)}
                 />
               </ErrorBoundary>
             </motion.div>

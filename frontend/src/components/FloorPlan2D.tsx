@@ -1526,12 +1526,12 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                       isEditMode
                         ? isSelected
                           ? "#2563EB"
-                          : "#94A3B8"
+                          : "#CBD5E1"
                         : isSelected
                         ? "#2563EB"
-                        : "#CBD5E1"
+                        : "#E2E8F0"
                     }
-                    strokeWidth={isSelected || isEditMode ? 2 : 1}
+                    strokeWidth={isSelected ? 1.5 : 0.8}
                     strokeDasharray={isEditMode ? "4 2" : "none"}
                     className="transition-colors duration-150"
                   />
@@ -1592,8 +1592,8 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
             {!isEditMode &&
               displayRooms.flatMap((r) => r.furniture || []).map((item) => renderFurniture(item))}
 
-            {/* Architectural Cut Walls (Double-face with Real Thickness & Opening Voids) */}
-            {/* 1. Exterior Walls (9" / 18px thickness, rich dark charcoal fill) */}
+            {/* Architectural Walls (Clean CAD Drafting Hierarchy: Medium Neutral Lines) */}
+            {/* 1. Exterior Walls (Clear medium-weight architectural drafting lines) */}
             {cutExteriorWalls.segments.map((seg) => (
               <line
                 key={seg.id}
@@ -1601,13 +1601,13 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                 y1={seg.y1}
                 x2={seg.x2}
                 y2={seg.y2}
-                stroke="#1E293B"
-                strokeWidth={seg.thickness}
-                strokeLinecap="square"
+                stroke="#525866"
+                strokeWidth={2.4}
+                strokeLinecap="round"
               />
             ))}
 
-            {/* 2. Interior Partition Walls (4.5" / 10px thickness) */}
+            {/* 2. Interior Partition Walls (Clean, precise partition drafting lines) */}
             {cutInteriorWalls.segments.map((seg) => (
               <line
                 key={seg.id}
@@ -1615,22 +1615,22 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                 y1={seg.y1}
                 x2={seg.x2}
                 y2={seg.y2}
-                stroke="#334155"
-                strokeWidth={seg.thickness}
-                strokeLinecap="square"
+                stroke="#717885"
+                strokeWidth={1.6}
+                strokeLinecap="round"
               />
             ))}
 
-            {/* 3. Opening Jamb End-Caps (Returns across wall thickness) */}
+            {/* 3. Opening Jamb End-Caps */}
             {[...cutExteriorWalls.jambs, ...cutInteriorWalls.jambs].map((jamb, jIdx) => (
               <line
                 key={`jamb_${jIdx}`}
-                x1={jamb.x - jamb.nx * jamb.halfThick}
-                y1={jamb.y - jamb.ny * jamb.halfThick}
-                x2={jamb.x + jamb.nx * jamb.halfThick}
-                y2={jamb.y + jamb.ny * jamb.halfThick}
-                stroke="#0F172A"
-                strokeWidth={1.5}
+                x1={jamb.x - jamb.nx * 2}
+                y1={jamb.y - jamb.ny * 2}
+                x2={jamb.x + jamb.nx * 2}
+                y2={jamb.y + jamb.ny * 2}
+                stroke="#717885"
+                strokeWidth={1.0}
               />
             ))}
 
@@ -1738,8 +1738,8 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
                     width={6}
                     height={14}
                     transform={`rotate(${(jb.angle * 180) / Math.PI}, ${jb.x}, ${jb.y})`}
-                    fill="#451A03"
-                    stroke="#1E293B"
+                    fill="#78350F"
+                    stroke="#717885"
                     strokeWidth={0.8}
                   />
                 ))}

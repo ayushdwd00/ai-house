@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { Camera, ChevronDown, RotateCcw, Sun, Moon, Sparkles, Layers, Eye } from "lucide-react";
 import {
   HouseLayout,
   FloorPlan,
@@ -42,9 +43,22 @@ export interface Dollhouse3DProps {
   showLandscape?: boolean;
   onToggleLandscape?: () => void;
   initialPresentationMode?: PresentationMode;
+  hasNotification?: boolean;
 }
 
-export type PresentationMode = "exterior" | "interior" | "landscape";
+export type PresentationMode = "exterior" | "interior" | "landscape" | "all";
+
+export type CameraPresetType =
+  | "exterior"
+  | "iso"
+  | "top"
+  | "front"
+  | "side"
+  | "entrance"
+  | "living"
+  | "kitchen"
+  | "bedroom"
+  | "garden";
 
 export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   layout,
@@ -68,16 +82,37 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   showLandscape = true,
   onToggleLandscape,
   initialPresentationMode,
+  hasNotification,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
 
-  // Dedicated primary presentation modes: EXTERIOR | INTERIOR | LANDSCAPE
+  const hasOptimizationNotice =
+    hasNotification !== undefined
+      ? hasNotification
+      : Boolean((layout as any)?.metadata?.optimization_note);
+
+  // Dedicated primary presentation modes: EXTERIOR | INTERIOR | LANDSCAPE | ALL
   const [presentationMode, setPresentationMode] = useState<PresentationMode>(
     initialPresentationMode || "landscape"
   );
   const [multiFloorStacked, setMultiFloorStacked] = useState(true);
   const [explodedFloors, setExplodedFloors] = useState(false);
-  const [cameraView, setCameraView] = useState<"iso" | "top" | "front" | "side">("iso");
+  const [cameraView, setCameraView] = useState<CameraPresetType>("exterior");
+  const [isCameraMenuOpen, setIsCameraMenuOpen] = useState(false);
+
+  // Optional Feature Toggles: Furniture, Vegetation, Roof, Walls
+  const [showFurnitureState, setShowFurnitureState] = useState(true);
+  const [showVegetationState, setShowVegetationState] = useState(true);
+  const [internalWallHeightMode, setInternalWallHeightMode] = useState<"cutaway" | "full">(wallHeightMode || "full");
+  const effectiveWallHeightMode = onToggleWallHeightMode ? wallHeightMode : internalWallHeightMode;
+
+  const [internalShowRoof, setInternalShowRoof] = useState(showRoof !== undefined ? showRoof : true);
+  const effectiveShowRoof = onToggleRoof ? showRoof : internalShowRoof;
+
+  const [internalLightingPreset, setInternalLightingPreset] = useState<"day" | "sunset" | "night">(
+    lightingPreset === "night" || lightingPreset === "sunset" ? lightingPreset : "day"
+  );
+  const effectiveLightingPreset = onChangeLightingPreset ? lightingPreset : internalLightingPreset;
 
   const [internalShowStructure, setInternalShowStructure] = useState(false);
   const effectiveShowStructure = showStructure !== undefined ? showStructure : internalShowStructure;
@@ -473,7 +508,11 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         curtainMat,
       } = materials;
 
-      const effectiveWallH = isExteriorView ? fullWallHeight : cutawayWallHeight;
+      const effectiveWallH = isExteriorView
+        ? effectiveWallHeightMode === "cutaway"
+          ? cutawayWallHeight
+          : fullWallHeight
+        : cutawayWallHeight;
 
       // 1. Structural Finished Floor Slabs for each Room
       (floor.rooms || []).forEach((room) => {
@@ -503,16 +542,20 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           floorGroup.add(wireframe);
         }
 
-        // Room Downlights in dusk mode
-        if (lightingPreset === "sunset" || lightingPreset === "night") {
-          const roomLight = new THREE.PointLight(0xffecd1, lightingPreset === "night" ? 0.8 : 0.45, 20);
+        // Room Downlights in dusk and night modes
+        if (effectiveLightingPreset === "sunset" || effectiveLightingPreset === "night") {
+          const roomLight = new THREE.PointLight(
+            0xffeed1,
+            effectiveLightingPreset === "night" ? 1.15 : 0.55,
+            24
+          );
           roomLight.position.set(rx, 0.52 + 7.5, rz);
           roomLight.castShadow = false;
           interiorLights.add(roomLight);
         }
 
-        // 2. Furnished Interior (Always rendered inside cutaway mode; hidden in solid exterior view)
-        if (!isExteriorView) {
+        // 2. Furnished Interior (Rendered in interior mode when furniture toggle is active)
+        if (!isExteriorView && showFurnitureState) {
           (room.furniture || []).forEach((item) => {
             if (!item) return;
             const fMesh = buildArchitecturalFurniture(item, room.type, isDarkMode, selectedFurnitureId === item.id);
@@ -528,7 +571,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         }
       });
 
-      // 3. Real Architectural Staircase connecting floors (Rendered ONLY in Interior/cutaway mode)
+      // 3. Real Architectural Staircase connecting floors (Rendered in Interior mode)
       if (!isExteriorView) {
         const stairRooms = (floor.rooms || []).filter(
           (r) => r.type === "staircase" || r.name.toLowerCase().includes("stair")
@@ -548,7 +591,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         });
       }
 
-      // 4. Canonical Wall Network with PHYSICAL OPENINGS
+      // 4. Canonical Wall Network with PHYSICAL OPENINGS & ARCHITECTURAL JOINERY
       const allWalls: Wall[] = [
         ...(floor.exterior_walls || []).map((w) => ({ ...w, is_exterior: true })),
         ...(floor.interior_walls || []).map((w) => ({ ...w, is_exterior: false })),
@@ -574,10 +617,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
             : extWallMat
           : intWallMat;
 
-        // Wall Height:
-        // Exterior view: Solid 9.5ft massed walls
-        // Interior view: 3.5ft for exterior front walls, 4.2ft for interior partitions
-        const activeH = isExteriorView ? fullWallHeight : cutawayWallHeight;
+        const activeH = effectiveWallH;
 
         // Detect openings hosted along this wall
         type OpeningInterval = {
@@ -662,7 +702,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               floorGroup.add(mesh);
             }
 
-            // Window Elements: Lintel, Sill, Reflective Glass Pane, Aluminum Frame, Curtains
+            // Window Elements: Lintel, Projecting Stone Sill, 4-Sided Frame, Glass Pane, Mullion
             if (op.type === "window") {
               const sillH = 2.8;
               const headH = 7.0;
@@ -692,34 +732,79 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                 floorGroup.add(lMesh);
               }
 
-              // Glass Pane & Modern Aluminum Frame
+              // Detailed Architectural Window Joinery & Glass
               if (activeH >= sillH + 0.5) {
                 const renderWinH = Math.min(winH, activeH - sillH);
+                const frameThick = 0.14;
 
-                // Semi-Transparent Reflective Glass Pane
-                const gGeo = new THREE.BoxGeometry(op.width - 0.1, renderWinH - 0.1, 0.08);
+                // 1. Projecting Architectural Stone Window Sill (0.35ft projection)
+                const sillProj = 0.35;
+                const sillOverhang = 0.3;
+                const normX = -Math.sin(angle);
+                const normZ = Math.cos(angle);
+                const sillGeo = new THREE.BoxGeometry(op.width + sillOverhang, 0.16, thickness + sillProj);
+                const sillMesh = new THREE.Mesh(sillGeo, materials.terraceMat);
+                sillMesh.position.set(
+                  op.midX + (isExt ? normX * (sillProj / 2) : 0),
+                  0.5 + sillH - 0.08,
+                  op.midZ + (isExt ? normZ * (sillProj / 2) : 0)
+                );
+                sillMesh.rotation.y = -angle;
+                sillMesh.castShadow = true;
+                sillMesh.receiveShadow = true;
+                floorGroup.add(sillMesh);
+
+                // 2. Semi-Transparent Reflective Glass Pane
+                const gGeo = new THREE.BoxGeometry(
+                  Math.max(0.1, op.width - frameThick * 2),
+                  Math.max(0.1, renderWinH - frameThick * 2),
+                  0.06
+                );
                 const gMesh = new THREE.Mesh(gGeo, glassMat);
                 gMesh.position.set(op.midX, 0.5 + sillH + renderWinH / 2, op.midZ);
                 gMesh.rotation.y = -angle;
                 floorGroup.add(gMesh);
 
-                // Thin Perimeter Aluminum Frame
-                const frameThick = 0.15;
-                const fTop = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.05), frameMat);
-                fTop.position.set(op.midX, 0.5 + sillH + renderWinH, op.midZ);
+                // 3. 4-Sided Perimeter Aluminum Frame (Top, Bottom, Left Jamb, Right Jamb)
+                const fTop = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.04), frameMat);
+                fTop.position.set(op.midX, 0.5 + sillH + renderWinH - frameThick / 2, op.midZ);
                 fTop.rotation.y = -angle;
-                const fBot = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.05), frameMat);
-                fBot.position.set(op.midX, 0.5 + sillH, op.midZ);
-                fBot.rotation.y = -angle;
-                floorGroup.add(fTop, fBot);
 
-                // Indian Architectural RCC Chajja (Sunshade)
+                const fBot = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.04), frameMat);
+                fBot.position.set(op.midX, 0.5 + sillH + frameThick / 2, op.midZ);
+                fBot.rotation.y = -angle;
+
+                const fLeft = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderWinH, thickness + 0.04), frameMat);
+                fLeft.position.set(
+                  op.midX - (ux * (op.width / 2 - frameThick / 2)),
+                  0.5 + sillH + renderWinH / 2,
+                  op.midZ - (uz * (op.width / 2 - frameThick / 2))
+                );
+                fLeft.rotation.y = -angle;
+
+                const fRight = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderWinH, thickness + 0.04), frameMat);
+                fRight.position.set(
+                  op.midX + (ux * (op.width / 2 - frameThick / 2)),
+                  0.5 + sillH + renderWinH / 2,
+                  op.midZ + (uz * (op.width / 2 - frameThick / 2))
+                );
+                fRight.rotation.y = -angle;
+
+                floorGroup.add(fTop, fBot, fLeft, fRight);
+
+                // 4. Central Mullion Divider for Windows wider than 3ft
+                if (op.width > 3.0) {
+                  const mullion = new THREE.Mesh(new THREE.BoxGeometry(frameThick * 0.85, renderWinH, thickness + 0.04), frameMat);
+                  mullion.position.set(op.midX, 0.5 + sillH + renderWinH / 2, op.midZ);
+                  mullion.rotation.y = -angle;
+                  floorGroup.add(mullion);
+                }
+
+                // 5. Indian Architectural RCC Chajja (Sunshade) on Exterior Windows
                 if (isExt) {
                   const chajjaProj = 1.5;
                   const chajjaThick = 0.25;
                   const chajjaW = op.width + 1.0;
-                  const normX = -Math.sin(angle);
-                  const normZ = Math.cos(angle);
                   const chajjaGeo = new THREE.BoxGeometry(chajjaW, chajjaThick, chajjaProj);
                   const chajjaMesh = new THREE.Mesh(chajjaGeo, materials.terraceMat);
                   chajjaMesh.position.set(
@@ -747,7 +832,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               }
             }
 
-            // Door Opening: Lintel + Door Leaf
+            // Door Opening: Lintel + Architectural Frame + Recessed Leaf + Lever Handle
             if (op.type === "door") {
               const doorHeadH = 7.0;
               if (activeH >= fullWallHeight) {
@@ -761,14 +846,56 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                 floorGroup.add(lMesh);
               }
 
-              // Wooden Door Leaf
               const renderDoorH = Math.min(doorHeadH, activeH);
-              const leafGeo = new THREE.BoxGeometry(op.width - 0.1, renderDoorH, 0.15);
+              const frameThick = 0.12;
+
+              // 1. 3-Sided Architectural Door Frame (Left Jamb, Right Jamb, Header)
+              const jambL = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderDoorH, thickness + 0.04), frameMat);
+              jambL.position.set(
+                op.midX - (ux * (op.width / 2 - frameThick / 2)),
+                0.5 + renderDoorH / 2,
+                op.midZ - (uz * (op.width / 2 - frameThick / 2))
+              );
+              jambL.rotation.y = -angle;
+
+              const jambR = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderDoorH, thickness + 0.04), frameMat);
+              jambR.position.set(
+                op.midX + (ux * (op.width / 2 - frameThick / 2)),
+                0.5 + renderDoorH / 2,
+                op.midZ + (uz * (op.width / 2 - frameThick / 2))
+              );
+              jambR.rotation.y = -angle;
+
+              const jambTop = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.04), frameMat);
+              jambTop.position.set(op.midX, 0.5 + renderDoorH - frameThick / 2, op.midZ);
+              jambTop.rotation.y = -angle;
+              floorGroup.add(jambL, jambR, jambTop);
+
+              // 2. Recessed Door Leaf Panel
+              const leafW = Math.max(1.2, op.width - frameThick * 2);
+              const leafH = Math.max(1.5, renderDoorH - frameThick);
+              const leafGeo = new THREE.BoxGeometry(leafW, leafH, 0.12);
               const leafMesh = new THREE.Mesh(leafGeo, doorLeafMat);
-              leafMesh.position.set(op.midX, 0.5 + renderDoorH / 2, op.midZ);
+              leafMesh.position.set(op.midX, 0.5 + leafH / 2, op.midZ);
               leafMesh.rotation.y = -angle;
               leafMesh.castShadow = true;
               floorGroup.add(leafMesh);
+
+              // 3. Ergonomic Lever Handle (Chrome at 3.0ft ergonomic height)
+              if (renderDoorH >= 3.5) {
+                const handleHeight = 0.5 + 3.0;
+                const handleOffsetAlong = leafW / 2 - 0.35;
+                const hx = op.midX + ux * handleOffsetAlong;
+                const hz = op.midZ + uz * handleOffsetAlong;
+
+                const handleBar = new THREE.Mesh(
+                  new THREE.BoxGeometry(0.35, 0.06, thickness + 0.16),
+                  (materials.chromeMat as THREE.Material) || frameMat
+                );
+                handleBar.position.set(hx, handleHeight, hz);
+                handleBar.rotation.y = -angle;
+                floorGroup.add(handleBar);
+              }
             }
 
             currentS = op.end;
@@ -802,7 +929,9 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       floorElevation,
       selectedRoomId,
       selectedFurnitureId,
-      lightingPreset,
+      effectiveLightingPreset,
+      effectiveWallHeightMode,
+      showFurnitureState,
     ]
   );
 
@@ -865,6 +994,12 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         color: "#1E242B",
         roughness: 0.4,
         metalness: 0.85,
+      }),
+      // Architectural Chrome / Metal Hardware
+      chromeMat: new THREE.MeshStandardMaterial({
+        color: "#E2E8F0",
+        roughness: 0.15,
+        metalness: 0.9,
       }),
       // Wooden Door Leaf
       doorLeafMat: new THREE.MeshStandardMaterial({
@@ -970,10 +1105,10 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     rootGroup.add(plinthMesh);
 
     // 2. SITE & CANONICAL RESIDENTIAL ARCHITECTURAL LANDSCAPE
-    const isLandscape = presentationMode === "landscape";
-    const isExterior = presentationMode === "exterior";
-    const isExteriorView = isLandscape || isExterior;
-    const showSiteAndLandscape = isLandscape || (isExterior && effectiveShowLandscape);
+    const isLandscape = presentationMode === "landscape" || presentationMode === "all";
+    const isExterior = presentationMode === "exterior" || presentationMode === "all";
+    const isExteriorView = presentationMode === "all" || isLandscape || isExterior;
+    const showSiteAndLandscape = presentationMode === "all" || isLandscape || (isExterior && effectiveShowLandscape);
 
     if (showSiteAndLandscape) {
       const landscapeModel = generateArchitecturalLandscape(layout);
@@ -982,8 +1117,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         materials,
         loadedModelsRef.current as Record<string, THREE.Group>,
         {
-          filterCategory: landscapeCategory,
-          lightingPreset,
+          filterCategory: showVegetationState ? landscapeCategory : "paths",
+          lightingPreset: effectiveLightingPreset,
           isDarkMode,
         }
       );
@@ -1098,7 +1233,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     }
 
     // 4. RCC ROOF SLAB, PARAPET & STAIR MUMTY (IN EXTERIOR & LANDSCAPE MODES)
-    if (isExteriorView && showRoof) {
+    if (isExteriorView && effectiveShowRoof) {
       const topFloorY = multiFloorStacked
         ? (numFloors - 1) * floorSpacing + fullWallHeight
         : (activeFloorIndex + 1) * floorElevation;
@@ -1193,6 +1328,13 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       canopyMesh.rotation.y = -dAngle;
       canopyMesh.castShadow = true;
       rootGroup.add(canopyMesh);
+
+      // Warm Porch Downlight in dusk & night mode
+      if (effectiveLightingPreset === "sunset" || effectiveLightingPreset === "night") {
+        const porchLight = new THREE.PointLight(0xf59e0b, effectiveLightingPreset === "night" ? 2.2 : 1.2, 20);
+        porchLight.position.set(mdx + nx * 2.0, 7.8, mdz + nz * 2.0);
+        interiorLights.add(porchLight);
+      }
     }
   }, [
     createGrassTexture,
@@ -1203,7 +1345,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     presentationMode,
     multiFloorStacked,
     activeFloorIndex,
-    showRoof,
+    effectiveShowRoof,
     isDarkMode,
     pw,
     pl,
@@ -1218,7 +1360,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     effectiveShowStructure,
     explodedFloors,
     landscapeCategory,
-    lightingPreset,
+    showVegetationState,
+    effectiveLightingPreset,
   ]);
 
   // Three.js Mount & Animation Loop
@@ -1346,18 +1489,16 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     rebuildScene();
   }, [rebuildScene]);
 
-  // Mode Transition Handler (EXTERIOR | INTERIOR | LANDSCAPE)
+  // Mode Transition Handler (EXTERIOR | INTERIOR | LANDSCAPE | ALL)
   const handleSwitchMode = (mode: PresentationMode) => {
     setPresentationMode(mode);
     if (!cameraRef.current || !controlsRef.current) return;
 
     isTransitioningCamera.current = true;
-    if (mode === "landscape") {
-      // Professional Architectural 3/4 Site Landscape Overview
+    if (mode === "all" || mode === "landscape") {
       targetCamPos.current.set(cx + pw * 1.35, pl * 1.05, cz + pl * 1.45);
       targetControlsTarget.current.set(cx, 2.5, cz);
     } else if (mode === "exterior") {
-      // Architectural Building Residence Close View
       targetCamPos.current.set(cx + pw * 1.05, pl * 0.7, cz + pl * 1.15);
       targetControlsTarget.current.set(cx, 4.0, cz);
     } else {
@@ -1367,22 +1508,23 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     }
   };
 
-  // Lighting Preset Adjustments
+  // Lighting Preset Adjustments (Day, Dusk, Night)
   useEffect(() => {
     if (sunLightRef.current && skyLightRef.current && sceneRef.current) {
-      if (lightingPreset === "sunset") {
+      if (effectiveLightingPreset === "sunset") {
         sunLightRef.current.color.set("#FF8E4D");
         sunLightRef.current.intensity = 1.5;
         sunLightRef.current.position.set(cx + 50, 20, cz - 20);
         skyLightRef.current.color.set("#FED7AA");
         skyLightRef.current.groundColor.set("#B45309");
         sceneRef.current.background = new THREE.Color(isDarkMode ? "#181412" : "#FFF7ED");
-      } else if (lightingPreset === "night") {
-        sunLightRef.current.color.set("#38BDF8");
+      } else if (effectiveLightingPreset === "night") {
+        sunLightRef.current.color.set("#60A5FA");
         sunLightRef.current.intensity = 0.35;
+        sunLightRef.current.position.set(cx - 30, 60, cz - 30);
         skyLightRef.current.color.set("#1E293B");
-        skyLightRef.current.groundColor.set("#0F172A");
-        sceneRef.current.background = new THREE.Color("#0F1218");
+        skyLightRef.current.groundColor.set("#0B0F19");
+        sceneRef.current.background = new THREE.Color("#0A0D14");
       } else {
         // Daylight
         sunLightRef.current.color.set("#FFFBF0");
@@ -1393,12 +1535,12 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         sceneRef.current.background = new THREE.Color(isDarkMode ? "#121214" : "#F3F4F6");
       }
     }
-  }, [lightingPreset, isDarkMode, cx, cz]);
+  }, [effectiveLightingPreset, isDarkMode, cx, cz]);
 
   const handleResetCamera = () => {
     if (!cameraRef.current || !controlsRef.current) return;
     isTransitioningCamera.current = true;
-    if (presentationMode === "landscape") {
+    if (presentationMode === "all" || presentationMode === "landscape") {
       targetCamPos.current.set(cx + pw * 1.35, pl * 1.05, cz + pl * 1.45);
       targetControlsTarget.current.set(cx, 2.5, cz);
     } else if (presentationMode === "exterior") {
@@ -1410,31 +1552,117 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     }
   };
 
-  const handleCameraPreset = (preset: "iso" | "top" | "front" | "side") => {
+  // 10 Camera View Presets with Smooth Transitions
+  const handleCameraPreset = (preset: CameraPresetType) => {
     setCameraView(preset);
+    setIsCameraMenuOpen(false);
     if (!cameraRef.current || !controlsRef.current) return;
     isTransitioningCamera.current = true;
-    if (preset === "top") {
+
+    if (preset === "exterior") {
+      targetCamPos.current.set(cx + pw * 1.05, pl * 0.7, cz + pl * 1.15);
+      targetControlsTarget.current.set(cx, 4.0, cz);
+    } else if (preset === "iso") {
+      targetCamPos.current.set(cx + pw * 1.15, pl * 0.95, cz + pl * 1.25);
+      targetControlsTarget.current.set(cx, 3.0, cz);
+    } else if (preset === "top") {
       targetCamPos.current.set(cx, pl * 2.2, cz + 0.01);
       targetControlsTarget.current.set(cx, 0, cz);
     } else if (preset === "front") {
-      targetCamPos.current.set(cx, pl * 0.45, cz + pl * 1.55);
+      targetCamPos.current.set(cx, pl * 0.35, cz + pl * 1.45);
       targetControlsTarget.current.set(cx, 4.0, cz);
     } else if (preset === "side") {
-      targetCamPos.current.set(cx + pw * 1.6, pl * 0.45, cz);
+      targetCamPos.current.set(cx + pw * 1.5, pl * 0.4, cz);
       targetControlsTarget.current.set(cx, 4.0, cz);
+    } else if (preset === "entrance") {
+      const mainDoor = (layout.doors || []).find((d) => d.door_type === "entry") || (layout.doors || [])[0];
+      if (mainDoor) {
+        const mdx = (mainDoor.x1 + mainDoor.x2) / 2;
+        const mdz = (mainDoor.y1 + mainDoor.y2) / 2;
+        const dAngle = Math.atan2(mainDoor.y2 - mainDoor.y1, mainDoor.x2 - mainDoor.x1);
+        const nx = -Math.sin(dAngle);
+        const nz = Math.cos(dAngle);
+        targetCamPos.current.set(mdx + nx * 14, 5.5, mdz + nz * 14);
+        targetControlsTarget.current.set(mdx, 4.0, mdz);
+      } else {
+        targetCamPos.current.set(cx, 5.0, cz + pl * 0.6);
+        targetControlsTarget.current.set(cx, 3.5, cz);
+      }
+    } else if (preset === "living") {
+      const livingRoom = (layout.rooms || []).find((r) =>
+        (r.type || "").toLowerCase().includes("living") || (r.name || "").toLowerCase().includes("living")
+      );
+      if (livingRoom && livingRoom.rect) {
+        const rx = livingRoom.rect.x + livingRoom.rect.width / 2;
+        const rz = livingRoom.rect.y + livingRoom.rect.length / 2;
+        targetCamPos.current.set(rx - 10, 12, rz + 12);
+        targetControlsTarget.current.set(rx, 2.0, rz);
+        setPresentationMode("interior");
+      }
+    } else if (preset === "kitchen") {
+      const kitchenRoom = (layout.rooms || []).find((r) =>
+        (r.type || "").toLowerCase().includes("kitchen") || (r.name || "").toLowerCase().includes("kitchen")
+      );
+      if (kitchenRoom && kitchenRoom.rect) {
+        const rx = kitchenRoom.rect.x + kitchenRoom.rect.width / 2;
+        const rz = kitchenRoom.rect.y + kitchenRoom.rect.length / 2;
+        targetCamPos.current.set(rx - 8, 11, rz + 9);
+        targetControlsTarget.current.set(rx, 2.0, rz);
+        setPresentationMode("interior");
+      }
+    } else if (preset === "bedroom") {
+      const bedRoom = (layout.rooms || []).find((r) =>
+        (r.type || "").toLowerCase().includes("master") || (r.type || "").toLowerCase().includes("bed")
+      );
+      if (bedRoom && bedRoom.rect) {
+        const rx = bedRoom.rect.x + bedRoom.rect.width / 2;
+        const rz = bedRoom.rect.y + bedRoom.rect.length / 2;
+        targetCamPos.current.set(rx - 9, 11, rz + 10);
+        targetControlsTarget.current.set(rx, 2.0, rz);
+        setPresentationMode("interior");
+      }
+    } else if (preset === "garden") {
+      targetCamPos.current.set(cx + pw * 0.55, 9.0, cz + pl * 0.7);
+      targetControlsTarget.current.set(cx, 1.5, cz + pl * 0.35);
+      setPresentationMode("landscape");
+    }
+  };
+
+  const handleSelectLighting = (preset: "day" | "sunset" | "night") => {
+    if (onChangeLightingPreset) {
+      onChangeLightingPreset(preset);
     } else {
-      // Iso
-      targetCamPos.current.set(cx + pw * 1.15, pl * 0.95, cz + pl * 1.25);
-      targetControlsTarget.current.set(cx, 3.0, cz);
+      setInternalLightingPreset(preset);
+    }
+  };
+
+  const handleToggleRoofClick = () => {
+    if (onToggleRoof) {
+      onToggleRoof();
+    } else {
+      setInternalShowRoof((prev) => !prev);
+    }
+  };
+
+  const handleToggleWallsClick = () => {
+    if (onToggleWallHeightMode) {
+      onToggleWallHeightMode();
+    } else {
+      setInternalWallHeightMode((prev) => (prev === "cutaway" ? "full" : "cutaway"));
     }
   };
 
   return (
     <div className="relative w-full h-full select-none overflow-hidden bg-[#ECEEF2]">
-      {/* FLOATING 3D CONTROLS (TOP LEFT) */}
-      <div className="absolute top-16 sm:top-20 left-3 sm:left-6 z-30 flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] pointer-events-auto">
-        {/* Primary Presentation Modes: EXTERIOR | INTERIOR | LANDSCAPE */}
+      {/* FLOATING 3D MINIMAL CONTROLS (TOP LEFT) */}
+      <div
+        className={`absolute left-3 sm:left-6 z-30 flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] pointer-events-auto transition-[top] duration-200 ${
+          hasOptimizationNotice
+            ? "top-[98px] sm:top-[118px]"
+            : "top-16 sm:top-20"
+        }`}
+      >
+        {/* 1. Primary Presentation Modes: EXTERIOR | INTERIOR | LANDSCAPE | ALL */}
         <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
           <button
             onClick={() => handleSwitchMode("exterior")}
@@ -1466,39 +1694,56 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           >
             LANDSCAPE
           </button>
+          <button
+            onClick={() => handleSwitchMode("all")}
+            className={`px-3 py-1 rounded-full transition-all ${
+              presentationMode === "all"
+                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+          >
+            ALL
+          </button>
         </div>
 
-        {/* When LANDSCAPE is active, provide visibility filters: ALL | VEGETATION | PATHS | LIGHTS | FURNITURE */}
-        {presentationMode === "landscape" && (
-          <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-[#C48446]/40 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
-            {(
-              [
-                { id: "all", label: "ALL" },
-                { id: "vegetation", label: "VEGETATION" },
-                { id: "paths", label: "PATHS" },
-                { id: "lighting", label: "LIGHTS" },
-                { id: "furniture", label: "FURNITURE" },
-              ] as const
-            ).map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setLandscapeCategory(cat.id)}
-                className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-                  landscapeCategory === cat.id
-                    ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-sm"
-                    : "hover:text-[#F5F3EF]"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* 2. Lighting: DAY | DUSK | NIGHT */}
+        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
+          <button
+            onClick={() => handleSelectLighting("day")}
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
+              effectiveLightingPreset === "day"
+                ? "bg-[#F5F3EF] text-[#0A0B0E] font-medium shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+          >
+            DAY
+          </button>
+          <button
+            onClick={() => handleSelectLighting("sunset")}
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
+              effectiveLightingPreset === "sunset"
+                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+          >
+            DUSK
+          </button>
+          <button
+            onClick={() => handleSelectLighting("night")}
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
+              effectiveLightingPreset === "night"
+                ? "bg-[#38BDF8] text-[#0A0B0E] font-medium shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+          >
+            NIGHT
+          </button>
+        </div>
 
-        {/* Floor Level Switcher (Single floor cutaway or ALL stacked) */}
-        {layout.floors && layout.floors.length > 1 && (
-          <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
-            {layout.floors.map((fl, idx) => {
+        {/* 3. Floor Level Switcher: GROUND | FIRST | SECOND | ALL */}
+        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
+          {layout.floors && layout.floors.length > 1 ? (
+            layout.floors.map((fl, idx) => {
               const label = fl.floor_name
                 ? fl.floor_name.replace(" Floor", "").toUpperCase()
                 : idx === 0
@@ -1525,99 +1770,132 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                   {label}
                 </button>
               );
-            })}
+            })
+          ) : (
             <button
-              onClick={() => setMultiFloorStacked(true)}
+              onClick={() => {
+                setMultiFloorStacked(false);
+                onSelectFloor?.(0);
+              }}
               className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-                multiFloorStacked
+                !multiFloorStacked
                   ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
                   : "hover:text-[#F5F3EF]"
               }`}
             >
-              ALL
+              GROUND
             </button>
-          </div>
-        )}
-
-        {/* Lighting: DAY / DUSK */}
-        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
+          )}
           <button
-            onClick={() => onChangeLightingPreset?.("day")}
+            onClick={() => setMultiFloorStacked(true)}
             className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-              lightingPreset === "day"
-                ? "bg-[#F5F3EF] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-          >
-            DAY
-          </button>
-          <button
-            onClick={() => onChangeLightingPreset?.("sunset")}
-            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-              lightingPreset === "sunset" || lightingPreset === "night"
+              multiFloorStacked
                 ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
                 : "hover:text-[#F5F3EF]"
             }`}
           >
-            DUSK
+            ALL
           </button>
         </div>
 
-        {/* Camera Angles: ISO | TOP | FRONT | SIDE */}
-        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
-          {(["iso", "top", "front", "side"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => handleCameraPreset(mode)}
-              className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-                cameraView === mode
-                  ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                  : "hover:text-[#F5F3EF]"
-              }`}
-            >
-              {mode.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-        {/* Multi-Floor Exploded View Toggle */}
-        {layout.floors && layout.floors.length > 1 && multiFloorStacked && (
+        {/* 4. 10 Camera View Presets Menu */}
+        <div className="relative">
           <button
-            onClick={() => setExplodedFloors((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-full transition-all text-[10px] sm:text-[11px] font-mono border shadow-2xl ${
-              explodedFloors
-                ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446] font-semibold"
-                : "bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border-white/10"
-            }`}
+            onClick={() => setIsCameraMenuOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-[10px] sm:text-[11px] font-mono shadow-2xl transition-all"
           >
-            {explodedFloors ? "COLLAPSE" : "EXPLODED"}
+            <Camera className="w-3.5 h-3.5 text-[#C48446]" />
+            <span className="uppercase">{cameraView}</span>
+            <ChevronDown className="w-3 h-3 text-[#9E9C98]" />
           </button>
-        )}
 
-        {/* Structure (Columns & Beams) Toggle */}
-        <button
-          onClick={() => {
-            if (onToggleStructure) {
-              onToggleStructure();
-            } else {
-              setInternalShowStructure((prev) => !prev);
-            }
-          }}
-          className={`px-3 py-1.5 rounded-full transition-all text-[10px] sm:text-[11px] font-mono border shadow-2xl ${
-            effectiveShowStructure
-              ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446] font-semibold"
-              : "bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border-white/10"
-          }`}
-        >
-          STRUCTURE
-        </button>
+          {isCameraMenuOpen && (
+            <div className="absolute top-full left-0 mt-1.5 w-44 p-1.5 rounded-2xl bg-[#12141A]/95 backdrop-blur-md border border-white/10 shadow-2xl z-50 flex flex-col gap-0.5 text-[10px] font-mono">
+              {(
+                [
+                  { id: "exterior", label: "Exterior (3/4)" },
+                  { id: "iso", label: "Isometric" },
+                  { id: "top", label: "Top (Plan)" },
+                  { id: "front", label: "Front Elevation" },
+                  { id: "side", label: "Side Elevation" },
+                  { id: "entrance", label: "Entrance Porch" },
+                  { id: "living", label: "Living Room" },
+                  { id: "kitchen", label: "Kitchen" },
+                  { id: "bedroom", label: "Bedroom" },
+                  { id: "garden", label: "Garden / Lawn" },
+                ] as const
+              ).map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handleCameraPreset(preset.id)}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-colors flex items-center justify-between ${
+                    cameraView === preset.id
+                      ? "bg-[#C48446] text-black font-semibold"
+                      : "text-[#9E9C98] hover:text-[#F5F3EF] hover:bg-white/5"
+                  }`}
+                >
+                  <span>{preset.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 5. Optional Toggles: Furniture, Vegetation, Roof, Walls */}
+        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
+          <button
+            onClick={() => setShowFurnitureState((prev) => !prev)}
+            className={`px-2.5 py-1 rounded-full transition-all ${
+              showFurnitureState
+                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+            title="Toggle Furniture"
+          >
+            FURNITURE
+          </button>
+          <button
+            onClick={() => setShowVegetationState((prev) => !prev)}
+            className={`px-2.5 py-1 rounded-full transition-all ${
+              showVegetationState
+                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+            title="Toggle Vegetation"
+          >
+            VEGETATION
+          </button>
+          <button
+            onClick={handleToggleRoofClick}
+            className={`px-2.5 py-1 rounded-full transition-all ${
+              effectiveShowRoof
+                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+            title="Toggle Roof Slab"
+          >
+            ROOF
+          </button>
+          <button
+            onClick={handleToggleWallsClick}
+            className={`px-2.5 py-1 rounded-full transition-all ${
+              effectiveWallHeightMode === "full"
+                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
+                : "hover:text-[#F5F3EF]"
+            }`}
+            title="Toggle Full vs Cutaway Walls"
+          >
+            WALLS
+          </button>
+        </div>
 
         {/* Reset Camera Button */}
         <button
           onClick={handleResetCamera}
-          className="px-3 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-[10px] sm:text-[11px] font-mono shadow-2xl transition-all"
+          className="p-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 shadow-2xl transition-all"
+          title="Reset Camera View"
         >
-          RESET VIEW
+          <RotateCcw className="w-3.5 h-3.5" />
         </button>
       </div>
 
