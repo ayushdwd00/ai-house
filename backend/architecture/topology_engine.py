@@ -94,10 +94,16 @@ def generate_architectural_schemes(
     s1.priority_adjacencies = [["living_room", "entry_foyer"], ["dining", "kitchen"]]
     s1.priority_separations = [["master_bedroom", "living_room"]]
     for r in rooms:
-        if r.type in ["entry_foyer", "living_room"]:
+        if r.type == "entry_foyer":
             s1.zone_placements[r.id] = {"rel_y": "front", "rel_x": "center"}
-        elif r.type in ["dining", "kitchen", "utility", "pantry"]:
+        elif r.type == "living_room":
+            s1.zone_placements[r.id] = {"rel_y": "front", "rel_x": "left"}
+        elif r.type == "dining":
+            s1.zone_placements[r.id] = {"rel_y": "middle", "rel_x": "center"}
+        elif r.type in ["kitchen", "pantry"]:
             s1.zone_placements[r.id] = {"rel_y": "front" if vastu_compliant and road == "south" else "middle", "rel_x": "right"}
+        elif r.type == "utility":
+            s1.zone_placements[r.id] = {"rel_y": "rear", "rel_x": "right"}
         elif r.type in ["master_bedroom", "dressing"]:
             s1.zone_placements[r.id] = {"rel_y": "front" if vastu_compliant and road == "south" else "rear", "rel_x": "left"}
         elif r.type in ["bedroom", "guest_bedroom"]:

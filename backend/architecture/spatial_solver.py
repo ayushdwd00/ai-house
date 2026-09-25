@@ -113,6 +113,27 @@ def solve_spatial_layout(
         model.Add(x_end == x + w)
         model.Add(y_end == y + l)
 
+        # HARD CONSTRAINT: Strict aspect ratio limits ensuring clean rectangular rooms with zero slivers
+        if not is_pinned and r.type not in ["hallway", "staircase"]:
+            habitable_set = {
+                "living_room", "family_lounge", "dining", "kitchen",
+                "master_bedroom", "bedroom", "guest_bedroom", "office", "pooja"
+            }
+            if r.type in habitable_set:
+                # Aspect ratio <= 1.45:1 (e.g. 10x14 or 12x16.5) for balanced rectangular rooms
+                model.Add(10 * w <= 15 * l)
+                model.Add(10 * l <= 15 * w)
+                # Ensure minimum 8ft in both dimensions for any habitable space
+                model.Add(w >= 8 * GRID_SCALE)
+                model.Add(l >= 8 * GRID_SCALE)
+            else:
+                # Secondary spaces (bathroom, utility, foyer, balcony) <= 1.75:1
+                model.Add(10 * w <= 18 * l)
+                model.Add(10 * l <= 18 * w)
+                # Ensure minimum 4ft width
+                model.Add(w >= 4 * GRID_SCALE)
+                model.Add(l >= 4 * GRID_SCALE)
+
         # 2D Interval variables for global no-overlap constraint
         x_iv = model.NewIntervalVar(x, w, x_end, f"x_iv_{r.id}")
         y_iv = model.NewIntervalVar(y, l, y_end, f"y_iv_{r.id}")
@@ -125,22 +146,22 @@ def solve_spatial_layout(
         y_intervals.append(y_iv)
 
         if not is_pinned:
-            # Soft objective: Proximity to preferred dimensions
+            # Strong objective: Proximity to preferred dimensions
             diff_w = model.NewIntVar(0, env_w_int, f"diff_w_{r.id}")
             diff_l = model.NewIntVar(0, env_l_int, f"diff_l_{r.id}")
             model.Add(diff_w >= w - pref_w)
             model.Add(diff_w >= pref_w - w)
             model.Add(diff_l >= l - pref_l)
             model.Add(diff_l >= pref_l - l)
-            objective_terms.append(diff_w * 4)
-            objective_terms.append(diff_l * 4)
+            objective_terms.append(diff_w * 8)
+            objective_terms.append(diff_l * 8)
 
-            # Soft objective: Aspect ratio penalty (keep rooms comfortable, not long slivers)
+            # Strong objective: Aspect ratio penalty (bias rooms toward clean balanced rectangles)
             if r.type not in ["hallway", "staircase"]:
                 diff_aspect = model.NewIntVar(0, env_w_int + env_l_int, f"aspect_{r.id}")
                 model.Add(diff_aspect >= w - l)
                 model.Add(diff_aspect >= l - w)
-                objective_terms.append(diff_aspect * 2)
+                objective_terms.append(diff_aspect * 16)
 
             # Topological placement hints from scheme
             if r.id in scheme.zone_placements:

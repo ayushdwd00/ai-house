@@ -42,6 +42,22 @@ import {
   AlertTriangle,
   Hand,
   Move,
+  MousePointer,
+  Square,
+  DoorClosed,
+  AppWindow,
+  Armchair,
+  Ruler,
+  Bed,
+  Bath,
+  Utensils,
+  PanelLeftClose,
+  PanelLeft,
+  PanelRightClose,
+  PanelRight,
+  ChevronDown,
+  ChevronRight,
+  PenTool,
 } from "lucide-react";
 
 export type PlanMode = "view" | "edit";
@@ -307,6 +323,29 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [isPanning, setIsPanning] = useState(false);
   const [isPanMode, setIsPanMode] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const touchStateRef = useRef<{
+    initialDist: number | null;
+    initialZoom: number;
+    startX: number;
+    startY: number;
+    startPanX: number;
+    startPanY: number;
+  }>({
+    initialDist: null,
+    initialZoom: 1.0,
+    startX: 0,
+    startY: 0,
+    startPanX: 0,
+    startPanY: 0,
+  });
+
+  // Figma-Style Editor Panels & Tools
+  const [activeTool, setActiveTool] = useState<"select" | "room" | "wall" | "door" | "window" | "furniture" | "dimension">("select");
+  const [showDimensions, setShowDimensions] = useState(true);
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
+  const [alignmentGuides, setAlignmentGuides] = useState<Array<{ type: "h" | "v"; pos: number }>>([]);
 
   // Overlays
   const [showStructure, setShowStructure] = useState(false);
@@ -565,9 +604,90 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     return () => container.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
+  // Reset / Zoom-to-fit Canvas View (Center Floor Plan with Padding)
+  const handleResetView = useCallback(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const pad = 60;
+      const fitZoom = Math.min(
+        (rect.width - pad * 2) / (svgWidth + 120),
+        (rect.height - pad * 2) / (svgHeight + 120),
+        1.5
+      );
+      setZoom(Math.max(0.4, Math.min(2.0, fitZoom)));
+      setPan({ x: 0, y: 0 });
+    } else {
+      setZoom(1.0);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [svgWidth, svgHeight]);
+
+  // Initial Auto-Fit on Mount or Project Change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleResetView();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [handleResetView, layout.id]);
+
+  // Helper: Room Type Icon
+  const getRoomIcon = (type: string) => {
+    const t = type.toLowerCase();
+    if (t.includes("bed")) return <Bed className="w-3.5 h-3.5" />;
+    if (t.includes("bath") || t.includes("toilet") || t.includes("powder")) return <Bath className="w-3.5 h-3.5" />;
+    if (t.includes("kitchen") || t.includes("dining") || t.includes("pantry")) return <Utensils className="w-3.5 h-3.5" />;
+    if (t.includes("living") || t.includes("lounge")) return <Armchair className="w-3.5 h-3.5" />;
+    return <Square className="w-3.5 h-3.5" />;
+  };
+
+  // Helper: Update Room Property (live with undo/redo snapshot)
+  const handleUpdateRoomProperty = (roomId: string, updates: Partial<Room>) => {
+    setLayout((prev) => {
+      const nextFloors = prev.floors ? [...prev.floors] : [];
+      if (nextFloors[activeFloorIndex]) {
+        const floor = nextFloors[activeFloorIndex];
+        const updatedRooms = (floor.rooms || []).map((r) => {
+          if (r.id === roomId) {
+            const updated = { ...r, ...updates };
+            if (updates.rect) {
+              updated.area_sqft = Math.round(updates.rect.width * updates.rect.length);
+            }
+            return updated;
+          }
+          return r;
+        });
+        nextFloors[activeFloorIndex] = { ...floor, rooms: updatedRooms };
+        const next = { ...prev, floors: nextFloors };
+        pushSnapshot(next);
+        return next;
+      }
+      return prev;
+    });
+  };
+
+  // Helper: Quick Room Size Increment (+1ft / -1ft)
+  const handleAdjustRoomSize = (roomId: string, deltaW: number, deltaL: number) => {
+    const target = (currentFloor.rooms || []).find((r) => r.id === roomId);
+    if (!target || !target.rect) return;
+    const newW = Math.max(3.0, Math.min(layout.plot_width - target.rect.x - 1, target.rect.width + deltaW));
+    const newL = Math.max(3.0, Math.min(layout.plot_length - target.rect.y - 1, target.rect.length + deltaL));
+    handleUpdateRoomProperty(roomId, {
+      rect: { ...target.rect, width: newW, length: newL },
+      area_sqft: Math.round(newW * newL),
+    });
+  };
+
   // Keyboard Shortcuts (Undo / Redo / Deselect)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      const isInput = activeTag === "input" || activeTag === "textarea" || activeTag === "select";
+
+      if (e.code === "Space" && !isInput) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
         if (e.shiftKey) {
@@ -586,17 +706,28 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         setIsAiOpen(false);
       }
     };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setIsSpacePressed(false);
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
   }, [canUndo, canRedo, undo, redo]);
 
   // Global Mouse Handlers
-  // Global Mouse Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only pan if middle click or pan mode active or background left click
+    // Only pan if middle click or pan mode active or space pressed or background left click
     if (
       e.button === 1 ||
       isPanMode ||
+      isSpacePressed ||
       (e.button === 0 &&
         !draggingRoom &&
         !draggingFurniture &&
@@ -758,7 +889,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       return;
     }
 
-    // 3. Room Dragging
+    // 3. Room Dragging with Smart Alignment Guides (Figma-Style)
     if (draggingRoom) {
       const deltaXFeet = (e.clientX - draggingRoom.startMouseX) / (SCALE * zoom);
       const deltaYFeet = (e.clientY - draggingRoom.startMouseY) / (SCALE * zoom);
@@ -768,11 +899,74 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
       const rawX = draggingRoom.initialX + deltaXFeet;
       const rawY = draggingRoom.initialY + deltaYFeet;
-
       const roomW = targetRoom.rect.width;
       const roomL = targetRoom.rect.length;
-      const clampedX = Math.max(1, Math.min(layout.plot_width - roomW - 1, Math.round(rawX * 2) / 2));
-      const clampedY = Math.max(1, Math.min(layout.plot_length - roomL - 1, Math.round(rawY * 2) / 2));
+
+      let finalX = Math.round(rawX * 2) / 2;
+      let finalY = Math.round(rawY * 2) / 2;
+      const guides: Array<{ type: "h" | "v"; pos: number }> = [];
+      const snapThreshold = 0.4;
+
+      // Snap to plot boundaries
+      if (Math.abs(rawX - 0) < snapThreshold) {
+        finalX = 0;
+        guides.push({ type: "v", pos: 0 });
+      } else if (Math.abs(rawX + roomW - layout.plot_width) < snapThreshold) {
+        finalX = layout.plot_width - roomW;
+        guides.push({ type: "v", pos: layout.plot_width });
+      }
+
+      if (Math.abs(rawY - 0) < snapThreshold) {
+        finalY = 0;
+        guides.push({ type: "h", pos: 0 });
+      } else if (Math.abs(rawY + roomL - layout.plot_length) < snapThreshold) {
+        finalY = layout.plot_length - roomL;
+        guides.push({ type: "h", pos: layout.plot_length });
+      }
+
+      // Snap to other room boundaries on the active floor
+      for (const other of currentFloor.rooms || []) {
+        if (other.id === draggingRoom.roomId || !other.rect) continue;
+        const ox1 = other.rect.x;
+        const ox2 = other.rect.x + other.rect.width;
+        const oy1 = other.rect.y;
+        const oy2 = other.rect.y + other.rect.length;
+
+        // X alignments
+        if (Math.abs(rawX - ox1) < snapThreshold) {
+          finalX = ox1;
+          guides.push({ type: "v", pos: ox1 });
+        } else if (Math.abs(rawX - ox2) < snapThreshold) {
+          finalX = ox2;
+          guides.push({ type: "v", pos: ox2 });
+        } else if (Math.abs(rawX + roomW - ox1) < snapThreshold) {
+          finalX = ox1 - roomW;
+          guides.push({ type: "v", pos: ox1 });
+        } else if (Math.abs(rawX + roomW - ox2) < snapThreshold) {
+          finalX = ox2 - roomW;
+          guides.push({ type: "v", pos: ox2 });
+        }
+
+        // Y alignments
+        if (Math.abs(rawY - oy1) < snapThreshold) {
+          finalY = oy1;
+          guides.push({ type: "h", pos: oy1 });
+        } else if (Math.abs(rawY - oy2) < snapThreshold) {
+          finalY = oy2;
+          guides.push({ type: "h", pos: oy2 });
+        } else if (Math.abs(rawY + roomL - oy1) < snapThreshold) {
+          finalY = oy1 - roomL;
+          guides.push({ type: "h", pos: oy1 });
+        } else if (Math.abs(rawY + roomL - oy2) < snapThreshold) {
+          finalY = oy2 - roomL;
+          guides.push({ type: "h", pos: oy2 });
+        }
+      }
+
+      setAlignmentGuides(guides);
+
+      const clampedX = Math.max(0, Math.min(layout.plot_width - roomW, finalX));
+      const clampedY = Math.max(0, Math.min(layout.plot_length - roomL, finalY));
 
       setLayout((prev) => {
         const nextFloors = prev.floors ? [...prev.floors] : [];
@@ -1070,6 +1264,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     // Room Dragging Completion: Client-Side Geometry Engine Update
     if (draggingRoom) {
       setDraggingRoom(null);
+      setAlignmentGuides([]);
       const currentRooms = currentFloor.rooms || [];
       const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(currentRooms, undefined, 9.5);
       const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
@@ -1102,6 +1297,63 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       pushSnapshot(layout);
       setDraggingFurniture(null);
     }
+  };
+
+  // Touch Handlers for Mobile Pinch-to-Zoom and Pan
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      touchStateRef.current = {
+        initialDist: dist,
+        initialZoom: zoom,
+        startX: (t1.clientX + t2.clientX) / 2,
+        startY: (t1.clientY + t2.clientY) / 2,
+        startPanX: pan.x,
+        startPanY: pan.y,
+      };
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0];
+      touchStateRef.current = {
+        initialDist: null,
+        initialZoom: zoom,
+        startX: t.clientX,
+        startY: t.clientY,
+        startPanX: pan.x,
+        startPanY: pan.y,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStateRef.current.initialDist !== null) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const scaleFactor = dist / touchStateRef.current.initialDist;
+      const nextZoom = Math.min(3.5, Math.max(0.4, touchStateRef.current.initialZoom * scaleFactor));
+      setZoom(nextZoom);
+    } else if (e.touches.length === 1 && touchStateRef.current.initialDist === null) {
+      const t = e.touches[0];
+      const dx = t.clientX - touchStateRef.current.startX;
+      const dy = t.clientY - touchStateRef.current.startY;
+      setPan({
+        x: touchStateRef.current.startPanX + dx,
+        y: touchStateRef.current.startPanY + dy,
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStateRef.current = {
+      initialDist: null,
+      initialZoom: zoom,
+      startX: 0,
+      startY: 0,
+      startPanX: pan.x,
+      startPanY: pan.y,
+    };
   };
 
   const handleApplyExactDimensions = async () => {
@@ -1165,19 +1417,6 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     }
   };
 
-  // Reset View to Fit
-  const handleResetView = () => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const availableWidth = rect.width - 60;
-    const availableHeight = rect.height - 60;
-    const totalDocW = svgWidth + padding * 2;
-    const totalDocH = svgHeight + padding * 2;
-    const fitScale = Math.min(availableWidth / totalDocW, availableHeight / totalDocH, 1.3);
-    setZoom(Math.max(0.65, Math.min(1.4, fitScale)));
-    setPan({ x: 0, y: 0 });
-  };
 
   // Save changes
   const handleSave = async () => {
@@ -1198,12 +1437,16 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // Stepper Resizing on Selected Room
   const handleStepResizeRoom = (dimension: "width" | "length", delta: number) => {
     if (!selectedRoomId) return;
+    let targetW = 0;
+    let targetL = 0;
     const updatedRooms = (currentFloor.rooms || []).map((r) => {
       if (r.id !== selectedRoomId || !r.rect) return r;
       const currentW = r.rect.width;
       const currentL = r.rect.length;
       const newW = dimension === "width" ? Math.max(6, Math.min(45, currentW + delta)) : currentW;
       const newL = dimension === "length" ? Math.max(6, Math.min(45, currentL + delta)) : currentL;
+      targetW = newW;
+      targetL = newL;
       return {
         ...r,
         rect: { ...r.rect, width: newW, length: newL },
@@ -1211,14 +1454,35 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       };
     });
 
+    const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(updatedRooms, undefined, 9.5);
+    const { doors: sDoors, windows: sWins } = synchronizeOpeningsWithWalls(
+      currentFloor.doors || [],
+      currentFloor.windows || [],
+      [...exteriorWalls, ...interiorWalls]
+    );
+
     const nextFloors = layout.floors
-      ? layout.floors.map((f, idx) => (idx === activeFloorIndex ? { ...f, rooms: updatedRooms } : f))
+      ? layout.floors.map((f, idx) =>
+          idx === activeFloorIndex
+            ? {
+                ...f,
+                rooms: updatedRooms,
+                exterior_walls: exteriorWalls,
+                interior_walls: interiorWalls,
+                doors: sDoors,
+                windows: sWins,
+              }
+            : f
+        )
       : [];
     const nextLayout: HouseLayout = {
       ...layout,
       floors: nextFloors.length > 0 ? nextFloors : (layout.floors || []),
       rooms: updatedRooms,
     };
+    if (targetW > 0) setExactWidthInput(feetToArchitectural(targetW));
+    if (targetL > 0) setExactLengthInput(feetToArchitectural(targetL));
+    setLayout(nextLayout);
     pushSnapshot(nextLayout);
   };
 
@@ -1254,6 +1518,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         ),
       })),
     };
+    setLayout(nextLayout);
     pushSnapshot(nextLayout);
   };
 
@@ -1282,6 +1547,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         })),
       };
       handleSelectFurniture(null);
+      setLayout(nextLayout);
       pushSnapshot(nextLayout);
     } else if (selectedWallId) {
       handleDeleteWall();
@@ -1327,6 +1593,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         doors: nextDoors,
       };
       setSelectedDoorId(null);
+      setLayout(nextLayout);
       pushSnapshot(nextLayout);
     } else if (selectedWindowId) {
       const nextWindows = (currentFloor.windows || []).filter((w) => w.id !== selectedWindowId);
@@ -1339,6 +1606,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         windows: nextWindows,
       };
       setSelectedWindowId(null);
+      setLayout(nextLayout);
       pushSnapshot(nextLayout);
     }
   };
@@ -1547,536 +1815,16 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       });
     };
 
-    // 1. Bed (King, Queen, Single)
-    if (item.type.includes("bed")) {
-      const headH = Math.max(6, il * 0.14);
-      const pillowW = iw * 0.36;
-      const pillowH = Math.min(18, il * 0.22);
+    // Minimal Architectural CAD Furniture Outlines
+    const isBed = item.type.includes("bed");
+    const isSofa = item.type.includes("sofa") || item.type.includes("couch");
+    const isDining = item.type.includes("dining") || item.type.includes("table");
+    const isBath = item.type.includes("toilet") || item.type.includes("commode") || item.type.includes("wc");
+    const isBasin = item.type.includes("sink") || item.type.includes("basin") || item.type.includes("vanity");
+    const isShower = item.type.includes("shower") || item.type.includes("bath");
+    const isKitchen = item.type.includes("counter") || item.type.includes("stove") || item.type.includes("kitchen") || item.type.includes("cooktop");
+    const isWardrobe = item.type.includes("wardrobe") || item.type.includes("closet");
 
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={3}
-            fill={isSelected ? "#FFFDF9" : "#FFFFFF"}
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={headH}
-            rx={2}
-            fill="#78350F"
-            stroke="#451A03"
-            strokeWidth={1}
-          />
-          <path
-            d={`M ${ix - iw / 2 + 2} ${iy - il / 2 + il * 0.42} Q ${ix} ${iy - il / 2 + il * 0.48} ${ix + iw / 2 - 2} ${iy - il / 2 + il * 0.42} L ${ix + iw / 2 - 2} ${iy + il / 2 - 2} L ${ix - iw / 2 + 2} ${iy + il / 2 - 2} Z`}
-            fill="#F1F5F9"
-            stroke="#94A3B8"
-            strokeWidth={1}
-          />
-          <rect
-            x={ix - iw / 2 + iw * 0.08}
-            y={iy - il / 2 + headH + 4}
-            width={pillowW}
-            height={pillowH}
-            rx={4}
-            fill="#FFFFFF"
-            stroke="#64748B"
-            strokeWidth={1}
-          />
-          <rect
-            x={ix + iw / 2 - iw * 0.08 - pillowW}
-            y={iy - il / 2 + headH + 4}
-            width={pillowW}
-            height={pillowH}
-            rx={4}
-            fill="#FFFFFF"
-            stroke="#64748B"
-            strokeWidth={1}
-          />
-          {isSelected && mode === "edit" && (
-            <circle cx={ix} cy={iy - il / 2 - 8} r={4} fill="#C48446" />
-          )}
-        </g>
-      );
-    }
-
-    // 2. Side Table / Nightstand
-    if (item.type.includes("side_table") || item.type.includes("nightstand")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={2}
-            fill={isSelected ? "#FFFDF9" : "#FAF5EE"}
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <line
-            x1={ix - iw / 2 + 3}
-            y1={iy}
-            x2={ix + iw / 2 - 3}
-            y2={iy}
-            stroke="#94A3B8"
-            strokeWidth={0.8}
-          />
-          <circle cx={ix} cy={iy} r={3} fill="#CBD5E1" stroke="#64748B" strokeWidth={0.8} />
-          {isSelected && mode === "edit" && (
-            <circle cx={ix} cy={iy - il / 2 - 6} r={3.5} fill="#C48446" />
-          )}
-        </g>
-      );
-    }
-
-    // 3. Wardrobe / Closet
-    if (item.type.includes("wardrobe") || item.type.includes("closet")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={1}
-            fill={isSelected ? "#FFFDF9" : "#F3EFE6"}
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <line
-            x1={ix}
-            y1={iy - il / 2}
-            x2={ix}
-            y2={iy + il / 2}
-            stroke="#94A3B8"
-            strokeWidth={1.2}
-          />
-          <line
-            x1={ix - iw / 4}
-            y1={iy - il / 2 + 4}
-            x2={ix - iw / 4}
-            y2={iy + il / 2 - 4}
-            stroke="#CBD5E1"
-            strokeWidth={0.8}
-            strokeDasharray="2 2"
-          />
-          <line
-            x1={ix + iw / 4}
-            y1={iy - il / 2 + 4}
-            x2={ix + iw / 4}
-            y2={iy + il / 2 - 4}
-            stroke="#CBD5E1"
-            strokeWidth={0.8}
-            strokeDasharray="2 2"
-          />
-          {isSelected && mode === "edit" && (
-            <circle cx={ix} cy={iy - il / 2 - 6} r={3.5} fill="#C48446" />
-          )}
-        </g>
-      );
-    }
-
-    // 4. Sofa / Living Couch
-    if (item.type.includes("sofa") || item.type.includes("couch")) {
-      const armW = Math.max(6, iw * 0.12);
-      const backH = Math.max(8, il * 0.28);
-      const seatW = (iw - 2 * armW) / 3;
-
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={5}
-            fill={isSelected ? "#FFFDF9" : "#FFFFFF"}
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <rect
-            x={ix - iw / 2 + armW}
-            y={iy - il / 2}
-            width={iw - 2 * armW}
-            height={backH}
-            rx={2}
-            fill="#E2E8F0"
-            stroke="#94A3B8"
-            strokeWidth={1}
-          />
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={armW}
-            height={il}
-            rx={3}
-            fill="#E2E8F0"
-            stroke="#94A3B8"
-            strokeWidth={1}
-          />
-          <rect
-            x={ix + iw / 2 - armW}
-            y={iy - il / 2}
-            width={armW}
-            height={il}
-            rx={3}
-            fill="#E2E8F0"
-            stroke="#94A3B8"
-            strokeWidth={1}
-          />
-          {Array.from({ length: 3 }).map((_, cIdx) => (
-            <rect
-              key={`sofa_cushion_${cIdx}`}
-              x={ix - iw / 2 + armW + cIdx * seatW + 1}
-              y={iy - il / 2 + backH + 1}
-              width={seatW - 2}
-              height={il - backH - 2}
-              rx={2}
-              fill="#F8FAFC"
-              stroke="#CBD5E1"
-              strokeWidth={0.8}
-            />
-          ))}
-          {isSelected && mode === "edit" && (
-            <circle cx={ix} cy={iy - il / 2 - 8} r={4} fill="#C48446" />
-          )}
-        </g>
-      );
-    }
-
-    // 5. Coffee Table
-    if (item.type.includes("coffee_table")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={4}
-            fill={isSelected ? "#FFFDF9" : "#FFFFFF"}
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <rect
-            x={ix - iw / 2 + 3}
-            y={iy - il / 2 + 3}
-            width={iw - 6}
-            height={il - 6}
-            rx={2}
-            fill="#F8FAFC"
-            stroke="#CBD5E1"
-            strokeWidth={0.8}
-          />
-        </g>
-      );
-    }
-
-    // 6. Dining Table & Chairs
-    if (item.type.includes("dining_table")) {
-      const chairW = Math.min(14, iw * 0.22);
-      const chairD = Math.min(12, il * 0.28);
-
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={3}
-            fill={isSelected ? "#FFFDF9" : "#FFFFFF"}
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          {[-iw * 0.28, 0, iw * 0.28].map((cxOffset, idx) => (
-            <React.Fragment key={`chair_${idx}`}>
-              <rect
-                x={ix + cxOffset - chairW / 2}
-                y={iy - il / 2 - chairD - 2}
-                width={chairW}
-                height={chairD}
-                rx={2}
-                fill="#F8FAFC"
-                stroke="#64748B"
-                strokeWidth={1}
-              />
-              <rect
-                x={ix + cxOffset - chairW / 2}
-                y={iy + il / 2 + 2}
-                width={chairW}
-                height={chairD}
-                rx={2}
-                fill="#F8FAFC"
-                stroke="#64748B"
-                strokeWidth={1}
-              />
-            </React.Fragment>
-          ))}
-          {isSelected && mode === "edit" && (
-            <circle cx={ix} cy={iy - il / 2 - 8} r={4} fill="#C48446" />
-          )}
-        </g>
-      );
-    }
-
-    // 7. Kitchen Counter & Appliances
-    if (item.type.includes("kitchen_counter")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            fill={isSelected ? "#FFFDF9" : "#F8FAFC"}
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <line
-            x1={ix - iw / 2}
-            y1={iy + il / 2 - 3}
-            x2={ix + iw / 2}
-            y2={iy + il / 2 - 3}
-            stroke="#CBD5E1"
-            strokeWidth={1}
-          />
-        </g>
-      );
-    }
-
-    if (item.type.includes("hob") || item.type.includes("cooktop")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={2}
-            fill="#1E293B"
-            stroke="#0F172A"
-            strokeWidth={1}
-          />
-          <circle cx={ix - iw * 0.25} cy={iy} r={iw * 0.16} fill="#334155" stroke="#E2E8F0" strokeWidth={1} />
-          <circle cx={ix} cy={iy - il * 0.15} r={iw * 0.14} fill="#334155" stroke="#E2E8F0" strokeWidth={1} />
-          <circle cx={ix + iw * 0.25} cy={iy} r={iw * 0.16} fill="#334155" stroke="#E2E8F0" strokeWidth={1} />
-        </g>
-      );
-    }
-
-    if (item.type.includes("sink")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={2}
-            fill="#F1F5F9"
-            stroke="#64748B"
-            strokeWidth={1.2}
-          />
-          <rect
-            x={ix - iw / 2 + 3}
-            y={iy - il / 2 + 3}
-            width={iw * 0.55}
-            height={il - 6}
-            rx={2}
-            fill="#E2E8F0"
-            stroke="#94A3B8"
-            strokeWidth={1}
-          />
-          <circle cx={ix - iw * 0.22} cy={iy} r={3} fill="#64748B" />
-        </g>
-      );
-    }
-
-    // 8. Bathroom WC / Toilet
-    if (item.type.includes("toilet") || item.type.includes("wc")) {
-      const tankH = Math.max(6, il * 0.3);
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={tankH}
-            rx={2}
-            fill="#FFFFFF"
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <ellipse
-            cx={ix}
-            cy={iy - il / 2 + tankH + (il - tankH) / 2}
-            rx={iw * 0.42}
-            ry={(il - tankH) * 0.45}
-            fill="#FFFFFF"
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <ellipse
-            cx={ix}
-            cy={iy - il / 2 + tankH + (il - tankH) / 2}
-            rx={iw * 0.26}
-            ry={(il - tankH) * 0.28}
-            fill="#F1F5F9"
-            stroke="#94A3B8"
-            strokeWidth={1}
-          />
-        </g>
-      );
-    }
-
-    // 9. Bathroom Basin / Vanity
-    if (item.type.includes("basin") || item.type.includes("vanity")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={3}
-            fill="#FFFFFF"
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <ellipse
-            cx={ix}
-            cy={iy + 2}
-            rx={iw * 0.38}
-            ry={il * 0.35}
-            fill="#F8FAFC"
-            stroke="#64748B"
-            strokeWidth={1}
-          />
-          <circle cx={ix} cy={iy + 2} r={2.5} fill="#475569" />
-        </g>
-      );
-    }
-
-    // 10. Shower
-    if (item.type.includes("shower")) {
-      return (
-        <g
-          key={item.id}
-          transform={`rotate(${item.rotation || 0}, ${ix}, ${iy})`}
-          onClick={handleFurnitureClick}
-          onMouseDown={handleFurnitureMouseDown}
-          className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
-        >
-          <rect
-            x={ix - iw / 2}
-            y={iy - il / 2}
-            width={iw}
-            height={il}
-            rx={2}
-            fill="#F1F5F9"
-            stroke={strokeCol}
-            strokeWidth={strokeW}
-          />
-          <line
-            x1={ix - iw / 2 + 3}
-            y1={iy - il / 2 + 3}
-            x2={ix + iw / 2 - 3}
-            y2={iy + il / 2 - 3}
-            stroke="#CBD5E1"
-            strokeWidth={0.8}
-            strokeDasharray="3 3"
-          />
-          <line
-            x1={ix + iw / 2 - 3}
-            y1={iy - il / 2 + 3}
-            x2={ix - iw / 2 + 3}
-            y2={iy + il / 2 - 3}
-            stroke="#CBD5E1"
-            strokeWidth={0.8}
-            strokeDasharray="3 3"
-          />
-          <circle cx={ix} cy={iy} r={5} fill="#FFFFFF" stroke="#64748B" strokeWidth={1} />
-        </g>
-      );
-    }
-
-    // Default Fallback
     return (
       <g
         key={item.id}
@@ -2085,18 +1833,176 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         onMouseDown={handleFurnitureMouseDown}
         className={`${mode === "edit" ? "cursor-move" : "cursor-pointer"}`}
       >
+        {/* Main Boundary Outline */}
         <rect
           x={ix - iw / 2}
           y={iy - il / 2}
           width={iw}
           height={il}
-          rx={2}
-          fill={isSelected ? "#FFFDF9" : "#F8FAFC"}
+          rx={isSofa || isBasin ? 4 : 2}
+          fill={isSelected ? "#FFFBF5" : "#FFFFFF"}
           stroke={strokeCol}
           strokeWidth={strokeW}
         />
+
+        {/* Minimal Bed Outline */}
+        {isBed && (
+          <>
+            <line
+              x1={ix - iw / 2}
+              y1={iy - il / 2 + Math.max(4, il * 0.14)}
+              x2={ix + iw / 2}
+              y2={iy - il / 2 + Math.max(4, il * 0.14)}
+              stroke={strokeCol}
+              strokeWidth={1}
+            />
+            <rect
+              x={ix - iw / 2 + iw * 0.1}
+              y={iy - il / 2 + 5}
+              width={iw * 0.34}
+              height={Math.min(14, il * 0.22)}
+              rx={2}
+              fill="none"
+              stroke="#94A3B8"
+              strokeWidth={0.9}
+            />
+            <rect
+              x={ix + iw / 2 - iw * 0.1 - iw * 0.34}
+              y={iy - il / 2 + 5}
+              width={iw * 0.34}
+              height={Math.min(14, il * 0.22)}
+              rx={2}
+              fill="none"
+              stroke="#94A3B8"
+              strokeWidth={0.9}
+            />
+          </>
+        )}
+
+        {/* Minimal Sofa Outline */}
+        {isSofa && (
+          <>
+            <line
+              x1={ix - iw / 2 + 6}
+              y1={iy - il / 2 + Math.max(6, il * 0.25)}
+              x2={ix + iw / 2 - 6}
+              y2={iy - il / 2 + Math.max(6, il * 0.25)}
+              stroke={strokeCol}
+              strokeWidth={1}
+            />
+            <line
+              x1={ix - iw / 2 + Math.max(5, iw * 0.12)}
+              y1={iy - il / 2}
+              x2={ix - iw / 2 + Math.max(5, iw * 0.12)}
+              y2={iy + il / 2}
+              stroke={strokeCol}
+              strokeWidth={0.9}
+            />
+            <line
+              x1={ix + iw / 2 - Math.max(5, iw * 0.12)}
+              y1={iy - il / 2}
+              x2={ix + iw / 2 - Math.max(5, iw * 0.12)}
+              y2={iy + il / 2}
+              stroke={strokeCol}
+              strokeWidth={0.9}
+            />
+          </>
+        )}
+
+        {/* Minimal Dining Table */}
+        {isDining && (
+          <rect
+            x={ix - iw / 2 + 3}
+            y={iy - il / 2 + 3}
+            width={Math.max(2, iw - 6)}
+            height={Math.max(2, il - 6)}
+            fill="none"
+            stroke="#CBD5E1"
+            strokeWidth={0.7}
+            strokeDasharray="2 2"
+          />
+        )}
+
+        {/* Minimal Toilet */}
+        {isBath && (
+          <>
+            <rect
+              x={ix - iw / 2 + 3}
+              y={iy - il / 2 + 2}
+              width={Math.max(4, iw - 6)}
+              height={Math.max(4, il * 0.3)}
+              rx={1}
+              fill="none"
+              stroke={strokeCol}
+              strokeWidth={1}
+            />
+            <ellipse
+              cx={ix}
+              cy={iy + il * 0.15}
+              rx={Math.max(3, iw * 0.32)}
+              ry={Math.max(4, il * 0.32)}
+              fill="none"
+              stroke={strokeCol}
+              strokeWidth={1}
+            />
+          </>
+        )}
+
+        {/* Minimal Basin */}
+        {isBasin && (
+          <circle
+            cx={ix}
+            cy={iy}
+            r={Math.min(iw, il) * 0.28}
+            fill="none"
+            stroke={strokeCol}
+            strokeWidth={1}
+          />
+        )}
+
+        {/* Minimal Shower */}
+        {isShower && (
+          <>
+            <line
+              x1={ix - iw / 2 + 3}
+              y1={iy - il / 2 + 3}
+              x2={ix + iw / 2 - 3}
+              y2={iy + il / 2 - 3}
+              stroke="#CBD5E1"
+              strokeWidth={0.8}
+            />
+            <line
+              x1={ix + iw / 2 - 3}
+              y1={iy - il / 2 + 3}
+              x2={ix - iw / 2 + 3}
+              y2={iy + il / 2 - 3}
+              stroke="#CBD5E1"
+              strokeWidth={0.8}
+            />
+            <circle cx={ix} cy={iy} r={3.5} fill="#FFFFFF" stroke={strokeCol} strokeWidth={1} />
+          </>
+        )}
+
+        {/* Minimal Kitchen Counter / Cooktop */}
+        {isKitchen && (
+          <>
+            <circle cx={ix - iw * 0.22} cy={iy} r={Math.min(iw, il) * 0.18} fill="none" stroke="#94A3B8" strokeWidth={0.9} />
+            <circle cx={ix + iw * 0.22} cy={iy} r={Math.min(iw, il) * 0.18} fill="none" stroke="#94A3B8" strokeWidth={0.9} />
+          </>
+        )}
+
+        {/* Minimal Wardrobe */}
+        {isWardrobe && (
+          <>
+            <line x1={ix} y1={iy - il / 2} x2={ix} y2={iy + il / 2} stroke={strokeCol} strokeWidth={1} />
+            <line x1={ix - 3} y1={iy} x2={ix - 3} y2={iy + 6} stroke={strokeCol} strokeWidth={1.2} />
+            <line x1={ix + 3} y1={iy} x2={ix + 3} y2={iy + 6} stroke={strokeCol} strokeWidth={1.2} />
+          </>
+        )}
+
+        {/* Selected visual indicator */}
         {isSelected && mode === "edit" && (
-          <circle cx={ix} cy={iy - il / 2 - 8} r={4} fill="#C48446" />
+          <circle cx={ix} cy={iy - il / 2 - 7} r={3.5} fill="#C48446" />
         )}
       </g>
     );
@@ -2108,567 +2014,20 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     .flatMap((r) => r.furniture || [])
     .find((f) => f.id === selectedFurnitureId);
 
-  return (
-    <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#ECEEF2]">
-      {/* 1. TOP BAR */}
-      <div className="absolute top-4 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
-        {/* Left: Exit & Minimal Studio Title */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {mode === "edit" ? (
-            <>
-              {/* EXIT Button */}
-              <button
-                onClick={handleExit}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg transition-all"
-                title="Exit Edit Mode"
-              >
-                <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
-                <span className="font-semibold">EXIT</span>
-              </button>
+  // Selected Entity helper
+  const selectedEntity = selectedRoom || selectedFurniture || selectedDoor || selectedWindow || selectedWall;
 
-              {/* Title Badge: EDIT YOUR HOME */}
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#12141A]/90 text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg">
-                <span className="w-2 h-2 rounded-full bg-[#C48446] animate-pulse" />
-                <span className="font-bold tracking-widest text-[#F5F3EF] uppercase">
-                  EDIT YOUR HOME
-                </span>
-              </div>
-            </>
-          ) : (
-            <button
-              onClick={() => router.push(`/project/${layout.id}/plan`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg transition-all"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
-              <span>PLAN</span>
-            </button>
-          )}
+  // Sync exact dimension inputs when selectedRoom changes
+  useEffect(() => {
+    if (selectedRoom && selectedRoom.rect) {
+      setExactWidthInput(feetToArchitectural(selectedRoom.rect.width));
+      setExactLengthInput(feetToArchitectural(selectedRoom.rect.length));
+    }
+  }, [selectedRoom?.id, selectedRoom?.rect?.width, selectedRoom?.rect?.length]);
 
-          {/* Floor Level Switcher (If multi-story) */}
-          {layout.floors && layout.floors.length > 1 && onSelectFloor && (
-            <div className="flex items-center p-0.5 rounded-full bg-[#12141A]/90 border border-white/10 shadow-lg text-[10px] font-mono text-[#9E9C98]">
-              {layout.floors.map((fl, idx) => (
-                <button
-                  key={fl.floor_number}
-                  onClick={() => onSelectFloor(idx)}
-                  className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeFloorIndex === idx
-                      ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                      : "hover:text-[#F5F3EF]"
-                  }`}
-                >
-                  {fl.floor_name ? fl.floor_name.replace(" Floor", "").toUpperCase() : idx === 0 ? "GROUND" : idx === 1 ? "FIRST" : idx === 2 ? "SECOND" : `L${fl.floor_number}`}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Right: Undo / Redo / DONE Controls */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {mode === "edit" && (
-            <>
-              {/* Undo / Redo */}
-              <div className="flex items-center p-0.5 rounded-full bg-[#12141A]/90 border border-white/10 shadow-lg text-[11px] font-mono text-[#9E9C98]">
-                <button
-                  onClick={undo}
-                  disabled={!canUndo}
-                  className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] disabled:opacity-30 transition-colors"
-                  title="Undo (Ctrl+Z)"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={redo}
-                  disabled={!canRedo}
-                  className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] disabled:opacity-30 transition-colors"
-                  title="Redo (Ctrl+Y)"
-                >
-                  <RotateCw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* DONE Button */}
-              <button
-                onClick={handleDone}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-mono tracking-wider shadow-lg transition-all bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold"
-                title="Save and finish editing"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                )}
-                <span>DONE</span>
-              </button>
-            </>
-          )}
-
-          {/* Export PNG */}
-          <button
-            onClick={handleExportPNG}
-            disabled={isExporting}
-            className="p-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#9E9C98] hover:text-[#F5F3EF] border border-white/10 shadow-lg transition-all disabled:opacity-50"
-            title="Export Architectural Drawing (PNG)"
-          >
-            {isExporting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* 2. CONTEXTUAL FLOATING TOOLBAR (APPEARS NEAR SELECTION) */}
-      {mode === "edit" && (selectedRoom || selectedFurniture || selectedDoor || selectedWindow || selectedWall) && (
-        <div className="absolute top-16 sm:top-18 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1 rounded-full bg-[#12141A]/95 backdrop-blur-md border border-[#C48446]/40 shadow-2xl text-xs font-mono text-[#F5F3EF] animate-in fade-in slide-in-from-top-2 duration-200">
-          {/* Wall Selection Controls */}
-          {selectedWall && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="px-2.5 py-1 text-[#C48446] font-bold truncate max-w-[140px]">
-                WALL · {selectedWall.is_exterior ? "EXTERIOR" : "PARTITION"}
-              </div>
-              <div className="h-4 w-px bg-white/10" />
-
-              {/* Thickness Toggle: 4.5" vs 9" */}
-              <button
-                type="button"
-                onClick={handleToggleWallThickness}
-                className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[#F5F3EF] text-[10px] font-mono transition-all flex items-center gap-1"
-                title="Toggle Wall Thickness between 4.5 inch partition and 9 inch structural"
-              >
-                <span>THICKNESS: {Math.round(selectedWall.thickness * 12)}&quot;</span>
-              </button>
-
-              <div className="h-4 w-px bg-white/10" />
-
-              <span className="text-[10px] text-[#9E9C98] hidden sm:inline">
-                Drag wall to move · Drag endpoints to extend/shorten
-              </span>
-
-              {/* AI prompt shortcut */}
-              <button
-                type="button"
-                onClick={() => {
-                  setAiPrompt(`Optimize wall ${selectedWall.id} and connected layout`);
-                  setIsAiOpen(true);
-                }}
-                className="px-2 py-1 rounded-full bg-[#C48446]/20 text-[#C48446] hover:bg-[#C48446]/30 text-[10px] font-mono flex items-center gap-1"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>AI</span>
-              </button>
-            </div>
-          )}
-
-          {/* Room Selection Controls: Exact Dimension Inputs & Steppers */}
-          {selectedRoom && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="px-2.5 py-1 text-[#C48446] font-bold truncate max-w-[140px]">
-                {selectedRoom.name.toUpperCase()}
-              </div>
-              <div className="h-4 w-px bg-white/10" />
-
-              {/* Exact Width input */}
-              <div className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
-                <span className="text-[10px] text-[#9E9C98]">W:</span>
-                <input
-                  type="text"
-                  value={exactWidthInput}
-                  onChange={(e) => setExactWidthInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleApplyExactDimensions();
-                  }}
-                  className="w-16 bg-transparent text-center font-mono text-xs text-[#F5F3EF] focus:outline-none focus:text-[#C48446]"
-                  placeholder="13'-0&quot;"
-                  title="Width (e.g. 13'-0&quot; or 13.5)"
-                />
-              </div>
-
-              <span className="text-white/30 text-[10px]">×</span>
-
-              {/* Exact Length / Depth input */}
-              <div className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
-                <span className="text-[10px] text-[#9E9C98]">D:</span>
-                <input
-                  type="text"
-                  value={exactLengthInput}
-                  onChange={(e) => setExactLengthInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleApplyExactDimensions();
-                  }}
-                  className="w-16 bg-transparent text-center font-mono text-xs text-[#F5F3EF] focus:outline-none focus:text-[#C48446]"
-                  placeholder="14'-0&quot;"
-                  title="Depth / Length (e.g. 14'-0&quot; or 14.0)"
-                />
-              </div>
-
-              {/* Apply Button */}
-              <button
-                type="button"
-                onClick={handleApplyExactDimensions}
-                disabled={isApplyingExact}
-                className="px-2.5 py-1 rounded-full bg-[#C48446] text-[#0A0B0E] font-bold text-[10px] hover:bg-[#D49354] transition-all flex items-center gap-1 disabled:opacity-50"
-                title="Apply Exact Dimensions"
-              >
-                {isApplyingExact ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3 stroke-[2.5]" />}
-                <span>APPLY</span>
-              </button>
-
-              <div className="h-4 w-px bg-white/10" />
-
-              {/* Steppers */}
-              <button
-                onClick={() => handleStepResizeRoom("width", 1)}
-                className="px-1.5 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
-                title="Expand Width +1ft"
-              >
-                +1&apos;W
-              </button>
-              <button
-                onClick={() => handleStepResizeRoom("width", -1)}
-                className="px-1.5 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
-                title="Shrink Width -1ft"
-              >
-                -1&apos;W
-              </button>
-              <button
-                onClick={() => handleStepResizeRoom("length", 1)}
-                className="px-1.5 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
-                title="Expand Length +1ft"
-              >
-                +1&apos;L
-              </button>
-              <button
-                onClick={() => handleStepResizeRoom("length", -1)}
-                className="px-1.5 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
-                title="Shrink Length -1ft"
-              >
-                -1&apos;L
-              </button>
-
-              <div className="h-4 w-px bg-white/10" />
-
-              {/* AI Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setAiPrompt(`Optimize layout of ${selectedRoom.name}`);
-                  setIsAiOpen(true);
-                }}
-                className="px-2 py-1 rounded-full bg-[#C48446]/20 text-[#C48446] hover:bg-[#C48446]/30 text-[10px] font-mono flex items-center gap-1"
-                title="Ask AI Architect about this room"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>AI</span>
-              </button>
-            </div>
-          )}
-
-          {/* Furniture Selection Controls */}
-          {selectedFurniture && (
-            <>
-              <div className="px-3 py-1 text-[#C48446] font-bold uppercase">
-                {selectedFurniture.type.replace(/_/g, " ")}
-              </div>
-              <div className="h-4 w-px bg-white/10" />
-              <button
-                onClick={handleRotateFurniture}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[#F5F3EF]"
-                title="Rotate 90 Degrees"
-              >
-                <RotateCw className="w-3 h-3 text-[#C48446]" />
-                <span>ROTATE 90°</span>
-              </button>
-            </>
-          )}
-
-          {/* Door Controls */}
-          {selectedDoor && (
-            <>
-              <div className="px-3 py-1 text-[#C48446] font-bold uppercase">
-                DOOR {selectedDoor.id}
-              </div>
-              <div className="h-4 w-px bg-white/10" />
-              <button
-                onClick={handleFlipDoorSwing}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[#F5F3EF]"
-                title="Flip Swing Direction"
-              >
-                <RotateCw className="w-3 h-3 text-[#C48446]" />
-                <span>FLIP SWING</span>
-              </button>
-            </>
-          )}
-
-          {/* Window Controls */}
-          {selectedWindow && (
-            <div className="flex items-center gap-2">
-              <div className="px-3 py-1 text-[#C48446] font-bold uppercase">
-                WINDOW {selectedWindow.id} ({selectedWindow.width}&apos;)
-              </div>
-              <div className="h-4 w-px bg-white/10" />
-              <button
-                onClick={() => handleResizeWindowWidth(1)}
-                className="px-2 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
-                title="Expand Window +1ft"
-              >
-                +1&apos;W
-              </button>
-              <button
-                onClick={() => handleResizeWindowWidth(-1)}
-                className="px-2 py-0.5 rounded-full hover:bg-white/10 text-[10px] text-[#9E9C98] hover:text-[#F5F3EF]"
-                title="Shrink Window -1ft"
-              >
-                -1&apos;W
-              </button>
-            </div>
-          )}
-
-          <div className="h-4 w-px bg-white/10" />
-
-          {/* Delete Entity */}
-          <button
-            onClick={handleDeleteSelected}
-            className="p-1.5 rounded-full hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
-            title="Delete Selected Item"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Close Context Toolbar */}
-          <button
-            onClick={() => {
-              handleSelectRoom(null);
-              handleSelectFurniture(null);
-              setSelectedWallId(null);
-              setSelectedDoorId(null);
-              setSelectedWindowId(null);
-            }}
-            className="p-1 rounded-full hover:bg-white/10 text-[#9E9C98] hover:text-[#F5F3EF]"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* INVALID OPERATION WARNING (REVERTS & WARNS USER) */}
-      {invalidMoveNotice && (
-        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full bg-red-950/90 text-red-200 border border-red-500/40 shadow-2xl text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
-          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-          <span>{invalidMoveNotice}</span>
-        </div>
-      )}
-
-      {/* EDIT NOTICE / CONSTRAINT WARNING BANNER */}
-      {editNotice && (
-        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-[#12141A]/95 border border-[#C48446]/60 shadow-2xl text-xs font-mono text-[#F5F3EF] flex items-center gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-          <Info className="w-4 h-4 text-[#C48446] shrink-0" />
-          <span>{editNotice}</span>
-          <button
-            onClick={() => setEditNotice(null)}
-            className="ml-2 text-[#9E9C98] hover:text-white p-0.5 rounded-full hover:bg-white/10"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-
-      {/* 3. LEFT FLOATING AI ARCHITECT BUTTON & POPOVER */}
-      {mode === "edit" && (
-        <div className="absolute top-20 left-4 sm:left-6 z-30 flex flex-col items-start pointer-events-auto">
-          <button
-            onClick={() => setIsAiOpen((prev) => !prev)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono tracking-wider shadow-xl transition-all ${
-              isAiOpen
-                ? "bg-[#C48446] text-[#0A0B0E] font-bold ring-2 ring-[#C48446]/40"
-                : "bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 hover:border-[#C48446]/40"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#C48446]" />
-            <span>✦ AI ARCHITECT</span>
-          </button>
-
-          {/* Collapsible Popover Card */}
-          {isAiOpen && (
-            <div className="mt-2 w-80 p-4 rounded-2xl bg-[#12141A]/95 backdrop-blur-md border border-white/10 shadow-2xl text-[#F5F3EF] animate-in fade-in slide-in-from-left-2 duration-200">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#C48446]" />
-                  <span className="font-mono text-xs font-semibold uppercase tracking-wider">
-                    Architectural Assistant
-                  </span>
-                </div>
-                <button
-                  onClick={() => setIsAiOpen(false)}
-                  className="p-1 rounded-full hover:bg-white/10 text-[#9E9C98] hover:text-white"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Quick Prompt Chips */}
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {[
-                  "Enlarge living room by 2ft",
-                  "Optimize bedroom circulation",
-                  "Add a walk-in wardrobe",
-                  "Align dining with kitchen",
-                  "Maximize master bedroom",
-                ].map((chip) => (
-                  <button
-                    key={chip}
-                    onClick={() => handleAiAction(chip)}
-                    disabled={isAiProcessing}
-                    className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] font-mono text-[#9E9C98] hover:text-[#F5F3EF] border border-white/5 transition-all text-left"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-
-              {/* Notice */}
-              {aiNotice && (
-                <div className="mt-3 p-2 rounded-lg bg-[#C48446]/10 border border-[#C48446]/20 text-[11px] font-mono text-[#C48446] leading-relaxed">
-                  {aiNotice}
-                </div>
-              )}
-
-              {/* Custom Input */}
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleAiAction(aiPrompt);
-                    }
-                  }}
-                  placeholder="Request architectural change..."
-                  disabled={isAiProcessing}
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-xs font-mono text-[#F5F3EF] placeholder-[#9E9C98] focus:outline-none focus:border-[#C48446]"
-                />
-                <button
-                  onClick={() => handleAiAction(aiPrompt)}
-                  disabled={isAiProcessing || !aiPrompt.trim()}
-                  className="p-2 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] disabled:opacity-30 transition-colors"
-                >
-                  {isAiProcessing ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              </div>
-
-              {/* Gemini Visual QA Button & Review Report */}
-              <div className="mt-4 pt-3 border-t border-white/10">
-                <button
-                  onClick={handleRunGeminiQa}
-                  disabled={isQaReviewing || isAiProcessing}
-                  className="w-full py-2 px-3 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 border border-sky-500/30 text-xs font-mono font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                >
-                  {isQaReviewing ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Reviewing Floor Plan...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-                      <span>✦ RUN GEMINI VISUAL QA REVIEW</span>
-                    </>
-                  )}
-                </button>
-
-                {qaReport && (
-                  <div className="mt-3 p-3 rounded-xl bg-black/40 border border-white/10 max-h-56 overflow-y-auto space-y-2 text-[11px] font-mono">
-                    <div className="flex items-center justify-between pb-1 border-b border-white/10">
-                      <span className="text-white font-bold">QA Visual Assessment</span>
-                      {qaReport.score !== undefined && (
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">
-                          {qaReport.score}/100
-                        </span>
-                      )}
-                    </div>
-                    {qaReport.critique && (
-                      <p className="text-[#9E9C98] leading-relaxed text-[10.5px]">
-                        {qaReport.critique}
-                      </p>
-                    )}
-                    {qaReport.issues && qaReport.issues.length > 0 ? (
-                      <div className="space-y-1.5 pt-1">
-                        <div className="text-[10px] uppercase text-[#64748B] font-bold">
-                          Items Inspected ({qaReport.issues.length}):
-                        </div>
-                        {qaReport.issues.map((iss, iIdx) => (
-                          <div
-                            key={iIdx}
-                            className="p-1.5 rounded bg-white/5 border border-white/5 space-y-0.5"
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  iss.severity === "high"
-                                    ? "bg-rose-400"
-                                    : iss.severity === "medium"
-                                    ? "bg-amber-400"
-                                    : "bg-sky-400"
-                                }`}
-                              />
-                              <span className="text-[9px] uppercase font-bold text-[#CBD5E1]">
-                                {iss.category}
-                              </span>
-                            </div>
-                            <div className="text-white/80 text-[10px] pl-3 leading-snug">
-                              {iss.description}
-                            </div>
-                            {iss.recommendation && (
-                              <div className="text-[#38BDF8] text-[9.5px] pl-3 italic">
-                                Rec: {iss.recommendation}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-emerald-400 text-[10.5px] pt-1">
-                        ✓ All architectural boundaries, openings, and clearances verified.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 4. MAIN DRAFTING SVG CANVAS */}
-      <div
-        ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onDoubleClick={handleResetView}
-        className={`w-full h-full flex items-center justify-center p-4 ${
-          isPanning ? "cursor-grabbing" : isPanMode ? "cursor-grab" : "cursor-default"
-        }`}
-      >
-        <div
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: "center center",
-            transition: isPanning || draggingRoom || draggingFurniture || resizingRoom ? "none" : "transform 0.12s cubic-bezier(0.16, 1, 0.3, 1)",
-          }}
-          className="flex items-center justify-center"
-        >
-          <svg
+  // Render SVG Drawing Sheet
+  const renderSvgSheet = () => (
+    <svg
             ref={svgRef}
             id="architectural-svg"
             width={svgWidth + padding * 2}
@@ -2924,16 +2283,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       <polyline
                         points={pts}
                         fill="none"
-                        stroke="#E2E8F0"
-                        strokeWidth={(p.width || 3.5) * SCALE}
-                        strokeLinecap="square"
-                        strokeLinejoin="round"
-                      />
-                      <polyline
-                        points={pts}
-                        fill="none"
                         stroke="#94A3B8"
-                        strokeWidth={1.2}
+                        strokeWidth={1.5}
                         strokeDasharray="4 3"
                       />
                     </g>
@@ -2955,6 +2306,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               return (
                 <g
                   key={room.id}
+                  id={`canvas-room-${room.id}`}
+                  data-room-id={room.id}
                   transform={`translate(${rx}, ${ry})`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -3013,83 +2366,6 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                     </g>
                   )}
 
-                  {/* Centered Readable Architectural Room Label */}
-                  <g pointerEvents="none" className="select-none">
-                    {(rw < 90 || rl < 70) ? (
-                      /* Compact Frosted Pill Label for Small Rooms */
-                      <g transform={`translate(${rw / 2}, ${rl / 2})`}>
-                        <rect
-                          x={-Math.min(rw * 0.45, 42)}
-                          y={-18}
-                          width={Math.min(rw * 0.9, 84)}
-                          height={36}
-                          rx={3}
-                          fill="#FFFFFF"
-                          fillOpacity={0.88}
-                          stroke="#E2E8F0"
-                          strokeWidth={0.5}
-                        />
-                        <text
-                          x={0}
-                          y={-6}
-                          textAnchor="middle"
-                          fill={isSelected ? "#92400E" : "#0F172A"}
-                          className="font-sans text-[8.5px] font-bold tracking-wider"
-                        >
-                          {room.name.toUpperCase()}
-                        </text>
-                        <text
-                          x={0}
-                          y={4}
-                          textAnchor="middle"
-                          fill={isSelected ? "#C48446" : "#334155"}
-                          className="font-mono text-[7.5px] font-semibold"
-                        >
-                          {feetToArchitectural(room.rect.width)} × {feetToArchitectural(room.rect.length)}
-                        </text>
-                        <text
-                          x={0}
-                          y={14}
-                          textAnchor="middle"
-                          fill={isSelected ? "#D97706" : "#64748B"}
-                          className="font-mono text-[7px] font-medium"
-                        >
-                          {room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT
-                        </text>
-                      </g>
-                    ) : (
-                      /* Standard Clean 3-Line Centered Architectural Room Label */
-                      <g transform={`translate(${rw / 2}, ${rl / 2})`}>
-                        <text
-                          x={0}
-                          y={-9}
-                          textAnchor="middle"
-                          fill={isSelected ? "#92400E" : "#0F172A"}
-                          className="font-sans text-[11px] font-bold tracking-wider"
-                        >
-                          {room.name.toUpperCase()}
-                        </text>
-                        <text
-                          x={0}
-                          y={5}
-                          textAnchor="middle"
-                          fill={isSelected ? "#C48446" : "#334155"}
-                          className="font-mono text-[9px] font-semibold"
-                        >
-                          {feetToArchitectural(room.rect.width)} × {feetToArchitectural(room.rect.length)}
-                        </text>
-                        <text
-                          x={0}
-                          y={17}
-                          textAnchor="middle"
-                          fill={isSelected ? "#D97706" : "#64748B"}
-                          className="font-mono text-[8px] font-medium"
-                        >
-                          {room.area_sqft || Math.round(room.rect.width * room.rect.length)} SQ FT
-                        </text>
-                      </g>
-                    )}
-                  </g>
 
                   {/* Corner & Edge Resize Handles in Edit Mode */}
                   {mode === "edit" && isSelected && (
@@ -3616,6 +2892,180 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               );
             })}
 
+            {/* SMART ALIGNMENT GUIDES (RENDERED DURING ROOM DRAGGING) */}
+            {alignmentGuides && alignmentGuides.length > 0 && (
+              <g id="alignment-guides-layer" pointerEvents="none">
+                {alignmentGuides.map((g, idx) => (
+                  <g key={`guide-${idx}`}>
+                    {g.type === "v" ? (
+                      <>
+                        <line
+                          x1={g.pos * SCALE}
+                          y1={-padding}
+                          x2={g.pos * SCALE}
+                          y2={svgHeight + padding}
+                          stroke="#EC4899"
+                          strokeWidth={1.5}
+                          strokeDasharray="4 3"
+                        />
+                        <rect
+                          x={g.pos * SCALE - 16}
+                          y={-18}
+                          width={32}
+                          height={14}
+                          rx={3}
+                          fill="#EC4899"
+                        />
+                        <text
+                          x={g.pos * SCALE}
+                          y={-8}
+                          textAnchor="middle"
+                          fill="#FFFFFF"
+                          className="font-mono text-[8px] font-bold select-none"
+                        >
+                          ALIGN
+                        </text>
+                      </>
+                    ) : (
+                      <>
+                        <line
+                          x1={-padding}
+                          y1={g.pos * SCALE}
+                          x2={svgWidth + padding}
+                          y2={g.pos * SCALE}
+                          stroke="#EC4899"
+                          strokeWidth={1.5}
+                          strokeDasharray="4 3"
+                        />
+                        <rect
+                          x={-28}
+                          y={g.pos * SCALE - 7}
+                          width={32}
+                          height={14}
+                          rx={3}
+                          fill="#EC4899"
+                        />
+                        <text
+                          x={-12}
+                          y={g.pos * SCALE + 3}
+                          textAnchor="middle"
+                          fill="#FFFFFF"
+                          className="font-mono text-[8px] font-bold select-none"
+                        >
+                          ALIGN
+                        </text>
+                      </>
+                    )}
+                  </g>
+                ))}
+              </g>
+            )}
+
+            {/* MASTER ARCHITECTURAL ROOM LABELS (CRISP, HIGHEST LAYER, NEVER CLASH WITH FURNITURE OR WALLS) */}
+            <g id="master-room-labels-layer" pointerEvents="none">
+              {(currentFloor.rooms || []).map((room) => {
+                if (!room.rect) return null;
+                const rx = room.rect.x * SCALE;
+                const ry = room.rect.y * SCALE;
+                const rw = room.rect.width * SCALE;
+                const rl = room.rect.length * SCALE;
+                const isSelected = selectedRoomId === room.id;
+
+                let roomName = (room.name || "ROOM").toUpperCase().trim();
+                // Clean abbreviations for tight rooms
+                if (rw < 100 || rl < 70) {
+                  if (roomName.includes("BALCONY") || roomName.includes("TERRACE")) roomName = "BALCONY";
+                  else if (roomName.includes("PRIMARY SUITE") || roomName.includes("MASTER BEDROOM")) roomName = "PRIMARY BED";
+                  else if (roomName.includes("ENTRY FOYER") || roomName.includes("FOYER")) roomName = "ENTRY";
+                  else if (roomName.includes("CIRCULATION") || roomName.includes("HALLWAY")) roomName = "HALL";
+                  else if (roomName.includes("POWDER")) roomName = "POWDER";
+                  else if (roomName.includes("GUEST BEDROOM")) roomName = "GUEST BED";
+                  else if (roomName.includes("LIVING ROOM")) roomName = "LIVING";
+                }
+                if (roomName.includes(" / ")) {
+                  roomName = roomName.split(" / ")[0];
+                }
+
+                const dimStr = `${feetToArchitectural(room.rect.width)} × ${feetToArchitectural(room.rect.length)}`;
+                const areaSqFt = room.area_sqft || Math.round(room.rect.width * room.rect.length);
+                const areaStr = `${areaSqFt} SQ FT`;
+
+                const safeMargin = 10;
+                const maxAllowedW = Math.max(28, rw - safeMargin);
+                const isUltraCompact = rw < 75 || rl < 55;
+                const isSmall = rw < 110 || rl < 80;
+
+                const titleFont = Math.min(
+                  isUltraCompact ? 8.0 : isSmall ? 9.5 : 11.5,
+                  Math.max(6.5, (maxAllowedW / Math.max(roomName.length, 1)) * 1.35)
+                );
+                const dimFont = Math.min(
+                  isUltraCompact ? 7.0 : isSmall ? 8.0 : 9.0,
+                  Math.max(6.0, (maxAllowedW / Math.max(dimStr.length, 1)) * 1.4)
+                );
+                const areaFont = Math.min(
+                  isUltraCompact ? 6.5 : isSmall ? 7.5 : 8.0,
+                  Math.max(5.5, (maxAllowedW / Math.max(areaStr.length, 1)) * 1.4)
+                );
+
+                const estTitleW = roomName.length * titleFont * 0.65;
+                const estDimW = dimStr.length * dimFont * 0.6;
+                const estAreaW = isUltraCompact ? 0 : areaStr.length * areaFont * 0.6;
+                const maxContentW = Math.max(estTitleW, estDimW, estAreaW);
+
+                const patchW = Math.min(maxAllowedW, Math.max(48, maxContentW + 16));
+                const patchH = isUltraCompact ? 26 : isSmall ? 36 : 44;
+
+                return (
+                  <g key={`lbl-${room.id}`} transform={`translate(${rx + rw / 2}, ${ry + rl / 2})`}>
+                    <rect
+                      x={-patchW / 2}
+                      y={-patchH / 2}
+                      width={patchW}
+                      height={patchH}
+                      rx={4}
+                      fill="#FFFFFF"
+                      fillOpacity={0.98}
+                      stroke={isSelected ? "#C48446" : "#CBD5E1"}
+                      strokeWidth={isSelected ? 1.5 : 0.8}
+                    />
+                    <text
+                      x={0}
+                      y={isUltraCompact ? -2 : isSmall ? -5 : -7}
+                      textAnchor="middle"
+                      fill={isSelected ? "#92400E" : "#0F172A"}
+                      style={{ fontSize: `${titleFont}px` }}
+                      className="font-sans font-bold tracking-wider select-none"
+                    >
+                      {roomName}
+                    </text>
+                    <text
+                      x={0}
+                      y={isUltraCompact ? 8 : isSmall ? 7 : 7}
+                      textAnchor="middle"
+                      fill={isSelected ? "#C48446" : "#475569"}
+                      style={{ fontSize: `${dimFont}px` }}
+                      className="font-mono font-semibold select-none"
+                    >
+                      {dimStr}
+                    </text>
+                    {!isUltraCompact && (
+                      <text
+                        x={0}
+                        y={isSmall ? 16 : 18}
+                        textAnchor="middle"
+                        fill={isSelected ? "#D97706" : "#64748B"}
+                        style={{ fontSize: `${areaFont}px` }}
+                        className="font-mono font-medium select-none"
+                      >
+                        {areaStr}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+
             {/* COMPASS ROSE / NORTH ARROW */}
             <g transform={`translate(${svgWidth - 45}, -30)`} pointerEvents="none">
               <circle cx={0} cy={0} r={22} fill="#FFFFFF" stroke="#334155" strokeWidth={1.5} />
@@ -3686,10 +3136,932 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               </text>
             </g>
           </svg>
+  );
+
+  // -------------------------------------------------------------
+  // 1. FIGMA-STYLE PROFESSIONAL EDITOR (when mode === 'edit')
+  // -------------------------------------------------------------
+  if (mode === "edit") {
+    return (
+      <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#0F1014] text-[#F3F4F6] font-sans">
+        {/* TOP DOCKED HEADER & TOOLBAR */}
+        <header className="h-12 border-b border-[#23252B] bg-[#16171B] flex items-center justify-between px-2 sm:px-3 z-40 shrink-0 gap-2">
+          {/* Left: Exit, Layers Toggle & Project Title */}
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-exit"
+              onClick={handleExit}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-[#E2E8F0] hover:text-white border border-white/5 transition-all shrink-0"
+              title="Exit to Plan Overview"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
+              <span className="font-semibold hidden xs:inline">EXIT</span>
+            </button>
+            <button
+              id="btn-toggle-layers"
+              onClick={() => setIsLeftPanelOpen((prev) => !prev)}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                isLeftPanelOpen
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Toggle Structure / Layers Panel (L)"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+            <div className="h-4 w-px bg-white/10 hidden sm:block" />
+            <div className="hidden md:flex items-center gap-2">
+              <span className="text-xs font-semibold text-white/90 truncate max-w-[160px] lg:max-w-[240px]">
+                {layout.title || "Architectural Floor Plan"}
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[#E69F58] font-mono text-[9px] uppercase font-bold tracking-wider border border-amber-500/30">
+                EDITOR
+              </span>
+            </div>
+          </div>
+
+          {/* Center: Minimal Icon-Based Toolbar */}
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-[#202227] p-1 rounded-xl border border-white/5 shadow-inner overflow-x-auto">
+            <button
+              id="tool-select"
+              type="button"
+              onClick={() => setActiveTool("select")}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                activeTool === "select"
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Select & Move (V)"
+            >
+              <MousePointer className="w-4 h-4" />
+            </button>
+            <button
+              id="tool-room"
+              type="button"
+              onClick={() => setActiveTool("room")}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                activeTool === "room"
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Room Tool (R)"
+            >
+              <Square className="w-4 h-4" />
+            </button>
+            <button
+              id="tool-wall"
+              type="button"
+              onClick={() => setActiveTool("wall")}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                activeTool === "wall"
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Wall Tool (W)"
+            >
+              <PenTool className="w-4 h-4" />
+            </button>
+            <button
+              id="tool-door"
+              type="button"
+              onClick={() => setActiveTool("door")}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                activeTool === "door"
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Door Tool (D)"
+            >
+              <DoorClosed className="w-4 h-4" />
+            </button>
+            <button
+              id="tool-window"
+              type="button"
+              onClick={() => setActiveTool("window")}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                activeTool === "window"
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Window Tool (O)"
+            >
+              <AppWindow className="w-4 h-4" />
+            </button>
+            <button
+              id="tool-furniture"
+              type="button"
+              onClick={() => setActiveTool("furniture")}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                activeTool === "furniture"
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Furniture Tool (F)"
+            >
+              <Armchair className="w-4 h-4" />
+            </button>
+            <button
+              id="tool-dimensions"
+              type="button"
+              onClick={() => setShowDimensions((prev) => !prev)}
+              className={`p-1.5 rounded-lg transition-all shrink-0 ${
+                showDimensions
+                  ? "text-[#C48446] bg-[#C48446]/10"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Toggle Dimensions (M)"
+            >
+              <Ruler className="w-4 h-4" />
+            </button>
+            <div className="h-4 w-px bg-white/10 mx-0.5 sm:mx-1 shrink-0" />
+            {/* Integrated AI Architect accent button */}
+            <button
+              id="tool-ai-architect"
+              type="button"
+              onClick={() => setIsAiOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all shrink-0 ${
+                isAiOpen
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "bg-[#C48446]/15 hover:bg-[#C48446]/25 text-[#E69F58] border border-[#C48446]/30"
+              }`}
+              title="AI Architectural Assistant"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">✦ AI ARCHITECT</span>
+              <span className="sm:hidden">✦ AI</span>
+            </button>
+          </div>
+
+          {/* Right: Properties Toggle & Undo / Redo / Done / Export */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <button
+              id="btn-toggle-properties"
+              onClick={() => setIsRightPanelOpen((prev) => !prev)}
+              className={`p-1.5 rounded-lg transition-all ${
+                isRightPanelOpen
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Toggle Properties / Inspector Panel (P)"
+            >
+              <Sliders className="w-4 h-4" />
+            </button>
+            <div className="h-4 w-px bg-white/10 mx-0.5 hidden xs:block" />
+            <button
+              id="btn-undo"
+              onClick={undo}
+              disabled={!canUndo}
+              className="p-1.5 sm:p-2 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              title="Undo (Ctrl+Z)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              id="btn-redo"
+              onClick={redo}
+              disabled={!canRedo}
+              className="p-1.5 sm:p-2 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              title="Redo (Ctrl+Y)"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+            <div className="h-4 w-px bg-white/10 mx-0.5 hidden sm:block" />
+            <button
+              id="btn-export"
+              onClick={handleExportPNG}
+              disabled={isExporting}
+              className="p-1.5 sm:p-2 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-40 transition-colors hidden xs:block"
+              title="Export Architectural Drawing (PNG)"
+            >
+              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              id="btn-done"
+              onClick={handleDone}
+              disabled={isSaving}
+              className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs font-mono tracking-wider shadow transition-all"
+              title="Save & Return to Plan"
+            >
+              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+              <span>DONE</span>
+            </button>
+          </div>
+        </header>
+
+        {/* WORKBENCH BODY: Left Panel + Dominant Canvas + Right Inspector Panel */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* LEFT PANEL: LAYERS / STRUCTURE */}
+          {isLeftPanelOpen && (
+            <aside className="fixed md:static inset-y-12 left-0 w-64 bg-[#16171B] border-r border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none">
+              {/* Floor switcher */}
+              <div className="p-3 border-b border-[#23252B]">
+                <div className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8] mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span>FLOORS</span>
+                    <span className="text-white/40">({layout.floors?.length || 1})</span>
+                  </div>
+                  <button
+                    id="btn-close-layers"
+                    onClick={() => setIsLeftPanelOpen(false)}
+                    className="p-1 rounded hover:bg-white/10 text-[#94A3B8] hover:text-white md:hidden"
+                    title="Close Layers Panel"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex gap-1 p-0.5 rounded-lg bg-[#202227] border border-white/5">
+                  {(layout.floors || [{ floor_number: 1, floor_name: "Ground Floor" }]).map((fl, idx) => (
+                    <button
+                      key={fl.floor_number}
+                      id={`btn-floor-${idx}`}
+                      onClick={() => onSelectFloor?.(idx)}
+                      className={`flex-1 py-1 rounded text-[11px] font-mono font-medium transition-all ${
+                        activeFloorIndex === idx
+                          ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                          : "text-[#94A3B8] hover:text-white"
+                      }`}
+                    >
+                      {fl.floor_name ? fl.floor_name.replace(" Floor", "") : `L${fl.floor_number}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Structure / Layers List */}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <div className="px-2 py-1 text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8] flex items-center justify-between">
+                  <span>ROOMS ({(currentFloor.rooms || []).length})</span>
+                  <span className="text-[9px] text-white/40">SELECT</span>
+                </div>
+
+                {(currentFloor.rooms || []).map((room) => {
+                  const isSelected = selectedRoomId === room.id;
+                  return (
+                    <div
+                      key={room.id}
+                      id={`layer-room-${room.id}`}
+                      data-room-id={room.id}
+                      onClick={() => handleSelectRoom(isSelected ? null : room.id)}
+                      className={`group flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer transition-all ${
+                        isSelected
+                          ? "bg-[#C48446]/20 border-l-2 border-[#C48446] text-white"
+                          : "hover:bg-white/5 text-[#CBD5E1]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={isSelected ? "text-[#C48446]" : "text-[#94A3B8]"}>
+                          {getRoomIcon(room.type)}
+                        </span>
+                        <div className="truncate">
+                          <div className="text-xs font-medium truncate">{room.name}</div>
+                          <div className="text-[10px] font-mono text-[#94A3B8]">
+                            {feetToArchitectural(room.rect.width)} × {feetToArchitectural(room.rect.length)}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-[#94A3B8]">
+                        {room.area_sqft || Math.round(room.rect.width * room.rect.length)} sf
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Structural Entities count */}
+                <div className="pt-3 mt-3 border-t border-[#23252B] px-2 space-y-1.5 text-[11px] font-mono text-[#94A3B8]">
+                  <div className="flex justify-between">
+                    <span>Walls:</span>
+                    <span className="text-white/70">{(currentFloor.walls || layout.walls || []).length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Doors:</span>
+                    <span className="text-white/70">{(currentFloor.doors || layout.doors || []).length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Windows:</span>
+                    <span className="text-white/70">{(currentFloor.windows || layout.windows || []).length}</span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          )}
+
+          {/* CENTER HERO CANVAS */}
+          <main
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            onDoubleClick={handleResetView}
+            className={`flex-1 h-full relative overflow-hidden bg-[#0D0E11] flex items-center justify-center select-none touch-none ${
+              isPanning ? "cursor-grabbing" : isPanMode || isSpacePressed ? "cursor-grab" : "cursor-default"
+            }`}
+          >
+            {/* SVG Canvas with Pan & Zoom */}
+            <div
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: "center center",
+                transition: isPanning || draggingRoom || draggingFurniture || resizingRoom ? "none" : "transform 0.12s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
+              className="flex items-center justify-center"
+            >
+              {renderSvgSheet()}
+            </div>
+
+            {/* INVALID OPERATION WARNING BANNER */}
+            {invalidMoveNotice && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full bg-red-950/90 text-red-200 border border-red-500/40 shadow-2xl text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{invalidMoveNotice}</span>
+              </div>
+            )}
+
+            {/* EDIT NOTICE / CONSTRAINT WARNING BANNER */}
+            {editNotice && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-[#12141A]/95 border border-[#C48446]/60 shadow-2xl text-xs font-mono text-[#F5F3EF] flex items-center gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                <Info className="w-4 h-4 text-[#C48446] shrink-0" />
+                <span>{editNotice}</span>
+                <button
+                  onClick={() => setEditNotice(null)}
+                  className="ml-2 text-[#9E9C98] hover:text-white p-0.5 rounded-full hover:bg-white/10"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* AI ARCHITECT POPOVER CARD */}
+            {isAiOpen && (
+              <div className="absolute top-4 left-4 z-40 w-80 p-4 rounded-2xl bg-[#16171B]/95 backdrop-blur-md border border-[#C48446]/30 shadow-2xl text-[#F5F3EF] animate-in fade-in slide-in-from-left-2 duration-200">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#C48446]" />
+                    <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#E69F58]">
+                      AI Architectural Assistant
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setIsAiOpen(false)}
+                    className="p-1 rounded-full hover:bg-white/10 text-[#9E9C98] hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Quick Prompts */}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {[
+                    "Enlarge living room by 2ft",
+                    "Optimize bedroom circulation",
+                    "Add a walk-in wardrobe",
+                    "Align dining with kitchen",
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => handleAiAction(chip)}
+                      disabled={isAiProcessing}
+                      className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] font-mono text-[#9E9C98] hover:text-[#F5F3EF] border border-white/5 transition-all text-left"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Notice */}
+                {aiNotice && (
+                  <div className="mt-2.5 p-2 rounded-lg bg-[#C48446]/10 border border-[#C48446]/20 text-[11px] font-mono text-[#C48446] leading-relaxed">
+                    {aiNotice}
+                  </div>
+                )}
+
+                {/* Custom Input */}
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAiAction(aiPrompt);
+                      }
+                    }}
+                    placeholder="Request architectural change..."
+                    disabled={isAiProcessing}
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-xs font-mono text-[#F5F3EF] placeholder-[#9E9C98] focus:outline-none focus:border-[#C48446]"
+                  />
+                  <button
+                    onClick={() => handleAiAction(aiPrompt)}
+                    disabled={isAiProcessing || !aiPrompt.trim()}
+                    className="p-2 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] disabled:opacity-30 transition-colors"
+                  >
+                    {isAiProcessing ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Gemini QA Review Button */}
+                <div className="mt-3 pt-2.5 border-t border-white/10">
+                  <button
+                    onClick={handleRunGeminiQa}
+                    disabled={isQaReviewing || isAiProcessing}
+                    className="w-full py-1.5 px-3 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 border border-sky-500/30 text-[11px] font-mono font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {isQaReviewing ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Reviewing Floor Plan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                        <span>RUN VISUAL QA REVIEW</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* BOTTOM-RIGHT FLOATING ZOOM/PAN CONTROLS */}
+            <div className="absolute bottom-4 right-4 z-30 flex items-center gap-1 p-1 rounded-xl bg-[#16171B]/95 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#94A3B8]">
+              <button
+                onClick={() => setZoom((z) => Math.max(0.4, z * 0.85))}
+                className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white"
+                title="Zoom Out (-)"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="px-2 text-[11px] font-bold text-white select-none">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                onClick={() => setZoom((z) => Math.min(3.5, z * 1.15))}
+                className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white"
+                title="Zoom In (+)"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <div className="h-4 w-px bg-white/10 mx-0.5" />
+              <button
+                onClick={handleResetView}
+                className="px-2 py-1 rounded-lg hover:bg-white/5 hover:text-white text-[10px]"
+                title="Fit to Screen"
+              >
+                FIT
+              </button>
+              <button
+                onClick={() => setIsPanMode((prev) => !prev)}
+                className={`p-1.5 rounded-lg ${isPanMode ? "bg-[#C48446] text-[#0A0B0E]" : "hover:bg-white/5 hover:text-white"}`}
+                title="Pan Tool (Hand)"
+              >
+                <Hand className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </main>
+
+          {/* RIGHT PANEL: PROPERTIES / INSPECTOR */}
+          {isRightPanelOpen && (
+            <aside className="fixed md:static inset-y-12 right-0 w-72 bg-[#16171B] border-l border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none overflow-y-auto">
+              {/* Inspector Header */}
+              <div className="p-3 border-b border-[#23252B] flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8]">
+                  PROPERTIES
+                </span>
+                <div className="flex items-center gap-1">
+                  {selectedEntity && (
+                    <button
+                      id="btn-deselect-entity"
+                      onClick={() => {
+                        handleSelectRoom(null);
+                        handleSelectFurniture(null);
+                        setSelectedWallId(null);
+                        setSelectedDoorId(null);
+                        setSelectedWindowId(null);
+                      }}
+                      className="p-1 rounded hover:bg-white/10 text-[#94A3B8] hover:text-white"
+                      title="Deselect"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    id="btn-close-properties"
+                    onClick={() => setIsRightPanelOpen(false)}
+                    className="p-1 rounded hover:bg-white/10 text-[#94A3B8] hover:text-white md:hidden"
+                    title="Close Properties Panel"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-4">
+                {selectedRoom ? (
+                  <>
+                    {/* Room Name & Type */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono uppercase text-[#94A3B8] block">Room Name</label>
+                      <input
+                        id="inspector-room-name"
+                        type="text"
+                        value={selectedRoom.name}
+                        onChange={(e) => {
+                          const newName = e.target.value;
+                          setLayout((prev) => {
+                            const nextFloors = prev.floors ? [...prev.floors] : [];
+                            if (nextFloors[activeFloorIndex]) {
+                              nextFloors[activeFloorIndex] = {
+                                ...nextFloors[activeFloorIndex],
+                                rooms: nextFloors[activeFloorIndex].rooms.map((r) =>
+                                  r.id === selectedRoom.id ? { ...r, name: newName } : r
+                                ),
+                              };
+                              return { ...prev, floors: nextFloors };
+                            }
+                            return prev;
+                          });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#202227] border border-white/10 text-xs font-sans text-white focus:outline-none focus:border-[#C48446]"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono uppercase text-[#94A3B8] block">Room Type</label>
+                      <select
+                        id="inspector-room-type"
+                        value={selectedRoom.type}
+                        onChange={(e) => {
+                          const newType = e.target.value as any;
+                          setLayout((prev) => {
+                            const nextFloors = prev.floors ? [...prev.floors] : [];
+                            if (nextFloors[activeFloorIndex]) {
+                              nextFloors[activeFloorIndex] = {
+                                ...nextFloors[activeFloorIndex],
+                                rooms: nextFloors[activeFloorIndex].rooms.map((r) =>
+                                  r.id === selectedRoom.id ? { ...r, type: newType } : r
+                                ),
+                              };
+                              return { ...prev, floors: nextFloors };
+                            }
+                            return prev;
+                          });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#202227] border border-white/10 text-xs font-mono text-[#CBD5E1] focus:outline-none focus:border-[#C48446]"
+                      >
+                        <option value="living_room">Living Room</option>
+                        <option value="master_bedroom">Master Bedroom / Primary Suite</option>
+                        <option value="bedroom">Bedroom</option>
+                        <option value="guest_bedroom">Guest Bedroom</option>
+                        <option value="dining">Dining Room</option>
+                        <option value="kitchen">Kitchen</option>
+                        <option value="bathroom">Bathroom</option>
+                        <option value="powder_room">Powder Room</option>
+                        <option value="entry_foyer">Entry Foyer</option>
+                        <option value="hallway">Circulation / Hallway</option>
+                        <option value="office">Home Office / Study</option>
+                        <option value="pooja">Pooja Room</option>
+                        <option value="balcony">Balcony / Terrace</option>
+                        <option value="utility">Utility / Laundry</option>
+                      </select>
+                    </div>
+
+                    {/* Dimensions */}
+                    <div className="space-y-2 pt-2 border-t border-[#23252B]">
+                      <label className="text-[10px] font-mono uppercase text-[#94A3B8] block">Dimensions</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[9px] font-mono text-[#94A3B8] block mb-1">Width</span>
+                          <input
+                            id="inspector-exact-width"
+                            type="text"
+                            value={exactWidthInput}
+                            onChange={(e) => setExactWidthInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleApplyExactDimensions();
+                            }}
+                            className="w-full px-2 py-1.5 rounded-lg bg-[#202227] border border-white/10 text-xs font-mono text-white text-center focus:outline-none focus:border-[#C48446]"
+                            placeholder="12'-0&quot;"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-mono text-[#94A3B8] block mb-1">Depth / Length</span>
+                          <input
+                            id="inspector-exact-depth"
+                            type="text"
+                            value={exactLengthInput}
+                            onChange={(e) => setExactLengthInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleApplyExactDimensions();
+                            }}
+                            className="w-full px-2 py-1.5 rounded-lg bg-[#202227] border border-white/10 text-xs font-mono text-white text-center focus:outline-none focus:border-[#C48446]"
+                            placeholder="14'-0&quot;"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Area Pill */}
+                      <div className="p-2 rounded-lg bg-white/5 border border-white/5 flex items-center justify-between text-xs font-mono">
+                        <span className="text-[#94A3B8]">Floor Area:</span>
+                        <span id="inspector-live-area" className="text-[#C48446] font-bold">
+                          {selectedRoom.area_sqft || Math.round(selectedRoom.rect.width * selectedRoom.rect.length)} SQ FT
+                        </span>
+                      </div>
+
+                      {/* Apply Dimensions Button */}
+                      <button
+                        id="inspector-apply-dimensions"
+                        type="button"
+                        onClick={handleApplyExactDimensions}
+                        disabled={isApplyingExact}
+                        className="w-full py-2 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs font-mono flex items-center justify-center gap-1.5 transition-all shadow"
+                      >
+                        {isApplyingExact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                        <span>APPLY DIMENSIONS</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Adjustments */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-mono uppercase text-[#94A3B8] block">Step Adjustments</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          id="inspector-step-w-plus"
+                          onClick={() => handleStepResizeRoom("width", 1)}
+                          className="py-1.5 rounded bg-white/5 hover:bg-white/10 text-[11px] font-mono text-[#CBD5E1] border border-white/5"
+                        >
+                          +1&apos; Width
+                        </button>
+                        <button
+                          id="inspector-step-w-minus"
+                          onClick={() => handleStepResizeRoom("width", -1)}
+                          className="py-1.5 rounded bg-white/5 hover:bg-white/10 text-[11px] font-mono text-[#CBD5E1] border border-white/5"
+                        >
+                          -1&apos; Width
+                        </button>
+                        <button
+                          id="inspector-step-l-plus"
+                          onClick={() => handleStepResizeRoom("length", 1)}
+                          className="py-1.5 rounded bg-white/5 hover:bg-white/10 text-[11px] font-mono text-[#CBD5E1] border border-white/5"
+                        >
+                          +1&apos; Depth
+                        </button>
+                        <button
+                          id="inspector-step-l-minus"
+                          onClick={() => handleStepResizeRoom("length", -1)}
+                          className="py-1.5 rounded bg-white/5 hover:bg-white/10 text-[11px] font-mono text-[#CBD5E1] border border-white/5"
+                        >
+                          -1&apos; Depth
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-2 border-t border-[#23252B] space-y-2">
+                      <button
+                        id="inspector-ask-ai"
+                        type="button"
+                        onClick={() => {
+                          setAiPrompt(`Optimize layout and furniture of ${selectedRoom.name}`);
+                          setIsAiOpen(true);
+                        }}
+                        className="w-full py-2 rounded-lg bg-[#C48446]/10 hover:bg-[#C48446]/20 border border-[#C48446]/30 text-[#E69F58] text-xs font-mono flex items-center justify-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>✦ Ask AI to Optimize</span>
+                      </button>
+                      <button
+                        id="inspector-delete-room"
+                        type="button"
+                        onClick={handleDeleteSelected}
+                        className="w-full py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-mono flex items-center justify-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Room</span>
+                      </button>
+                    </div>
+                  </>
+                ) : selectedWall ? (
+                /* Wall Properties */
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs font-bold text-white uppercase">
+                      WALL ({selectedWall.is_exterior ? "EXTERIOR" : "INTERIOR PARTITION"})
+                    </div>
+                    <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5">
+                      Thickness: {Math.round(selectedWall.thickness * 12)}&quot;
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleWallThickness}
+                    className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                  >
+                    TOGGLE THICKNESS (4.5&quot; / 9&quot;)
+                  </button>
+
+                  <div className="text-[10px] text-[#64748B] leading-relaxed">
+                    Drag the wall line to move it, or drag its endpoints to stretch/shorten.
+                  </div>
+                </div>
+              ) : selectedDoor ? (
+                /* Door Properties */
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs font-bold text-white uppercase">
+                      DOOR {selectedDoor.id}
+                    </div>
+                    <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5">
+                      Width: {selectedDoor.width || 3.0}&apos;-0&quot; · Swing: {selectedDoor.swing_direction || "inward"}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleFlipDoorSwing}
+                    className="w-full py-2 rounded-lg bg-[#C48446]/10 hover:bg-[#C48446]/20 border border-[#C48446]/30 text-[#E69F58] text-xs font-mono flex items-center justify-center gap-1.5"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>FLIP SWING DIRECTION</span>
+                  </button>
+                </div>
+              ) : selectedWindow ? (
+                /* Window Properties */
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs font-bold text-white uppercase">
+                      WINDOW {selectedWindow.id}
+                    </div>
+                    <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5">
+                      Width: {selectedWindow.width || 4.0}&apos;-0&quot;
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleResizeWindowWidth(1)}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                    >
+                      +1&apos; Width
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResizeWindowWidth(-1)}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                    >
+                      -1&apos; Width
+                    </button>
+                  </div>
+                </div>
+              ) : selectedFurniture ? (
+                /* Furniture Properties */
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs font-bold text-white uppercase">
+                      {selectedFurniture.type.replace(/_/g, " ")}
+                    </div>
+                    <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5">
+                      {selectedFurniture.width}&apos; × {selectedFurniture.depth || selectedFurniture.length}&apos;
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRotateFurniture}
+                    className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white flex items-center justify-center gap-1.5"
+                  >
+                    <RotateCw className="w-3.5 h-3.5 text-[#C48446]" />
+                    <span>ROTATE 90°</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    className="w-full py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-mono flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Item</span>
+                  </button>
+                </div>
+              ) : (
+                /* Default Plan Overview */
+                <div className="space-y-3 text-xs font-mono">
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-2">
+                    <div className="text-[10px] uppercase font-bold text-[#C48446]">PLAN OVERVIEW</div>
+                    <div className="flex justify-between text-[#94A3B8]">
+                      <span>Plot Size:</span>
+                      <span className="text-white font-medium">{layout.plot_width}&apos; × {layout.plot_length}&apos;</span>
+                    </div>
+                    <div className="flex justify-between text-[#94A3B8]">
+                      <span>Built-Up Area:</span>
+                      <span className="text-white font-medium">{layout.total_area_sqft || 949} SQ FT</span>
+                    </div>
+                    <div className="flex justify-between text-[#94A3B8]">
+                      <span>Road Frontage:</span>
+                      <span className="text-white font-medium">{layout.site?.road_side?.toUpperCase() || "SOUTH"}</span>
+                    </div>
+                    <div className="flex justify-between text-[#94A3B8]">
+                      <span>Rooms on Floor:</span>
+                      <span className="text-white font-medium">{(currentFloor.rooms || []).length}</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-[#64748B] leading-relaxed">
+                    Select any room, wall, door, or furniture on the canvas or from the Layers panel to inspect and customize properties.
+                  </p>
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 2. PRESENTATION VIEW MODE (when mode === 'view')
+  // -------------------------------------------------------------
+  return (
+    <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#ECEEF2]">
+      {/* Presentation Top Bar */}
+      <div className="absolute top-4 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={() => router.push(`/project/${layout.id}/plan`)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg transition-all"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
+            <span>PLAN</span>
+          </button>
+
+          {/* Floor Level Switcher */}
+          {layout.floors && layout.floors.length > 1 && onSelectFloor && (
+            <div className="flex items-center p-0.5 rounded-full bg-[#12141A]/90 border border-white/10 shadow-lg text-[10px] font-mono text-[#9E9C98]">
+              {layout.floors.map((fl, idx) => (
+                <button
+                  key={fl.floor_number}
+                  onClick={() => onSelectFloor(idx)}
+                  className={`px-2.5 py-1 rounded-full transition-all ${
+                    activeFloorIndex === idx
+                      ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
+                      : "hover:text-[#F5F3EF]"
+                  }`}
+                >
+                  {fl.floor_name ? fl.floor_name.replace(" Floor", "").toUpperCase() : idx === 0 ? "GROUND" : idx === 1 ? "FIRST" : `L${fl.floor_number}`}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Export PNG */}
+        <div className="pointer-events-auto">
+          <button
+            onClick={handleExportPNG}
+            disabled={isExporting}
+            className="p-2 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#9E9C98] hover:text-[#F5F3EF] border border-white/10 shadow-lg transition-all disabled:opacity-50"
+            title="Export Architectural Drawing (PNG)"
+          >
+            {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+          </button>
         </div>
       </div>
 
-      {/* 5. MINIMAL BOTTOM CONTROLS (CLEAN & NON-OBTRUSIVE) */}
+      {/* Main Drafting SVG Canvas */}
+      <div
+        ref={containerRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onDoubleClick={handleResetView}
+        className={`w-full h-full flex items-center justify-center p-4 ${
+          isPanning ? "cursor-grabbing" : isPanMode ? "cursor-grab" : "cursor-default"
+        }`}
+      >
+        <div
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: "center center",
+            transition: isPanning || draggingRoom || draggingFurniture || resizingRoom ? "none" : "transform 0.12s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+          className="flex items-center justify-center"
+        >
+          {renderSvgSheet()}
+        </div>
+      </div>
+
+      {/* Minimal Bottom Zoom Controls */}
       <div className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 z-30 flex items-center p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
         <button
           onClick={() => setZoom((z) => Math.min(3.5, z * 1.15))}
@@ -3730,4 +4102,5 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       </div>
     </div>
   );
+
 };
