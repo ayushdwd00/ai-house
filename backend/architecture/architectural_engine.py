@@ -1159,21 +1159,54 @@ def generate_architectural_house_layout(
                     )
                     return vertical_layout
 
-            # Strategy Stage 7: Only then return genuinely infeasible
-            min_needed_area = round(sum(r.min_width * r.min_length for r in floor_rooms))
+            # Strategy Stage 7: Evaluate whether failure is genuine site capacity deficit or geometric constraint
+            all_program_rooms = []
+            for f_idx in range(1, num_floors + 1):
+                all_program_rooms.extend(
+                    build_room_program(
+                        floor_num=f_idx,
+                        total_floors=num_floors,
+                        bedrooms=bedrooms,
+                        bathrooms=bathrooms,
+                        attached_bathroom_count=attached_bathroom_count,
+                        special_rooms=special_rooms,
+                        open_concept=open_concept,
+                        room_allocations=room_allocations
+                    )
+                )
+            total_net_req = sum(r.min_width * r.min_length for r in all_program_rooms)
+            total_gross_req = round(total_net_req * 1.27)
+            total_avail_buildable = round(envelope_area * num_floors)
+
+            ground_rooms = [r for r in all_program_rooms if r.floor == 1]
+            ground_net = sum(r.min_width * r.min_length for r in ground_rooms)
+            ground_gross = round(ground_net * 1.27)
+
+            is_site_capacity_failure = (total_gross_req > total_avail_buildable) or (ground_gross > envelope_area)
+
             conflicting = [r.name for r in floor_rooms if r.min_width * r.min_length >= 60]
             conf_str = ", ".join(conflicting[:4]) if conflicting else "bedrooms and living spaces"
             suggested_beds = max(1, bedrooms - 1)
             suggested_w = round(plot_width * 1.3, 0)
             suggested_l = round(plot_length * 1.3, 0)
 
-            err_msg = (
-                f"Plot buildable envelope ({envelope_w} x {envelope_l} ft, {envelope_area} sq ft) "
-                f"is insufficient for the requested program of {bedrooms} bedrooms and {bathrooms} bathrooms on {num_floors} floor(s). "
-                f"The requested room program requires at least ~{min_needed_area} sq ft of buildable footprint. "
-                f"Conflicting spaces: {conf_str}. "
-                f"Recommendation: Reduce bedroom count to {suggested_beds}, increase plot dimensions to at least {suggested_w} x {suggested_l} ft, or consider an additional floor."
-            )
+            if is_site_capacity_failure:
+                if num_floors > 1:
+                    envelope_desc = f"{envelope_w} x {envelope_l} ft, {envelope_area} sq ft per floor, {total_avail_buildable} sq ft total across {num_floors} floors"
+                else:
+                    envelope_desc = f"{envelope_w} x {envelope_l} ft, {envelope_area} sq ft"
+                err_msg = (
+                    f"Plot buildable envelope ({envelope_desc}) is insufficient for the requested program. "
+                    f"The requested rooms require at least ~{total_gross_req} sq ft gross footprint (including circulation & wall thickness). "
+                    f"Conflicting spaces: {conf_str}. "
+                    f"Recommendation: Reduce bedroom count to {suggested_beds}, increase plot dimensions to at least {suggested_w} x {suggested_l} ft, or consider an additional floor."
+                )
+            else:
+                err_msg = (
+                    f"The requested room program ({len(floor_rooms)} spaces on {floor_name}) could not be resolved into a valid non-overlapping layout "
+                    f"within the {envelope_w} x {envelope_l} ft envelope due to room proportion and adjacency constraints. "
+                    f"Recommendation: Try standard room dimensions, adjust attached bathrooms, or rebalance room allocations across floors."
+                )
             empty_val = ArchitecturalValidation(
                 is_valid=False,
                 errors=[err_msg]

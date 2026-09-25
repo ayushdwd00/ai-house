@@ -113,26 +113,11 @@ def solve_spatial_layout(
         model.Add(x_end == x + w)
         model.Add(y_end == y + l)
 
-        # HARD CONSTRAINT: Strict aspect ratio limits ensuring clean rectangular rooms with zero slivers
+        # Architectural aspect ratio bounds preventing sliver degeneration (ratio <= 2.2:1)
+        # Note: Minimum width and length are already strictly enforced by the variable bounds (min_w, min_l)
         if not is_pinned and r.type not in ["hallway", "staircase"]:
-            habitable_set = {
-                "living_room", "family_lounge", "dining", "kitchen",
-                "master_bedroom", "bedroom", "guest_bedroom", "office", "pooja"
-            }
-            if r.type in habitable_set:
-                # Aspect ratio <= 1.35:1 (e.g. 10x13, 12x15) for balanced rectangular rooms
-                model.Add(10 * w <= 14 * l)
-                model.Add(10 * l <= 14 * w)
-                # Ensure minimum 9ft in both dimensions for any primary habitable space
-                model.Add(w >= 9 * GRID_SCALE)
-                model.Add(l >= 9 * GRID_SCALE)
-            else:
-                # Secondary spaces (bathroom, utility, foyer, balcony) <= 1.5:1
-                model.Add(10 * w <= 15 * l)
-                model.Add(10 * l <= 15 * w)
-                # Ensure minimum 4.5ft width
-                model.Add(w >= int(round(4.5 * GRID_SCALE)))
-                model.Add(l >= int(round(4.5 * GRID_SCALE)))
+            model.Add(10 * w <= 22 * l)
+            model.Add(10 * l <= 22 * w)
 
         # 2D Interval variables for global no-overlap constraint
         x_iv = model.NewIntervalVar(x, w, x_end, f"x_iv_{r.id}")
@@ -199,36 +184,37 @@ def solve_spatial_layout(
 
     # 2. HARD CONSTRAINT: Attached Bathrooms MUST be fully flush against their parent bedroom
     for r in rooms:
-        if r.attached_room_id and r.attached_room_id in x_vars:
-            parent_id = r.attached_room_id
-            bath_id = r.id
+        if r.type in ["bathroom", "powder_room"] and (r.parent_room_id or r.attached_room_id):
+            parent_id = r.parent_room_id or r.attached_room_id
+            if parent_id in x_vars and parent_id != r.id:
+                bath_id = r.id
 
-            b_left_of_p = model.NewBoolVar(f"{bath_id}_left_{parent_id}")
-            b_right_of_p = model.NewBoolVar(f"{bath_id}_right_{parent_id}")
-            b_above_p = model.NewBoolVar(f"{bath_id}_above_{parent_id}")
-            b_below_p = model.NewBoolVar(f"{bath_id}_below_{parent_id}")
+                b_left_of_p = model.NewBoolVar(f"{bath_id}_left_{parent_id}")
+                b_right_of_p = model.NewBoolVar(f"{bath_id}_right_{parent_id}")
+                b_above_p = model.NewBoolVar(f"{bath_id}_above_{parent_id}")
+                b_below_p = model.NewBoolVar(f"{bath_id}_below_{parent_id}")
 
-            # Touch wall
-            model.Add(x_vars[bath_id] + w_vars[bath_id] == x_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
-            model.Add(x_vars[parent_id] + w_vars[parent_id] == x_vars[bath_id]).OnlyEnforceIf(b_right_of_p)
-            model.Add(y_vars[bath_id] + l_vars[bath_id] == y_vars[parent_id]).OnlyEnforceIf(b_above_p)
-            model.Add(y_vars[parent_id] + l_vars[parent_id] == y_vars[bath_id]).OnlyEnforceIf(b_below_p)
+                # Touch wall
+                model.Add(x_vars[bath_id] + w_vars[bath_id] == x_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
+                model.Add(x_vars[parent_id] + w_vars[parent_id] == x_vars[bath_id]).OnlyEnforceIf(b_right_of_p)
+                model.Add(y_vars[bath_id] + l_vars[bath_id] == y_vars[parent_id]).OnlyEnforceIf(b_above_p)
+                model.Add(y_vars[parent_id] + l_vars[parent_id] == y_vars[bath_id]).OnlyEnforceIf(b_below_p)
 
-            # Flush containment along shared boundary (no awkward protruding corners)
-            model.Add(y_vars[bath_id] >= y_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
-            model.Add(y_vars[bath_id] + l_vars[bath_id] <= y_vars[parent_id] + l_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
+                # Flush containment along shared boundary (no awkward protruding corners)
+                model.Add(y_vars[bath_id] >= y_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
+                model.Add(y_vars[bath_id] + l_vars[bath_id] <= y_vars[parent_id] + l_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
 
-            model.Add(y_vars[bath_id] >= y_vars[parent_id]).OnlyEnforceIf(b_right_of_p)
-            model.Add(y_vars[bath_id] + l_vars[bath_id] <= y_vars[parent_id] + l_vars[parent_id]).OnlyEnforceIf(b_right_of_p)
+                model.Add(y_vars[bath_id] >= y_vars[parent_id]).OnlyEnforceIf(b_right_of_p)
+                model.Add(y_vars[bath_id] + l_vars[bath_id] <= y_vars[parent_id] + l_vars[parent_id]).OnlyEnforceIf(b_right_of_p)
 
-            model.Add(x_vars[bath_id] >= x_vars[parent_id]).OnlyEnforceIf(b_above_p)
-            model.Add(x_vars[bath_id] + w_vars[bath_id] <= x_vars[parent_id] + w_vars[parent_id]).OnlyEnforceIf(b_above_p)
+                model.Add(x_vars[bath_id] >= x_vars[parent_id]).OnlyEnforceIf(b_above_p)
+                model.Add(x_vars[bath_id] + w_vars[bath_id] <= x_vars[parent_id] + w_vars[parent_id]).OnlyEnforceIf(b_above_p)
 
-            model.Add(x_vars[bath_id] >= x_vars[parent_id]).OnlyEnforceIf(b_below_p)
-            model.Add(x_vars[bath_id] + w_vars[bath_id] <= x_vars[parent_id] + w_vars[parent_id]).OnlyEnforceIf(b_below_p)
+                model.Add(x_vars[bath_id] >= x_vars[parent_id]).OnlyEnforceIf(b_below_p)
+                model.Add(x_vars[bath_id] + w_vars[bath_id] <= x_vars[parent_id] + w_vars[parent_id]).OnlyEnforceIf(b_below_p)
 
-            # At least one touch direction must hold
-            model.AddBoolOr([b_left_of_p, b_right_of_p, b_above_p, b_below_p])
+                # At least one touch direction must hold
+                model.AddBoolOr([b_left_of_p, b_right_of_p, b_above_p, b_below_p])
 
     # 3. WALL ALIGNMENT OBJECTIVE: Strongly reward collinear walls between neighboring rooms
     # (Eliminates small jogs, notches, and slivers, producing clean rectangular architectural boundaries)
