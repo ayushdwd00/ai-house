@@ -120,19 +120,19 @@ def solve_spatial_layout(
                 "master_bedroom", "bedroom", "guest_bedroom", "office", "pooja"
             }
             if r.type in habitable_set:
-                # Aspect ratio <= 1.45:1 (e.g. 10x14 or 12x16.5) for balanced rectangular rooms
+                # Aspect ratio <= 1.35:1 (e.g. 10x13, 12x15) for balanced rectangular rooms
+                model.Add(10 * w <= 14 * l)
+                model.Add(10 * l <= 14 * w)
+                # Ensure minimum 9ft in both dimensions for any primary habitable space
+                model.Add(w >= 9 * GRID_SCALE)
+                model.Add(l >= 9 * GRID_SCALE)
+            else:
+                # Secondary spaces (bathroom, utility, foyer, balcony) <= 1.5:1
                 model.Add(10 * w <= 15 * l)
                 model.Add(10 * l <= 15 * w)
-                # Ensure minimum 8ft in both dimensions for any habitable space
-                model.Add(w >= 8 * GRID_SCALE)
-                model.Add(l >= 8 * GRID_SCALE)
-            else:
-                # Secondary spaces (bathroom, utility, foyer, balcony) <= 1.75:1
-                model.Add(10 * w <= 18 * l)
-                model.Add(10 * l <= 18 * w)
-                # Ensure minimum 4ft width
-                model.Add(w >= 4 * GRID_SCALE)
-                model.Add(l >= 4 * GRID_SCALE)
+                # Ensure minimum 4.5ft width
+                model.Add(w >= int(round(4.5 * GRID_SCALE)))
+                model.Add(l >= int(round(4.5 * GRID_SCALE)))
 
         # 2D Interval variables for global no-overlap constraint
         x_iv = model.NewIntervalVar(x, w, x_end, f"x_iv_{r.id}")
@@ -153,15 +153,15 @@ def solve_spatial_layout(
             model.Add(diff_w >= pref_w - w)
             model.Add(diff_l >= l - pref_l)
             model.Add(diff_l >= pref_l - l)
-            objective_terms.append(diff_w * 8)
-            objective_terms.append(diff_l * 8)
+            objective_terms.append(diff_w * 10)
+            objective_terms.append(diff_l * 10)
 
             # Strong objective: Aspect ratio penalty (bias rooms toward clean balanced rectangles)
             if r.type not in ["hallway", "staircase"]:
                 diff_aspect = model.NewIntVar(0, env_w_int + env_l_int, f"aspect_{r.id}")
                 model.Add(diff_aspect >= w - l)
                 model.Add(diff_aspect >= l - w)
-                objective_terms.append(diff_aspect * 16)
+                objective_terms.append(diff_aspect * 20)
 
             # Topological placement hints from scheme
             if r.id in scheme.zone_placements:
@@ -169,13 +169,7 @@ def solve_spatial_layout(
                 rel_y = hint.get("rel_y")
                 rel_x = hint.get("rel_x")
 
-                # Road side orientation logic
-                # South road: front = high Y, rear = low Y
-                # North road: front = low Y, rear = high Y
                 road = site.road_side
-                target_front_y = env_l_int if road == "south" else 0
-                target_rear_y = 0 if road == "south" else env_l_int
-
                 if rel_y == "front":
                     dev_y = model.NewIntVar(0, env_l_int, f"dev_front_{r.id}")
                     if road == "south":
@@ -194,42 +188,78 @@ def solve_spatial_layout(
                 if rel_x == "left":
                     dev_x = model.NewIntVar(0, env_w_int, f"dev_left_{r.id}")
                     model.Add(dev_x >= x)
-                    objective_terms.append(dev_x * 5)
+                    objective_terms.append(dev_x * 6)
                 elif rel_x == "right":
                     dev_x = model.NewIntVar(0, env_w_int, f"dev_right_{r.id}")
                     model.Add(dev_x >= env_w_int - (x + w))
-                    objective_terms.append(dev_x * 5)
+                    objective_terms.append(dev_x * 6)
 
     # 1. HARD CONSTRAINT: No Overlap between any two rooms
     model.AddNoOverlap2D(x_intervals, y_intervals)
 
-    # 2. HARD CONSTRAINT: Attached Bathrooms MUST touch their parent bedroom
+    # 2. HARD CONSTRAINT: Attached Bathrooms MUST be fully flush against their parent bedroom
     for r in rooms:
         if r.attached_room_id and r.attached_room_id in x_vars:
             parent_id = r.attached_room_id
             bath_id = r.id
 
-            # In CP-SAT: room A and room B touch if:
-            # (A is directly right of B or left or top or bottom) AND they overlap in other dimension
             b_left_of_p = model.NewBoolVar(f"{bath_id}_left_{parent_id}")
             b_right_of_p = model.NewBoolVar(f"{bath_id}_right_{parent_id}")
             b_above_p = model.NewBoolVar(f"{bath_id}_above_{parent_id}")
             b_below_p = model.NewBoolVar(f"{bath_id}_below_{parent_id}")
 
+            # Touch wall
             model.Add(x_vars[bath_id] + w_vars[bath_id] == x_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
             model.Add(x_vars[parent_id] + w_vars[parent_id] == x_vars[bath_id]).OnlyEnforceIf(b_right_of_p)
             model.Add(y_vars[bath_id] + l_vars[bath_id] == y_vars[parent_id]).OnlyEnforceIf(b_above_p)
             model.Add(y_vars[parent_id] + l_vars[parent_id] == y_vars[bath_id]).OnlyEnforceIf(b_below_p)
 
+            # Flush containment along shared boundary (no awkward protruding corners)
+            model.Add(y_vars[bath_id] >= y_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
+            model.Add(y_vars[bath_id] + l_vars[bath_id] <= y_vars[parent_id] + l_vars[parent_id]).OnlyEnforceIf(b_left_of_p)
+
+            model.Add(y_vars[bath_id] >= y_vars[parent_id]).OnlyEnforceIf(b_right_of_p)
+            model.Add(y_vars[bath_id] + l_vars[bath_id] <= y_vars[parent_id] + l_vars[parent_id]).OnlyEnforceIf(b_right_of_p)
+
+            model.Add(x_vars[bath_id] >= x_vars[parent_id]).OnlyEnforceIf(b_above_p)
+            model.Add(x_vars[bath_id] + w_vars[bath_id] <= x_vars[parent_id] + w_vars[parent_id]).OnlyEnforceIf(b_above_p)
+
+            model.Add(x_vars[bath_id] >= x_vars[parent_id]).OnlyEnforceIf(b_below_p)
+            model.Add(x_vars[bath_id] + w_vars[bath_id] <= x_vars[parent_id] + w_vars[parent_id]).OnlyEnforceIf(b_below_p)
+
             # At least one touch direction must hold
             model.AddBoolOr([b_left_of_p, b_right_of_p, b_above_p, b_below_p])
 
-    # 3. SOFT OBJECTIVES: Adjacency optimization
+    # 3. WALL ALIGNMENT OBJECTIVE: Strongly reward collinear walls between neighboring rooms
+    # (Eliminates small jogs, notches, and slivers, producing clean rectangular architectural boundaries)
+    r_list = [r for r in rooms if r.id in x_vars]
+    for i in range(len(r_list)):
+        for j in range(i + 1, len(r_list)):
+            r1 = r_list[i]
+            r2 = r_list[j]
+            # Alignment between r1.x and r2.x
+            dev_x_align = model.NewIntVar(0, env_w_int, f"align_x_{r1.id}_{r2.id}")
+            model.Add(dev_x_align >= x_vars[r1.id] - x_vars[r2.id])
+            model.Add(dev_x_align >= x_vars[r2.id] - x_vars[r1.id])
+            
+            # Indicator for near-alignment (within 2ft / 4 grid units)
+            is_near_x = model.NewBoolVar(f"near_x_{r1.id}_{r2.id}")
+            model.Add(dev_x_align <= 4).OnlyEnforceIf(is_near_x)
+            model.Add(dev_x_align > 4).OnlyEnforceIf(is_near_x.Not())
+            # Penalize small misalignments to snap them to identical line
+            objective_terms.append(dev_x_align * 12)
+
+            # Alignment between r1.y and r2.y
+            dev_y_align = model.NewIntVar(0, env_l_int, f"align_y_{r1.id}_{r2.id}")
+            model.Add(dev_y_align >= y_vars[r1.id] - y_vars[r2.id])
+            model.Add(dev_y_align >= y_vars[r2.id] - y_vars[r1.id])
+            objective_terms.append(dev_y_align * 12)
+
+    # 4. SOFT OBJECTIVES: Adjacency optimization
     room_map = {r.id: r for r in rooms}
     for r in rooms:
         for adj_id in r.required_adjacencies:
             if adj_id in x_vars and r.id < adj_id:
-                # Minimize center-to-center distance (scaled by 2 to avoid division)
                 dist_x = model.NewIntVar(0, env_w_int * 2, f"dist_x_{r.id}_{adj_id}")
                 dist_y = model.NewIntVar(0, env_l_int * 2, f"dist_y_{r.id}_{adj_id}")
                 c1_x = 2 * x_vars[r.id] + w_vars[r.id]

@@ -1108,7 +1108,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     const isLandscape = presentationMode === "landscape" || presentationMode === "all";
     const isExterior = presentationMode === "exterior" || presentationMode === "all";
     const isExteriorView = presentationMode === "all" || isLandscape || isExterior;
-    const showSiteAndLandscape = presentationMode === "all" || isLandscape || (isExterior && effectiveShowLandscape);
+    const showSiteAndLandscape = effectiveShowLandscape || presentationMode === "all" || isLandscape || isExterior;
 
     if (showSiteAndLandscape) {
       const landscapeModel = generateArchitecturalLandscape(layout);

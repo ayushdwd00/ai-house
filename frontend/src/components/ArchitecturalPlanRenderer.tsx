@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation";
 import { HouseLayout, FloorPlan, Room, FurnitureItem, Door, Window, Wall } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
+import { generateArchitecturalLandscape, ArchitecturalLandscapeModel } from "@/utils/residentialLandscapeGenerator";
 import {
   computeCutWalls,
   computeDoorGeometry,
@@ -489,7 +490,12 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     setPan({ x: 0, y: 0 });
   }, [svgWidth, svgHeight, padding]);
 
-  // Landscape Layer
+  // Canonical Residential Architectural Landscape (Shared 1:1 with 3D model)
+  const archLandscape = useMemo(() => {
+    return generateArchitecturalLandscape(layout);
+  }, [layout]);
+
+  // Fallback Landscape Layer
   const activeLandscape = useMemo(() => {
     return layout.landscape &&
       ((layout.landscape.elements && layout.landscape.elements.length > 0) ||
@@ -703,7 +709,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         handleSelectFurniture(null);
         setSelectedDoorId(null);
         setSelectedWindowId(null);
+        setSelectedWallId(null);
         setIsAiOpen(false);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && !isInput) {
+        if (selectedRoomId || selectedFurnitureId || selectedWallId || selectedDoorId || selectedWindowId) {
+          e.preventDefault();
+          handleDeleteSelected();
+        }
       }
     };
 
@@ -2205,58 +2217,140 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               </g>
             </g>
 
-            {/* 2D ARCHITECTURAL LANDSCAPE (LAWNS, DRIVEWAY, PATH) */}
-            {showLandscape && activeLandscape && (
+            {/* 2D CANONICAL ARCHITECTURAL LANDSCAPE (SHARED 1:1 WITH 3D MODEL) */}
+            {showLandscape && archLandscape && (
               <g id="landscape-background-layer" pointerEvents="none">
-                {(activeLandscape.elements || [])
-                  .filter((e) => e.type === "lawn")
-                  .map((lawn) => {
-                    const lx = (lawn.x - (lawn.width || 0) / 2) * SCALE;
-                    const ly = (lawn.y - (lawn.length || 0) / 2) * SCALE;
-                    const lw = (lawn.width || 0) * SCALE;
-                    const lh = (lawn.length || 0) * SCALE;
-                    return (
-                      <g key={lawn.element_id}>
-                        <rect
-                          x={lx}
-                          y={ly}
-                          width={lw}
-                          height={lh}
-                          fill="#EDF7ED"
-                          stroke="#81C784"
-                          strokeWidth={1.2}
-                          strokeDasharray="4 3"
-                          rx={3}
-                        />
-                        <text
-                          x={lx + lw / 2}
-                          y={ly + lh / 2 + 3}
-                          fill="#2E7D32"
-                          textAnchor="middle"
-                          className="font-mono text-[9px] tracking-widest uppercase font-semibold pointer-events-none select-none"
-                          opacity={0.65}
-                        >
-                          {lawn.zone === "front_garden" ? "FRONT LAWN" : "GARDEN TURF"}
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                {/* Vehicular Driveway */}
-                {activeLandscape.driveway && (() => {
-                  const dw = activeLandscape.driveway;
-                  const dx = (dw.x - (dw.width || 0) / 2) * SCALE;
-                  const dy = (dw.y - (dw.length || 0) / 2) * SCALE;
-                  const dwidth = (dw.width || 0) * SCALE;
-                  const dlength = (dw.length || 0) * SCALE;
+                {/* 1. Discrete Lawn Zones */}
+                {archLandscape.lawnZones.map((lawn) => {
+                  const lx = lawn.rect.x * SCALE;
+                  const ly = lawn.rect.y * SCALE;
+                  const lw = lawn.rect.width * SCALE;
+                  const lh = lawn.rect.length * SCALE;
                   return (
-                    <g key={dw.element_id}>
+                    <g key={lawn.id}>
+                      <rect
+                        x={lx}
+                        y={ly}
+                        width={lw}
+                        height={lh}
+                        fill="#F2FBF5"
+                        stroke="#86EFAC"
+                        strokeWidth={1.1}
+                        strokeDasharray="4 3"
+                        rx={3}
+                      />
+                      <text
+                        x={lx + lw / 2}
+                        y={ly + lh / 2 + 3}
+                        fill="#16A34A"
+                        textAnchor="middle"
+                        className="font-mono text-[8.5px] tracking-widest uppercase font-semibold pointer-events-none select-none"
+                        opacity={0.65}
+                      >
+                        {lawn.name}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* 2. Structured Planting Beds */}
+                {archLandscape.plantingBeds.map((bed) => {
+                  const bx = bed.rect.x * SCALE;
+                  const by = bed.rect.y * SCALE;
+                  const bw = bed.rect.width * SCALE;
+                  const bl = bed.rect.length * SCALE;
+                  return (
+                    <g key={bed.id}>
+                      <rect
+                        x={bx}
+                        y={by}
+                        width={bw}
+                        height={bl}
+                        fill="#ECFDF5"
+                        stroke="#6EE7B7"
+                        strokeWidth={0.9}
+                        rx={2}
+                      />
+                      {bw > 32 && bl > 14 && (
+                        <text
+                          x={bx + bw / 2}
+                          y={by + bl / 2 + 3}
+                          fill="#059669"
+                          textAnchor="middle"
+                          className="font-mono text-[7px] tracking-wider uppercase font-medium pointer-events-none select-none"
+                          opacity={0.55}
+                        >
+                          {bed.name}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* 3. Parking Stall / Carport */}
+                {archLandscape.parkingRect && (() => {
+                  const pr = archLandscape.parkingRect;
+                  const px = pr.x * SCALE;
+                  const py = pr.y * SCALE;
+                  const pw = pr.width * SCALE;
+                  const pl = pr.length * SCALE;
+                  return (
+                    <g key="canonical-parking">
+                      <rect
+                        x={px}
+                        y={py}
+                        width={pw}
+                        height={pl}
+                        fill="#F8FAFC"
+                        stroke="#94A3B8"
+                        strokeWidth={1.2}
+                        strokeDasharray="5 3"
+                        rx={2}
+                      />
+                      <line
+                        x1={px + 4}
+                        y1={py + 4}
+                        x2={px + 4}
+                        y2={py + pl - 4}
+                        stroke="#CBD5E1"
+                        strokeWidth={1}
+                      />
+                      <line
+                        x1={px + pw - 4}
+                        y1={py + 4}
+                        x2={px + pw - 4}
+                        y2={py + pl - 4}
+                        stroke="#CBD5E1"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={px + pw / 2}
+                        y={py + pl / 2 + 3}
+                        fill="#64748B"
+                        textAnchor="middle"
+                        className="font-mono text-[8px] tracking-wider uppercase font-semibold pointer-events-none select-none"
+                      >
+                        PARKING / CARPORT
+                      </text>
+                    </g>
+                  );
+                })()}
+
+                {/* 4. Vehicular Driveway */}
+                {archLandscape.drivewayRect && (() => {
+                  const dw = archLandscape.drivewayRect;
+                  const dx = dw.x * SCALE;
+                  const dy = dw.y * SCALE;
+                  const dwidth = dw.width * SCALE;
+                  const dlength = dw.length * SCALE;
+                  return (
+                    <g key="canonical-driveway">
                       <rect
                         x={dx}
                         y={dy}
                         width={dwidth}
                         height={dlength}
-                        fill="#F1F5F9"
+                        fill="#F8FAFC"
                         stroke="#94A3B8"
                         strokeWidth={1.2}
                         strokeDasharray="6 3"
@@ -2266,7 +2360,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                         y={dy + dlength / 2 + 3}
                         fill="#64748B"
                         textAnchor="middle"
-                        className="font-mono text-[8.5px] tracking-wider uppercase font-semibold pointer-events-none select-none"
+                        className="font-mono text-[8px] tracking-wider uppercase font-semibold pointer-events-none select-none"
                       >
                         DRIVEWAY
                       </text>
@@ -2274,19 +2368,124 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   );
                 })()}
 
-                {/* Pedestrian Pathway */}
-                {(activeLandscape.paths || []).map((p) => {
-                  if (!p.points || p.points.length < 2) return null;
-                  const pts = p.points.map((pt) => `${pt.x * SCALE},${pt.y * SCALE}`).join(" ");
+                {/* 5. Pedestrian Pathway Segments (Paved from Gate/Road to Main Entrance) */}
+                {archLandscape.walkwaySegments.map((seg, sIdx) => {
+                  const x1 = seg.p1.x * SCALE;
+                  const y1 = seg.p1.y * SCALE;
+                  const x2 = seg.p2.x * SCALE;
+                  const y2 = seg.p2.y * SCALE;
+                  const w = (seg.width || 3.6) * SCALE;
+                  const dx = x2 - x1;
+                  const dy = y2 - y1;
+                  const len = Math.hypot(dx, dy);
+                  if (len < 1) return null;
+                  const perpX = (-dy / len) * (w / 2);
+                  const perpY = (dx / len) * (w / 2);
+
+                  const pts = `${x1 + perpX},${y1 + perpY} ${x2 + perpX},${y2 + perpY} ${x2 - perpX},${y2 - perpY} ${x1 - perpX},${y1 - perpY}`;
+
                   return (
-                    <g key={p.element_id}>
-                      <polyline
+                    <g key={`canonical-walkway-${sIdx}`}>
+                      <polygon
                         points={pts}
-                        fill="none"
-                        stroke="#94A3B8"
-                        strokeWidth={1.5}
-                        strokeDasharray="4 3"
+                        fill="#F8FAFC"
+                        stroke="#CBD5E1"
+                        strokeWidth={1.0}
                       />
+                      <line
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke="#94A3B8"
+                        strokeWidth={1.0}
+                        strokeDasharray="3 3"
+                      />
+                    </g>
+                  );
+                })}
+
+                {/* 6. Landscape Bollard Lights along Pathway */}
+                {archLandscape.bollardLights.map((bl) => {
+                  const bx = bl.x * SCALE;
+                  const by = bl.z * SCALE;
+                  return (
+                    <g key={bl.id}>
+                      <circle cx={bx} cy={by} r={4.5} fill="#FEF08A" opacity={0.35} />
+                      <circle cx={bx} cy={by} r={2.0} fill="#F59E0B" stroke="#B45309" strokeWidth={0.7} />
+                    </g>
+                  );
+                })}
+
+                {/* 7. Shrubs & Accent Flower Plantings */}
+                {archLandscape.shrubs.map((shrub) => {
+                  const sx = shrub.x * SCALE;
+                  const sy = shrub.z * SCALE;
+                  const sr = Math.max(2.5, (shrub.scale || 1.0) * 1.1 * SCALE);
+                  return (
+                    <g key={shrub.id}>
+                      <circle cx={sx} cy={sy} r={sr} fill="#DCFCE7" stroke="#4ADE80" strokeWidth={0.8} />
+                      <circle cx={sx} cy={sy} r={sr * 0.4} fill="#86EFAC" opacity={0.6} />
+                    </g>
+                  );
+                })}
+                {archLandscape.flowers.map((fl) => {
+                  const fx = fl.x * SCALE;
+                  const fy = fl.z * SCALE;
+                  const col =
+                    fl.assetKey === "flowerRed"
+                      ? "#F43F5E"
+                      : fl.assetKey === "flowerYellow"
+                      ? "#FBBF24"
+                      : "#A855F7";
+                  return (
+                    <circle
+                      key={fl.id}
+                      cx={fx}
+                      cy={fy}
+                      r={2.2}
+                      fill={col}
+                      opacity={0.8}
+                    />
+                  );
+                })}
+
+                {/* 8. Architectural Canopy Trees (Clean Simple CAD Drafting Symbols) */}
+                {archLandscape.trees.map((tree) => {
+                  const tx = tree.x * SCALE;
+                  const ty = tree.z * SCALE;
+                  const canopyR = (tree.scale || 1.5) * 2.2 * SCALE;
+                  const innerR = canopyR * 0.65;
+                  return (
+                    <g key={tree.id}>
+                      {/* Outer Canopy Circle */}
+                      <circle
+                        cx={tx}
+                        cy={ty}
+                        r={canopyR}
+                        fill="#ECFDF5"
+                        stroke="#10B981"
+                        strokeWidth={1.2}
+                        opacity={0.7}
+                      />
+                      {/* Concentric Inner Dashed Ring */}
+                      <circle
+                        cx={tx}
+                        cy={ty}
+                        r={innerR}
+                        fill="none"
+                        stroke="#34D399"
+                        strokeWidth={0.8}
+                        strokeDasharray="3 2"
+                        opacity={0.8}
+                      />
+                      {/* Subtle 4 Cardinal Orientation Ticks */}
+                      <line x1={tx - canopyR} y1={ty} x2={tx - canopyR + 4} y2={ty} stroke="#10B981" strokeWidth={1.0} />
+                      <line x1={tx + canopyR - 4} y1={ty} x2={tx + canopyR} y2={ty} stroke="#10B981" strokeWidth={1.0} />
+                      <line x1={tx} y1={ty - canopyR} x2={tx} y2={ty - canopyR + 4} stroke="#10B981" strokeWidth={1.0} />
+                      <line x1={tx} y1={ty + canopyR - 4} x2={tx} y2={ty + canopyR} stroke="#10B981" strokeWidth={1.0} />
+                      {/* Center Trunk Dot */}
+                      <circle cx={tx} cy={ty} r={2.4} fill="#065F46" />
                     </g>
                   );
                 })}
@@ -2743,7 +2942,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 );
               })}
 
-            {/* WINDOWS */}
+            {/* WINDOWS: Clean wall-embedded representation */}
             {windowGeometries.map((wGeom) => {
               const isSelected = selectedWindowId === wGeom.id;
               return (
@@ -2755,75 +2954,72 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   }}
                   className={`${mode === "edit" ? "cursor-pointer" : "pointer-events-none"}`}
                 >
+                  {/* Clean wall opening mask */}
                   <line
                     x1={wGeom.x1}
                     y1={wGeom.y1}
                     x2={wGeom.x2}
                     y2={wGeom.y2}
                     stroke="#FFFFFF"
-                    strokeWidth={18}
+                    strokeWidth={14}
                     strokeLinecap="square"
                   />
-                  {/* Architectural light cyan glass fill like blueprint standard */}
+                  {/* Outer & Inner Sill Lines */}
                   <line
                     x1={wGeom.x1}
                     y1={wGeom.y1}
                     x2={wGeom.x2}
                     y2={wGeom.y2}
-                    stroke="#BAE6FD"
-                    strokeWidth={8}
+                    stroke={isSelected ? "#C48446" : "#64748B"}
+                    strokeWidth={1.5}
                     strokeLinecap="square"
                   />
-                  <path
-                    d={wGeom.chajjaPath}
-                    fill="none"
-                    stroke="#64748B"
-                    strokeWidth={1}
-                    strokeDasharray="4 2"
-                  />
+                  {/* Double Glazing Centerlines */}
                   <line
                     x1={wGeom.glaze1.x1}
                     y1={wGeom.glaze1.y1}
                     x2={wGeom.glaze1.x2}
                     y2={wGeom.glaze1.y2}
-                    stroke={isSelected ? "#C48446" : "#0284C7"}
-                    strokeWidth={1.5}
+                    stroke={isSelected ? "#C48446" : "#38BDF8"}
+                    strokeWidth={1.2}
                   />
                   <line
                     x1={wGeom.glaze2.x1}
                     y1={wGeom.glaze2.y1}
                     x2={wGeom.glaze2.x2}
                     y2={wGeom.glaze2.y2}
-                    stroke={isSelected ? "#C48446" : "#0284C7"}
-                    strokeWidth={1.5}
+                    stroke={isSelected ? "#C48446" : "#38BDF8"}
+                    strokeWidth={1.2}
                   />
-                  {/* Direction Badge */}
-                  <g transform={`translate(${wGeom.badgeX}, ${wGeom.badgeY})`}>
-                    <rect
-                      x={-22}
-                      y={-7}
-                      width={44}
-                      height={14}
-                      rx={3}
-                      fill="#0F172A"
-                      stroke={isSelected ? "#C48446" : "#38BDF8"}
-                      strokeWidth={0.8}
-                    />
-                    <text
-                      x={0}
-                      y={3}
-                      textAnchor="middle"
-                      fill={isSelected ? "#C48446" : "#38BDF8"}
-                      className="font-mono text-[7.5px] font-bold select-none"
-                    >
-                      {wGeom.label}
-                    </text>
-                  </g>
+                  {/* Subtle selection badge only in edit mode when selected */}
+                  {mode === "edit" && isSelected && (
+                    <g transform={`translate(${wGeom.badgeX}, ${wGeom.badgeY})`}>
+                      <rect
+                        x={-20}
+                        y={-7}
+                        width={40}
+                        height={14}
+                        rx={3}
+                        fill="#0F172A"
+                        stroke="#C48446"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={0}
+                        y={3.5}
+                        textAnchor="middle"
+                        fill="#C48446"
+                        className="font-mono text-[8px] font-bold select-none"
+                      >
+                        {wGeom.label}
+                      </text>
+                    </g>
+                  )}
                 </g>
               );
             })}
 
-            {/* DOORS */}
+            {/* DOORS: Clean opening, door leaf, and swing arc */}
             {doorGeometries.map((dGeom) => {
               const isSelected = selectedDoorId === dGeom.id;
               return (
@@ -2835,64 +3031,70 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   }}
                   className={`${mode === "edit" ? "cursor-pointer" : "pointer-events-none"}`}
                 >
+                  {/* Clean wall opening mask */}
                   <line
                     x1={dGeom.hingeX}
                     y1={dGeom.hingeY}
                     x2={dGeom.latchX}
                     y2={dGeom.latchY}
                     stroke="#FFFFFF"
-                    strokeWidth={18}
+                    strokeWidth={14}
                     strokeLinecap="square"
                   />
                   {/* Hinge Pivot Dot */}
                   <circle
                     cx={dGeom.hingeX}
                     cy={dGeom.hingeY}
-                    r={2.8}
-                    fill={isSelected ? "#C48446" : "#0F172A"}
+                    r={2.4}
+                    fill={isSelected ? "#C48446" : "#1E293B"}
                   />
+                  {/* 90-Degree Swing Arc */}
                   <path
                     d={dGeom.arcPath}
                     fill="none"
-                    stroke={isSelected ? "#C48446" : "#64748B"}
+                    stroke={isSelected ? "#C48446" : "#94A3B8"}
                     strokeWidth={1.2}
-                    strokeDasharray="3 3"
+                    strokeDasharray="3 2"
                   />
+                  {/* Solid Door Leaf */}
                   <line
                     x1={dGeom.hingeX}
                     y1={dGeom.hingeY}
                     x2={dGeom.leafEndX}
                     y2={dGeom.leafEndY}
-                    stroke={isSelected ? "#C48446" : "#78350F"}
-                    strokeWidth={3}
+                    stroke={isSelected ? "#C48446" : "#475569"}
+                    strokeWidth={2.4}
                     strokeLinecap="round"
                   />
-                  <g transform={`translate(${dGeom.badgeX}, ${dGeom.badgeY})`}>
-                    <rect
-                      x={-22}
-                      y={-7}
-                      width={44}
-                      height={14}
-                      rx={3}
-                      fill="#FFFFFF"
-                      stroke={isSelected ? "#C48446" : "#78350F"}
-                      strokeWidth={1}
-                    />
-                    <text
-                      x={0}
-                      y={3}
-                      textAnchor="middle"
-                      fill={isSelected ? "#C48446" : "#78350F"}
-                      className="font-mono text-[7.5px] font-bold select-none"
-                    >
-                      {dGeom.label}
-                    </text>
-                  </g>
+                  {/* Subtle selection badge only in edit mode when selected */}
+                  {mode === "edit" && isSelected && (
+                    <g transform={`translate(${dGeom.badgeX}, ${dGeom.badgeY})`}>
+                      <rect
+                        x={-20}
+                        y={-7}
+                        width={40}
+                        height={14}
+                        rx={3}
+                        fill="#0F172A"
+                        stroke="#C48446"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={0}
+                        y={3.5}
+                        textAnchor="middle"
+                        fill="#C48446"
+                        className="font-mono text-[8px] font-bold select-none"
+                      >
+                        {dGeom.label}
+                      </text>
+                    </g>
+                  )}
                 </g>
               );
             })}
 
-            {/* SMART ALIGNMENT GUIDES (RENDERED DURING ROOM DRAGGING) */}
+            {/* SMART ALIGNMENT GUIDES (RENDERED DURING ROOM/WALL DRAGGING) */}
             {alignmentGuides && alignmentGuides.length > 0 && (
               <g id="alignment-guides-layer" pointerEvents="none">
                 {alignmentGuides.map((g, idx) => (
@@ -2904,26 +3106,26 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                           y1={-padding}
                           x2={g.pos * SCALE}
                           y2={svgHeight + padding}
-                          stroke="#EC4899"
-                          strokeWidth={1.5}
+                          stroke="#E11D48"
+                          strokeWidth={1.2}
                           strokeDasharray="4 3"
                         />
                         <rect
-                          x={g.pos * SCALE - 16}
-                          y={-18}
-                          width={32}
-                          height={14}
-                          rx={3}
-                          fill="#EC4899"
+                          x={g.pos * SCALE - 14}
+                          y={-16}
+                          width={28}
+                          height={12}
+                          rx={2}
+                          fill="#E11D48"
                         />
                         <text
                           x={g.pos * SCALE}
-                          y={-8}
+                          y={-7}
                           textAnchor="middle"
                           fill="#FFFFFF"
-                          className="font-mono text-[8px] font-bold select-none"
+                          className="font-mono text-[7px] font-bold select-none"
                         >
-                          ALIGN
+                          SNAP
                         </text>
                       </>
                     ) : (
@@ -2933,26 +3135,26 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                           y1={g.pos * SCALE}
                           x2={svgWidth + padding}
                           y2={g.pos * SCALE}
-                          stroke="#EC4899"
-                          strokeWidth={1.5}
+                          stroke="#E11D48"
+                          strokeWidth={1.2}
                           strokeDasharray="4 3"
                         />
                         <rect
-                          x={-28}
-                          y={g.pos * SCALE - 7}
-                          width={32}
-                          height={14}
-                          rx={3}
-                          fill="#EC4899"
+                          x={-26}
+                          y={g.pos * SCALE - 6}
+                          width={28}
+                          height={12}
+                          rx={2}
+                          fill="#E11D48"
                         />
                         <text
                           x={-12}
                           y={g.pos * SCALE + 3}
                           textAnchor="middle"
                           fill="#FFFFFF"
-                          className="font-mono text-[8px] font-bold select-none"
+                          className="font-mono text-[7px] font-bold select-none"
                         >
-                          ALIGN
+                          SNAP
                         </text>
                       </>
                     )}
@@ -2961,7 +3163,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               </g>
             )}
 
-            {/* MASTER ARCHITECTURAL ROOM LABELS (CRISP, HIGHEST LAYER, NEVER CLASH WITH FURNITURE OR WALLS) */}
+            {/* MASTER ARCHITECTURAL ROOM LABELS (HIGHLY LEGIBLE, CENTERED, CLEAN MASKING OF FURNITURE UNDERNEATH) */}
             <g id="master-room-labels-layer" pointerEvents="none">
               {(currentFloor.rooms || []).map((room) => {
                 if (!room.rect) return null;
@@ -2972,12 +3174,12 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 const isSelected = selectedRoomId === room.id;
 
                 let roomName = (room.name || "ROOM").toUpperCase().trim();
-                // Clean abbreviations for tight rooms
+                // Clean abbreviations for compact secondary spaces
                 if (rw < 100 || rl < 70) {
                   if (roomName.includes("BALCONY") || roomName.includes("TERRACE")) roomName = "BALCONY";
-                  else if (roomName.includes("PRIMARY SUITE") || roomName.includes("MASTER BEDROOM")) roomName = "PRIMARY BED";
+                  else if (roomName.includes("PRIMARY SUITE") || roomName.includes("MASTER BEDROOM")) roomName = "MASTER BED";
                   else if (roomName.includes("ENTRY FOYER") || roomName.includes("FOYER")) roomName = "ENTRY";
-                  else if (roomName.includes("CIRCULATION") || roomName.includes("HALLWAY")) roomName = "HALL";
+                  else if (roomName.includes("CIRCULATION") || roomName.includes("HALLWAY")) roomName = "HALLWAY";
                   else if (roomName.includes("POWDER")) roomName = "POWDER";
                   else if (roomName.includes("GUEST BEDROOM")) roomName = "GUEST BED";
                   else if (roomName.includes("LIVING ROOM")) roomName = "LIVING";
@@ -2990,34 +3192,21 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 const areaSqFt = room.area_sqft || Math.round(room.rect.width * room.rect.length);
                 const areaStr = `${areaSqFt} SQ FT`;
 
-                const safeMargin = 10;
-                const maxAllowedW = Math.max(28, rw - safeMargin);
-                const isUltraCompact = rw < 75 || rl < 55;
-                const isSmall = rw < 110 || rl < 80;
-
-                const titleFont = Math.min(
-                  isUltraCompact ? 8.0 : isSmall ? 9.5 : 11.5,
-                  Math.max(6.5, (maxAllowedW / Math.max(roomName.length, 1)) * 1.35)
-                );
-                const dimFont = Math.min(
-                  isUltraCompact ? 7.0 : isSmall ? 8.0 : 9.0,
-                  Math.max(6.0, (maxAllowedW / Math.max(dimStr.length, 1)) * 1.4)
-                );
-                const areaFont = Math.min(
-                  isUltraCompact ? 6.5 : isSmall ? 7.5 : 8.0,
-                  Math.max(5.5, (maxAllowedW / Math.max(areaStr.length, 1)) * 1.4)
-                );
+                const isCompact = rw < 90 || rl < 65;
+                const titleFont = isCompact ? 10 : 12;
+                const dimFont = isCompact ? 8.5 : 10;
+                const areaFont = isCompact ? 7.5 : 8.5;
 
                 const estTitleW = roomName.length * titleFont * 0.65;
-                const estDimW = dimStr.length * dimFont * 0.6;
-                const estAreaW = isUltraCompact ? 0 : areaStr.length * areaFont * 0.6;
-                const maxContentW = Math.max(estTitleW, estDimW, estAreaW);
+                const estDimW = dimStr.length * dimFont * 0.62;
+                const maxContentW = Math.max(estTitleW, estDimW);
 
-                const patchW = Math.min(maxAllowedW, Math.max(48, maxContentW + 16));
-                const patchH = isUltraCompact ? 26 : isSmall ? 36 : 44;
+                const patchW = Math.min(rw - 12, Math.max(70, maxContentW + 20));
+                const patchH = isCompact ? 32 : 46;
 
                 return (
                   <g key={`lbl-${room.id}`} transform={`translate(${rx + rw / 2}, ${ry + rl / 2})`}>
+                    {/* Clean background badge completely masks furniture lines underneath */}
                     <rect
                       x={-patchW / 2}
                       y={-patchH / 2}
@@ -3025,36 +3214,39 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       height={patchH}
                       rx={4}
                       fill="#FFFFFF"
-                      fillOpacity={0.98}
+                      fillOpacity={0.96}
                       stroke={isSelected ? "#C48446" : "#CBD5E1"}
                       strokeWidth={isSelected ? 1.5 : 0.8}
                     />
+                    {/* Room Name */}
                     <text
                       x={0}
-                      y={isUltraCompact ? -2 : isSmall ? -5 : -7}
+                      y={isCompact ? -2 : -6}
                       textAnchor="middle"
-                      fill={isSelected ? "#92400E" : "#0F172A"}
-                      style={{ fontSize: `${titleFont}px` }}
-                      className="font-sans font-bold tracking-wider select-none"
+                      fill={isSelected ? "#C48446" : "#0F172A"}
+                      style={{ fontSize: `${titleFont}px`, letterSpacing: "0.04em" }}
+                      className="font-sans font-bold select-none"
                     >
                       {roomName}
                     </text>
+                    {/* Room Dimensions */}
                     <text
                       x={0}
-                      y={isUltraCompact ? 8 : isSmall ? 7 : 7}
+                      y={isCompact ? 9 : 8}
                       textAnchor="middle"
-                      fill={isSelected ? "#C48446" : "#475569"}
+                      fill={isSelected ? "#92400E" : "#334155"}
                       style={{ fontSize: `${dimFont}px` }}
                       className="font-mono font-semibold select-none"
                     >
                       {dimStr}
                     </text>
-                    {!isUltraCompact && (
+                    {/* Area (shown when not compact) */}
+                    {!isCompact && (
                       <text
                         x={0}
-                        y={isSmall ? 16 : 18}
+                        y={19}
                         textAnchor="middle"
-                        fill={isSelected ? "#D97706" : "#64748B"}
+                        fill="#64748B"
                         style={{ fontSize: `${areaFont}px` }}
                         className="font-mono font-medium select-none"
                       >
@@ -3066,73 +3258,54 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               })}
             </g>
 
-            {/* COMPASS ROSE / NORTH ARROW */}
-            <g transform={`translate(${svgWidth - 45}, -30)`} pointerEvents="none">
-              <circle cx={0} cy={0} r={22} fill="#FFFFFF" stroke="#334155" strokeWidth={1.5} />
-              <circle cx={0} cy={0} r={18} fill="none" stroke="#CBD5E1" strokeWidth={0.8} strokeDasharray="2 2" />
-              <line x1={-20} y1={0} x2={20} y2={0} stroke="#94A3B8" strokeWidth={0.8} />
-              <line x1={0} y1={-20} x2={0} y2={20} stroke="#94A3B8" strokeWidth={0.8} />
-              <polygon points="0,-18 5,0 0,-2 -5,0" fill="#DC2626" />
-              <polygon points="0,0 5,0 0,18 -5,0" fill="#0F172A" />
-              <text x={0} y={-24} textAnchor="middle" fill="#DC2626" className="font-mono font-bold text-[10px]">
+            {/* COMPASS: Small and unobtrusive */}
+            <g transform={`translate(${svgWidth - 30}, -20)`} pointerEvents="none">
+              <circle cx={0} cy={0} r={14} fill="#FFFFFF" stroke="#64748B" strokeWidth={1} />
+              <line x1={-12} y1={0} x2={12} y2={0} stroke="#CBD5E1" strokeWidth={0.8} />
+              <line x1={0} y1={-12} x2={0} y2={12} stroke="#CBD5E1" strokeWidth={0.8} />
+              <polygon points="0,-11 3.5,0 0,-1.5 -3.5,0" fill="#DC2626" />
+              <polygon points="0,0 3.5,0 0,11 -3.5,0" fill="#334155" />
+              <text x={0} y={-16} textAnchor="middle" fill="#DC2626" className="font-mono font-bold text-[8px]">
                 N
-              </text>
-              <text x={0} y={30} textAnchor="middle" fill="#64748B" className="font-mono font-semibold text-[8px]">
-                S
-              </text>
-              <text x={28} y={3} textAnchor="middle" fill="#64748B" className="font-mono font-semibold text-[8px]">
-                E
-              </text>
-              <text x={-28} y={3} textAnchor="middle" fill="#64748B" className="font-mono font-semibold text-[8px]">
-                W
               </text>
             </g>
 
             {/* ARCHITECTURAL GRAPHIC SCALE BAR */}
-            <g transform={`translate(10, ${svgHeight + 35})`} pointerEvents="none">
-              <line x1={0} y1={0} x2={SCALE * 20} y2={0} stroke="#0F172A" strokeWidth={2.5} />
-              <line x1={0} y1={-5} x2={0} y2={5} stroke="#0F172A" strokeWidth={2} />
-              <line x1={SCALE * 5} y1={-3.5} x2={SCALE * 5} y2={3.5} stroke="#0F172A" strokeWidth={1.2} />
-              <line x1={SCALE * 10} y1={-5} x2={SCALE * 10} y2={5} stroke="#0F172A" strokeWidth={2} />
-              <line x1={SCALE * 20} y1={-5} x2={SCALE * 20} y2={5} stroke="#0F172A" strokeWidth={2} />
-              <text x={0} y={14} fill="#0F172A" className="font-mono text-[8px] font-bold">0&apos;</text>
-              <text x={SCALE * 5} y={14} textAnchor="middle" fill="#475569" className="font-mono text-[8px] font-semibold">5&apos;</text>
-              <text x={SCALE * 10} y={14} textAnchor="middle" fill="#475569" className="font-mono text-[8px] font-semibold">10&apos;</text>
-              <text x={SCALE * 20} y={14} textAnchor="middle" fill="#0F172A" className="font-mono text-[8px] font-bold">20&apos; (6.1m)</text>
-              <text x={SCALE * 10} y={26} textAnchor="middle" fill="#64748B" className="font-mono text-[7px] tracking-wider uppercase">GRAPHIC BAR SCALE</text>
+            <g transform={`translate(10, ${svgHeight + 25})`} pointerEvents="none">
+              <line x1={0} y1={0} x2={SCALE * 20} y2={0} stroke="#0F172A" strokeWidth={2} />
+              <line x1={0} y1={-4} x2={0} y2={4} stroke="#0F172A" strokeWidth={1.5} />
+              <line x1={SCALE * 5} y1={-2.5} x2={SCALE * 5} y2={2.5} stroke="#0F172A" strokeWidth={1} />
+              <line x1={SCALE * 10} y1={-4} x2={SCALE * 10} y2={4} stroke="#0F172A" strokeWidth={1.5} />
+              <line x1={SCALE * 20} y1={-4} x2={SCALE * 20} y2={4} stroke="#0F172A" strokeWidth={1.5} />
+              <text x={0} y={12} fill="#0F172A" className="font-mono text-[7.5px] font-bold">0&apos;</text>
+              <text x={SCALE * 10} y={12} textAnchor="middle" fill="#475569" className="font-mono text-[7.5px] font-semibold">10&apos;</text>
+              <text x={SCALE * 20} y={12} textAnchor="middle" fill="#0F172A" className="font-mono text-[7.5px] font-bold">20&apos;</text>
             </g>
 
-            {/* MASTER BLUEPRINT TITLE BLOCK */}
-            <g transform={`translate(${Math.max(0, svgWidth - 280)}, ${svgHeight + 20})`} pointerEvents="none">
+            {/* MASTER BLUEPRINT TITLE BLOCK: Compact & Professional */}
+            <g transform={`translate(${Math.max(0, svgWidth - 230)}, ${svgHeight + 15})`} pointerEvents="none">
               <rect
                 x={0}
                 y={0}
-                width={280}
-                height={55}
+                width={230}
+                height={46}
                 fill="#FFFFFF"
                 stroke="#0F172A"
-                strokeWidth={1.5}
+                strokeWidth={1.2}
                 rx={2}
               />
-              <line x1={0} y1={20} x2={280} y2={20} stroke="#CBD5E1" strokeWidth={1} />
-              <line x1={175} y1={20} x2={175} y2={55} stroke="#CBD5E1" strokeWidth={1} />
-              <text x={10} y={14} fill="#0F172A" className="font-mono text-[10px] font-extrabold tracking-wider">
-                {currentFloor.floor_name ? currentFloor.floor_name.toUpperCase() : "GROUND FLOOR"} BLUEPRINT
+              <line x1={0} y1={18} x2={230} y2={18} stroke="#E2E8F0" strokeWidth={0.8} />
+              <text x={8} y={13} fill="#0F172A" className="font-mono text-[9px] font-bold tracking-wider">
+                {currentFloor.floor_name ? currentFloor.floor_name.toUpperCase() : "FLOOR PLAN"}
               </text>
-              <text x={270} y={14} textAnchor="end" fill="#C48446" className="font-mono text-[8px] font-bold tracking-widest">
-                ARCHITECTURAL DRAFTING
+              <text x={222} y={13} textAnchor="end" fill="#C48446" className="font-mono text-[8px] font-bold">
+                SCALE: 1/4&quot; = 1&apos;-0&quot;
               </text>
-              <text x={10} y={32} fill="#64748B" className="font-mono text-[8px]">
+              <text x={8} y={29} fill="#64748B" className="font-mono text-[7.5px]">
                 PLOT: <tspan fill="#0F172A" fontWeight="bold">{layout.plot_width}&apos; × {layout.plot_length}&apos;</tspan> ({(layout.plot_width * layout.plot_length).toLocaleString()} SQ FT)
               </text>
-              <text x={10} y={46} fill="#64748B" className="font-mono text-[8px]">
-                BUILT-UP: <tspan fill="#0F172A" fontWeight="bold">{layout.total_area_sqft || Math.round((currentFloor.rooms || []).reduce((acc, r) => acc + (r.area_sqft || (r.rect ? r.rect.width * r.rect.length : 0)), 0))} SQ FT</tspan>
-              </text>
-              <text x={185} y={32} fill="#64748B" className="font-mono text-[8px]">
-                FACING: <tspan fill="#0F172A" fontWeight="bold">{layout.facing || "EAST"}</tspan>
-              </text>
-              <text x={185} y={46} fill="#2563EB" className="font-mono text-[8px] font-semibold">
-                SCALE: 1/4&quot; = 1&apos;-0&quot;
+              <text x={8} y={40} fill="#64748B" className="font-mono text-[7.5px]">
+                BUILT-UP: <tspan fill="#0F172A" fontWeight="bold">{layout.total_area_sqft || Math.round((currentFloor.rooms || []).reduce((acc, r) => acc + (r.area_sqft || (r.rect ? r.rect.width * r.rect.length : 0)), 0))} SQ FT</tspan> · FACING: <tspan fill="#0F172A" fontWeight="bold">{layout.facing || "EAST"}</tspan>
               </text>
             </g>
           </svg>
@@ -3861,16 +4034,35 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                     </div>
                   </div>
 
+                  <div className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Length:</span>
+                      <span className="text-white font-bold">
+                        {feetToArchitectural(Math.hypot(selectedWall.x2 - selectedWall.x1, selectedWall.y2 - selectedWall.y1))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Orientation:</span>
+                      <span className="text-white font-bold">
+                        {Math.abs(selectedWall.y1 - selectedWall.y2) < 0.2 ? "Horizontal" : "Vertical"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Thickness:</span>
+                      <span className="text-white font-bold">{Math.round(selectedWall.thickness * 12)}&quot;</span>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleToggleWallThickness}
-                    className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                    className="w-full py-2 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs font-mono shadow transition-all"
                   >
                     TOGGLE THICKNESS (4.5&quot; / 9&quot;)
                   </button>
 
-                  <div className="text-[10px] text-[#64748B] leading-relaxed">
-                    Drag the wall line to move it, or drag its endpoints to stretch/shorten.
+                  <div className="text-[10px] text-[#94A3B8] leading-relaxed">
+                    Direct wall editing: drag the wall line to move and resize rooms, or drag circle endpoints to extend/shorten.
                   </div>
                 </div>
               ) : selectedDoor ? (
@@ -3878,20 +4070,44 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 <div className="space-y-3">
                   <div>
                     <div className="text-xs font-bold text-white uppercase">
-                      DOOR {selectedDoor.id}
+                      DOOR ({selectedDoor.door_type || selectedDoor.type || "INTERIOR"})
                     </div>
                     <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5">
-                      Width: {selectedDoor.width || 3.0}&apos;-0&quot; · Swing: {selectedDoor.swing_direction || "inward"}
+                      ID: {selectedDoor.id}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Width:</span>
+                      <span className="text-white font-bold">{feetToArchitectural(selectedDoor.width || 3.0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Swing:</span>
+                      <span className="text-white font-bold capitalize">{selectedDoor.swing_direction || "Inward"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Type:</span>
+                      <span className="text-white font-bold capitalize">{selectedDoor.door_type || selectedDoor.type || "Single Leaf"}</span>
                     </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleFlipDoorSwing}
-                    className="w-full py-2 rounded-lg bg-[#C48446]/10 hover:bg-[#C48446]/20 border border-[#C48446]/30 text-[#E69F58] text-xs font-mono flex items-center justify-center gap-1.5"
+                    className="w-full py-2 rounded-lg bg-[#C48446]/15 hover:bg-[#C48446]/25 border border-[#C48446]/30 text-[#E69F58] text-xs font-mono font-semibold flex items-center justify-center gap-1.5 transition-all"
                   >
                     <RotateCw className="w-3.5 h-3.5" />
                     <span>FLIP SWING DIRECTION</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    className="w-full py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-mono flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Door</span>
                   </button>
                 </div>
               ) : selectedWindow ? (
@@ -3899,10 +4115,21 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 <div className="space-y-3">
                   <div>
                     <div className="text-xs font-bold text-white uppercase">
-                      WINDOW {selectedWindow.id}
+                      WINDOW ({selectedWindow.window_type || selectedWindow.type || "CASEMENT"})
                     </div>
                     <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5">
-                      Width: {selectedWindow.width || 4.0}&apos;-0&quot;
+                      ID: {selectedWindow.id}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Width:</span>
+                      <span className="text-white font-bold">{feetToArchitectural(selectedWindow.width || 4.0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Type:</span>
+                      <span className="text-white font-bold capitalize">{selectedWindow.window_type || selectedWindow.type || "Casement"}</span>
                     </div>
                   </div>
 
@@ -3922,6 +4149,15 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       -1&apos; Width
                     </button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    className="w-full py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-mono flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Window</span>
+                  </button>
                 </div>
               ) : selectedFurniture ? (
                 /* Furniture Properties */
@@ -3931,16 +4167,35 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       {selectedFurniture.type.replace(/_/g, " ")}
                     </div>
                     <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5">
-                      {selectedFurniture.width}&apos; × {selectedFurniture.depth || selectedFurniture.length}&apos;
+                      ID: {selectedFurniture.id}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Size:</span>
+                      <span className="text-white font-bold">
+                        {selectedFurniture.width}&apos; × {selectedFurniture.depth || selectedFurniture.length}&apos;
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Position:</span>
+                      <span className="text-white font-bold">
+                        {selectedFurniture.x.toFixed(1)}&apos;, {selectedFurniture.y.toFixed(1)}&apos;
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Rotation:</span>
+                      <span className="text-white font-bold">{selectedFurniture.rotation || 0}°</span>
                     </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleRotateFurniture}
-                    className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white flex items-center justify-center gap-1.5"
+                    className="w-full py-2 rounded-lg bg-[#C48446]/15 hover:bg-[#C48446]/25 border border-[#C48446]/30 text-[#E69F58] text-xs font-mono font-semibold flex items-center justify-center gap-1.5 transition-all"
                   >
-                    <RotateCw className="w-3.5 h-3.5 text-[#C48446]" />
+                    <RotateCw className="w-3.5 h-3.5" />
                     <span>ROTATE 90°</span>
                   </button>
 

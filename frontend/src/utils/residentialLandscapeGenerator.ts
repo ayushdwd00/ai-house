@@ -294,6 +294,20 @@ export function generateArchitecturalLandscape(layout: HouseLayout): Architectur
       return true;
     }
 
+    // Individual room check (strictly guarantee no room is touched)
+    for (const r of rooms) {
+      if (r.rect) {
+        if (
+          x + clearance > r.rect.x - 0.6 &&
+          x - clearance < r.rect.x + r.rect.width + 0.6 &&
+          z + clearance > r.rect.y - 0.6 &&
+          z - clearance < r.rect.y + r.rect.length + 0.6
+        ) {
+          return true;
+        }
+      }
+    }
+
     // Parking area
     if (
       x + clearance > pkgRect.x - 0.4 &&
@@ -579,34 +593,63 @@ export function generateArchitecturalLandscape(layout: HouseLayout): Architectur
   }
 
   // 10. ORNAMENTAL TREES (2–4 CANOPY TREES WITH STRICT BUILDING CLEARANCE)
-  const treeCandidates = [
-    // Rear Northwest Garden Corner
-    { x: 5.2, z: bwThick + 3.2, scale: 1.55 },
-    // Rear Northeast Garden Corner
-    { x: pw - 5.2, z: bwThick + 3.2, scale: 1.5 },
-    // Front Lawn Framing Tree (opposite parking)
-    {
-      x: pkgRect.x > cx ? 6.0 : pw - 6.0,
-      z: pl - 6.5,
-      scale: 1.6,
-    },
-    // Side Garden Tree
-    { x: pw - 4.5, z: cz, scale: 1.35 },
-  ];
+  const treeCandidates: Array<{ x: number; z: number; scale: number }> = [];
+
+  // Rear garden candidates (if setback exists)
+  if (minBz > 5.0) {
+    const rearZ = Math.max(3.2, minBz / 2);
+    treeCandidates.push(
+      { x: 5.2, z: rearZ, scale: 1.5 },
+      { x: pw - 5.2, z: rearZ, scale: 1.5 }
+    );
+    if (pw > 45) {
+      treeCandidates.push({ x: cx, z: rearZ, scale: 1.4 });
+    }
+  }
+
+  // Front garden candidates (if front setback exists)
+  if (pl - maxBz > 5.5) {
+    const frontZ = Math.min(pl - 5.5, maxBz + (pl - maxBz) / 2);
+    const lawnSideX = pkgRect.x > cx ? 5.8 : pw - 5.8;
+    treeCandidates.push(
+      { x: lawnSideX, z: frontZ, scale: 1.55 },
+      { x: lawnSideX > cx ? lawnSideX + 6.0 : lawnSideX - 6.0, z: Math.min(pl - 5.0, frontZ + 2.0), scale: 1.35 }
+    );
+  }
+
+  // Side garden candidates
+  if (pw - maxBx > 6.0) {
+    treeCandidates.push({ x: pw - 4.5, z: cz, scale: 1.35 });
+  }
+  if (minBx > 6.0 && (pkgRect.y > cz || pkgRect.x > cx)) {
+    treeCandidates.push({ x: 4.5, z: cz, scale: 1.35 });
+  }
+
+  // Fallback fixed points
+  if (treeCandidates.length === 0) {
+    treeCandidates.push(
+      { x: 5.2, z: bwThick + 3.2, scale: 1.5 },
+      { x: pw - 5.2, z: bwThick + 3.2, scale: 1.5 },
+      { x: pkgRect.x > cx ? 6.0 : pw - 6.0, z: pl - 6.0, scale: 1.5 }
+    );
+  }
 
   let treeCounter = 1;
   treeCandidates.forEach((cand) => {
-    // Trees need generous clearance >= 3.0ft from buildings, parking, driveways, walkways
+    // Trees need generous clearance >= 2.5ft from buildings, parking, driveways, walkways
     if (!isPointCollidingHardscape(cand.x, cand.z, 2.5)) {
-      trees.push({
-        id: `tree_${treeCounter++}`,
-        type: "tree",
-        assetKey: "treeSmall",
-        x: cand.x,
-        z: cand.z,
-        scale: cand.scale,
-        rotationY: Math.sin(cand.x * 3.1) * Math.PI,
-      });
+      const tooClose = trees.some((t) => Math.hypot(t.x - cand.x, t.z - cand.z) < 7.5);
+      if (!tooClose) {
+        trees.push({
+          id: `tree_${treeCounter++}`,
+          type: "tree",
+          assetKey: "treeSmall",
+          x: cand.x,
+          z: cand.z,
+          scale: cand.scale,
+          rotationY: Math.sin(cand.x * 3.1) * Math.PI,
+        });
+      }
     }
   });
 
