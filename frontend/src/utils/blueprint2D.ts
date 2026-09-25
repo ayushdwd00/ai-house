@@ -255,8 +255,20 @@ export function computeDoorGeometry(
   // SVG arc: A rx ry x-axis-rotation large-arc-flag sweep-flag x y
   const arcPath = `M ${leafEndX} ${leafEndY} A ${doorWidth} ${doorWidth} 0 0 0 ${lx} ${ly}`;
 
-  // Direction label
-  const cardinal = door.direction_label || (door.outward_direction ? `${door.id} · ${door.outward_direction}` : `${door.id || `D0${index + 1}`}`);
+  // Architectural door designation code matching standard drafting
+  let code = "D";
+  const lowerId = (door.id || "").toLowerCase();
+  const lowerWall = (door.wall_id || "").toLowerCase();
+  if (lowerId.includes("main") || lowerId.includes("entry") || index === 0) {
+    code = "MD";
+  } else if (lowerId.includes("pooja") || lowerWall.includes("pooja")) {
+    code = "PD";
+  } else if ((door.width && door.width <= 2.6) || lowerId.includes("bath") || lowerId.includes("toilet") || lowerId.includes("store")) {
+    code = "D1";
+  } else {
+    code = "D";
+  }
+  const cardinal = code;
 
   // Label position: placed slightly offset along normal from mid-opening
   const midX = (x1 + x2) / 2;
@@ -353,8 +365,9 @@ export function computeWindowGeometry(
 
   const chajjaPath = `M ${cWall1x} ${cWall1y} L ${c1x} ${c1y} L ${c2x} ${c2y} L ${cWall2x} ${cWall2y}`;
 
-  // Label badge
-  const label = win.direction_label || (win.outward_direction ? `${win.id} · ${win.outward_direction}` : `${win.id || `W0${index + 1}`}`);
+  // Architectural window designation (W for window, V for ventilator)
+  const isVent = (win.width && win.width <= 2.5) || (win.id || "").toLowerCase().includes("vent") || (win.id || "").toLowerCase().includes("toilet") || (win.id || "").toLowerCase().includes("bath");
+  const label = isVent ? "V" : "W";
 
   // Label position outside the window beyond chajja
   const midX = (x1 + x2) / 2;

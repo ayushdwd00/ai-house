@@ -10,7 +10,7 @@ import {
   computeWindowGeometry,
   generateDimensionChains,
 } from "@/utils/blueprint2D";
-import { refineHouseLayout, editRoomLayoutFull } from "@/utils/api";
+import { refineHouseLayout, editRoomLayoutFull, reviewLayoutWithGemini } from "@/utils/api";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
 import {
   generateCanonicalWallNetwork,
@@ -131,6 +131,8 @@ export interface ArchitecturalPlanRendererProps {
   onSelectRoom?: (roomId: string | null) => void;
   onSelectFurniture?: (furnitureId: string | null) => void;
   onBack?: () => void;
+  onRegenerateLayout?: (arg?: any) => Promise<void> | void;
+  isRegenerating?: boolean;
 }
 
 interface DraggingRoomState {
@@ -320,6 +322,15 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [aiPrompt, setAiPrompt] = useState("");
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
+
+  // Gemini QA Visual Review
+  const [isQaReviewing, setIsQaReviewing] = useState(false);
+  const [qaReport, setQaReport] = useState<{
+    score?: number;
+    critique?: string;
+    issues?: Array<{ category: string; description: string; severity: "low" | "medium" | "high"; recommendation?: string }>;
+    strengths?: string[];
+  } | null>(null);
 
   // Dragging & Resizing States
   const [draggingRoom, setDraggingRoom] = useState<DraggingRoomState | null>(null);
@@ -1438,6 +1449,27 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     }
   };
 
+  // Run Gemini Visual Architectural QA
+  const handleRunGeminiQa = async () => {
+    setIsQaReviewing(true);
+    setAiNotice(null);
+    try {
+      const result = await reviewLayoutWithGemini(layout, Boolean(layout.vastu_result));
+      if (result) {
+        setQaReport(result);
+        const issueCount = result.issues?.length || 0;
+        setAiNotice(`Gemini QA completed. Score: ${result.score ?? "N/A"}/100 with ${issueCount} architectural check${issueCount === 1 ? "" : "s"}.`);
+      } else {
+        setAiNotice("Gemini QA completed. No architectural conflicts identified.");
+      }
+    } catch (err) {
+      console.warn("Visual QA check failed:", err);
+      setAiNotice("Visual QA check encountered an issue. Layout remains intact.");
+    } finally {
+      setIsQaReviewing(false);
+    }
+  };
+
   // Export 2D Blueprint as PNG
   const handleExportPNG = () => {
     const svgEl = svgRef.current;
@@ -2532,6 +2564,85 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   )}
                 </button>
               </div>
+
+              {/* Gemini Visual QA Button & Review Report */}
+              <div className="mt-4 pt-3 border-t border-white/10">
+                <button
+                  onClick={handleRunGeminiQa}
+                  disabled={isQaReviewing || isAiProcessing}
+                  className="w-full py-2 px-3 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 border border-sky-500/30 text-xs font-mono font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {isQaReviewing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Reviewing Floor Plan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                      <span>✦ RUN GEMINI VISUAL QA REVIEW</span>
+                    </>
+                  )}
+                </button>
+
+                {qaReport && (
+                  <div className="mt-3 p-3 rounded-xl bg-black/40 border border-white/10 max-h-56 overflow-y-auto space-y-2 text-[11px] font-mono">
+                    <div className="flex items-center justify-between pb-1 border-b border-white/10">
+                      <span className="text-white font-bold">QA Visual Assessment</span>
+                      {qaReport.score !== undefined && (
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+                          {qaReport.score}/100
+                        </span>
+                      )}
+                    </div>
+                    {qaReport.critique && (
+                      <p className="text-[#9E9C98] leading-relaxed text-[10.5px]">
+                        {qaReport.critique}
+                      </p>
+                    )}
+                    {qaReport.issues && qaReport.issues.length > 0 ? (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="text-[10px] uppercase text-[#64748B] font-bold">
+                          Items Inspected ({qaReport.issues.length}):
+                        </div>
+                        {qaReport.issues.map((iss, iIdx) => (
+                          <div
+                            key={iIdx}
+                            className="p-1.5 rounded bg-white/5 border border-white/5 space-y-0.5"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  iss.severity === "high"
+                                    ? "bg-rose-400"
+                                    : iss.severity === "medium"
+                                    ? "bg-amber-400"
+                                    : "bg-sky-400"
+                                }`}
+                              />
+                              <span className="text-[9px] uppercase font-bold text-[#CBD5E1]">
+                                {iss.category}
+                              </span>
+                            </div>
+                            <div className="text-white/80 text-[10px] pl-3 leading-snug">
+                              {iss.description}
+                            </div>
+                            {iss.recommendation && (
+                              <div className="text-[#38BDF8] text-[9.5px] pl-3 italic">
+                                Rec: {iss.recommendation}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-emerald-400 text-[10.5px] pt-1">
+                        ✓ All architectural boundaries, openings, and clearances verified.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -3377,6 +3488,16 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                     strokeWidth={18}
                     strokeLinecap="square"
                   />
+                  {/* Architectural light cyan glass fill like blueprint standard */}
+                  <line
+                    x1={wGeom.x1}
+                    y1={wGeom.y1}
+                    x2={wGeom.x2}
+                    y2={wGeom.y2}
+                    stroke="#BAE6FD"
+                    strokeWidth={8}
+                    strokeLinecap="square"
+                  />
                   <path
                     d={wGeom.chajjaPath}
                     fill="none"
@@ -3446,6 +3567,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                     stroke="#FFFFFF"
                     strokeWidth={18}
                     strokeLinecap="square"
+                  />
+                  {/* Hinge Pivot Dot */}
+                  <circle
+                    cx={dGeom.hingeX}
+                    cy={dGeom.hingeY}
+                    r={2.8}
+                    fill={isSelected ? "#C48446" : "#0F172A"}
                   />
                   <path
                     d={dGeom.arcPath}

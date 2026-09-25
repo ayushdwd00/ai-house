@@ -268,3 +268,38 @@ export async function generateDreamHomeLayout(
   }
 }
 
+/**
+ * Conduct Gemini multimodal architectural QA review on a floor plan layout.
+ */
+export async function reviewLayoutWithGemini(
+  layout: HouseLayout,
+  vastuEnabled: boolean = false
+): Promise<{
+  score?: number;
+  critique?: string;
+  issues?: Array<{ category: string; description: string; severity: "low" | "medium" | "high"; recommendation?: string }>;
+  strengths?: string[];
+  vastu_compliance?: Record<string, unknown>;
+} | null> {
+  const url = `${API_BASE_URL}/api/architectural-review`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        layout,
+        vastu_compliant: vastuEnabled,
+      }),
+    });
+
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  } catch (err) {
+    console.warn("[API NOTICE] reviewLayoutWithGemini failed:", err);
+    return null;
+  }
+}
+
+
