@@ -277,13 +277,39 @@ def export_layout_to_indian_drawing_svg(layout: HouseLayout) -> str:
     )
 
     # 2. Road Facing Banner
-    road_y = pl * scale + 35.0 if road_side == "SOUTH" else -45.0
-    svg_parts.append(
-        f'<rect x="0" y="{road_y - 12:.1f}" width="{pw * scale:.1f}" height="24" fill="#EDF2F7" stroke="#CBD5E0" />'
-    )
-    svg_parts.append(
-        f'<text x="{pw * scale / 2.0:.1f}" y="{road_y + 4:.1f}" text-anchor="middle" font-size="12" font-weight="700" fill="#4A5568">ROAD ({road_side} FACING)</text>'
-    )
+    rs_upper = (road_side or "SOUTH").upper()
+    if rs_upper == "SOUTH":
+        road_y = pl * scale + 35.0
+        svg_parts.append(
+            f'<rect x="0" y="{road_y - 12:.1f}" width="{pw * scale:.1f}" height="24" fill="#EDF2F7" stroke="#CBD5E0" />'
+        )
+        svg_parts.append(
+            f'<text x="{pw * scale / 2.0:.1f}" y="{road_y + 4:.1f}" text-anchor="middle" font-size="12" font-weight="700" fill="#4A5568">ROAD ({rs_upper} FACING)</text>'
+        )
+    elif rs_upper == "NORTH":
+        road_y = -45.0
+        svg_parts.append(
+            f'<rect x="0" y="{road_y - 12:.1f}" width="{pw * scale:.1f}" height="24" fill="#EDF2F7" stroke="#CBD5E0" />'
+        )
+        svg_parts.append(
+            f'<text x="{pw * scale / 2.0:.1f}" y="{road_y + 4:.1f}" text-anchor="middle" font-size="12" font-weight="700" fill="#4A5568">ROAD ({rs_upper} FACING)</text>'
+        )
+    elif rs_upper == "WEST":
+        road_x = -45.0
+        svg_parts.append(
+            f'<rect x="{road_x - 12:.1f}" y="0" width="24" height="{pl * scale:.1f}" fill="#EDF2F7" stroke="#CBD5E0" />'
+        )
+        svg_parts.append(
+            f'<text x="{road_x:.1f}" y="{pl * scale / 2.0:.1f}" text-anchor="middle" font-size="12" font-weight="700" fill="#4A5568" transform="rotate(-90 {road_x:.1f} {pl * scale / 2.0:.1f})">ROAD ({rs_upper} FACING)</text>'
+        )
+    else:  # EAST
+        road_x = pw * scale + 35.0
+        svg_parts.append(
+            f'<rect x="{road_x - 12:.1f}" y="0" width="24" height="{pl * scale:.1f}" fill="#EDF2F7" stroke="#CBD5E0" />'
+        )
+        svg_parts.append(
+            f'<text x="{road_x:.1f}" y="{pl * scale / 2.0:.1f}" text-anchor="middle" font-size="12" font-weight="700" fill="#4A5568" transform="rotate(90 {road_x:.1f} {pl * scale / 2.0:.1f})">ROAD ({rs_upper} FACING)</text>'
+        )
 
     # 3. Rooms (Fills & Dimensions)
     for r in rooms:

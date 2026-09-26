@@ -4,7 +4,29 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Camera, ChevronDown, RotateCcw, Sun, Moon, Sparkles, Layers, Eye } from "lucide-react";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import {
+  Camera,
+  ChevronDown,
+  RotateCcw,
+  Sun,
+  Moon,
+  Sparkles,
+  Layers,
+  Eye,
+  Scissors,
+  Building,
+  Plus,
+  Minus,
+  Maximize2,
+  Minimize2,
+  Compass,
+  Download,
+} from "lucide-react";
 import {
   HouseLayout,
   FloorPlan,
@@ -13,13 +35,14 @@ import {
   Wall,
   Door,
   WindowItem,
-  LandscapePlan,
-  LandscapeElement,
+  Rect,
 } from "@/types/house";
 import {
   generateArchitecturalLandscape,
   buildArchitecturalLandscapeScene,
 } from "@/utils/residentialLandscapeGenerator";
+import { RealisticRenderModal } from "@/components/RealisticRenderModal";
+import { editRoomLayoutFull } from "@/utils/api";
 
 export interface Dollhouse3DProps {
   layout: HouseLayout;
@@ -29,6 +52,7 @@ export interface Dollhouse3DProps {
   selectedFurnitureId?: string | null;
   onSelectRoom: (roomId: string | null) => void;
   onSelectFurniture?: (furnitureId: string | null) => void;
+  onUpdateLayout?: (updatedLayout: HouseLayout) => void;
   isDarkMode?: boolean;
   lightingPreset?: "day" | "sunset" | "night" | "studio";
   onChangeLightingPreset?: (preset: "day" | "sunset" | "night" | "studio") => void;
@@ -46,14 +70,14 @@ export interface Dollhouse3DProps {
   hasNotification?: boolean;
 }
 
-export type PresentationMode = "exterior" | "interior" | "landscape" | "all";
+export type PresentationMode = "cutaway" | "exterior" | "interior" | "landscape" | "all";
 
 export type CameraPresetType =
+  | "cutaway"
   | "exterior"
   | "iso"
   | "top"
   | "front"
-  | "side"
   | "entrance"
   | "living"
   | "kitchen"
@@ -68,6 +92,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   selectedFurnitureId,
   onSelectRoom,
   onSelectFurniture,
+  onUpdateLayout,
   isDarkMode = false,
   lightingPreset = "day",
   onChangeLightingPreset,
@@ -86,44 +111,56 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
 
-  const hasOptimizationNotice =
-    hasNotification !== undefined
-      ? hasNotification
-      : Boolean((layout as any)?.metadata?.optimization_note);
+  // Authoritative Architectural Elevation Constants
+  const plinthHeight = 0.8;   // Finished plinth at y = 0.8 ft
+  const floorHeight = 10.0;   // Height from floor level to next floor level (10 ft)
+  const fullWallHeight = 9.5; // Clear wall height (9.5 ft)
+  const cutawayWallHeight = 3.2; // Selective cutaway wall height
+  const slabThickness = 0.6;  // Concrete intermediate slab thickness (0.6 ft)
 
-  // Dedicated primary presentation modes: EXTERIOR | INTERIOR | LANDSCAPE | ALL
+  const pw = layout.plot_width || 40;
+  const pl = layout.plot_length || 50;
+  const cx = pw / 2;
+  const cz = pl / 2;
+
+  // Canonical Facing / Road Orientation
+  const resolvedFacing = (
+    layout.facing ||
+    layout.orientation ||
+    layout.site?.road_side ||
+    "south"
+  ).toLowerCase();
+
+  // Mode States
+  const [isCutawayMode, setIsCutawayMode] = useState<boolean>(true);
   const [presentationMode, setPresentationMode] = useState<PresentationMode>(
-    initialPresentationMode || "landscape"
+    initialPresentationMode || "cutaway"
   );
-  const [multiFloorStacked, setMultiFloorStacked] = useState(true);
-  const [explodedFloors, setExplodedFloors] = useState(false);
-  const [cameraView, setCameraView] = useState<CameraPresetType>("exterior");
+  const [cameraView, setCameraView] = useState<CameraPresetType>("cutaway");
   const [isCameraMenuOpen, setIsCameraMenuOpen] = useState(false);
-
-  // Optional Feature Toggles: Furniture, Vegetation, Roof, Walls
   const [showFurnitureState, setShowFurnitureState] = useState(true);
   const [showVegetationState, setShowVegetationState] = useState(true);
-  const [internalWallHeightMode, setInternalWallHeightMode] = useState<"cutaway" | "full">(wallHeightMode || "full");
-  const effectiveWallHeightMode = onToggleWallHeightMode ? wallHeightMode : internalWallHeightMode;
-
-  const [internalShowRoof, setInternalShowRoof] = useState(showRoof !== undefined ? showRoof : true);
-  const effectiveShowRoof = onToggleRoof ? showRoof : internalShowRoof;
+  const [multiFloorStacked, setMultiFloorStacked] = useState(true);
 
   const [internalLightingPreset, setInternalLightingPreset] = useState<"day" | "sunset" | "night">(
     lightingPreset === "night" || lightingPreset === "sunset" ? lightingPreset : "day"
   );
-  const effectiveLightingPreset = onChangeLightingPreset ? lightingPreset : internalLightingPreset;
+  const effectiveLightingPreset = onChangeLightingPreset ? (lightingPreset as "day" | "sunset" | "night") : internalLightingPreset;
 
-  const [internalShowStructure, setInternalShowStructure] = useState(false);
-  const effectiveShowStructure = showStructure !== undefined ? showStructure : internalShowStructure;
+  const [internalShowRoof, setInternalShowRoof] = useState(showRoof !== undefined ? showRoof : true);
+  const effectiveShowRoof = onToggleRoof ? showRoof : internalShowRoof;
 
   const [internalShowLandscape, setInternalShowLandscape] = useState(true);
   const effectiveShowLandscape = showLandscape !== undefined ? showLandscape : internalShowLandscape;
-  const [landscapeCategory, setLandscapeCategory] = useState<"all" | "vegetation" | "paths" | "lighting" | "furniture">("all");
+
+  // Realistic Render Modal
+  const [isRenderModalOpen, setIsRenderModalOpen] = useState(false);
+  const [isEditingRoom, setIsEditingRoom] = useState(false);
 
   // Three.js Core Refs
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const composerRef = useRef<EffectComposer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const houseRootRef = useRef<THREE.Group | null>(null);
@@ -131,100 +168,40 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   const skyLightRef = useRef<THREE.HemisphereLight | null>(null);
   const interiorLightsGroupRef = useRef<THREE.Group | null>(null);
 
-  // Smooth Camera Target Lerp Vectors
+  // Camera Target Lerp
   const targetCamPos = useRef(new THREE.Vector3());
   const targetControlsTarget = useRef(new THREE.Vector3());
   const isTransitioningCamera = useRef(false);
 
-  // Raycasting for interactive 3D entity selection
+  // Raycaster for touch/click interaction
   const raycaster = useRef(new THREE.Raycaster());
-  const mouse = useRef(new THREE.Vector2());
+  const pointer = useRef(new THREE.Vector2());
 
-  const fullWallHeight = 9.5;
-  const cutawayWallHeight = 3.5;
-  const floorElevation = 10.5;
+  // GLTF Asset Caches
+  const loadedFurnitureRef = useRef<Record<string, THREE.Group>>({});
+  const loadedNatureRef = useRef<Record<string, THREE.Group>>({});
+  const [assetsReady, setAssetsReady] = useState(false);
 
-  const pw = layout.plot_width || 40;
-  const pl = layout.plot_length || 50;
-  const cx = pw / 2;
-  const cz = pl / 2;
-
-  // Real CC0 lightweight assets state
-  interface LandscapingAssets {
-    bush?: THREE.Group;
-    bushDetailed?: THREE.Group;
-    flowerPurple?: THREE.Group;
-    flowerRed?: THREE.Group;
-    flowerYellow?: THREE.Group;
-    treeSmall?: THREE.Group;
-  }
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const loadedModelsRef = useRef<LandscapingAssets>({});
-
-  // Real CC0 tileable textures (self-hosted in /public/textures)
-  const [grassTexture, setGrassTexture] = useState<THREE.Texture | null>(null);
-  const [paverTexture, setPaverTexture] = useState<THREE.Texture | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const loader = new THREE.TextureLoader();
-    let mounted = true;
-
-    loader.load(
-      "/textures/grass.jpg",
-      (tex) => {
-        if (!mounted) return;
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(Math.max(4, Math.round(pw / 5)), Math.max(4, Math.round(pl / 5)));
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.needsUpdate = true;
-        setGrassTexture(tex);
-      },
-      undefined,
-      (err) => console.warn("Notice: /textures/grass.jpg fallback will be used:", err)
-    );
-
-    loader.load(
-      "/textures/pavers.jpg",
-      (tex) => {
-        if (!mounted) return;
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(2, 6);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.needsUpdate = true;
-        setPaverTexture(tex);
-      },
-      undefined,
-      (err) => console.warn("Notice: /textures/pavers.jpg fallback will be used:", err)
-    );
-
-    return () => {
-      mounted = false;
-    };
-  }, [pw, pl]);
-
-  // Preload CC0 low-poly nature models (Kenney Nature Kit)
+  // Preload CC0 / Procedural Textures & GLB Assets
   useEffect(() => {
     if (typeof window === "undefined") return;
     const loader = new GLTFLoader();
-    const assets: Record<keyof LandscapingAssets, string> = {
-      bush: "/models/bush.glb",
-      bushDetailed: "/models/bush_detailed.glb",
-      flowerPurple: "/models/flower_purple.glb",
-      flowerRed: "/models/flower_red.glb",
-      flowerYellow: "/models/flower_yellow.glb",
-      treeSmall: "/models/tree_small.glb",
-    };
-
     let mounted = true;
-    let loaded = 0;
-    const total = Object.keys(assets).length;
 
-    Object.entries(assets).forEach(([key, path]) => {
+    // Furniture Library
+    const furnitureModels = [
+      "sofa", "coffee_table", "tv_unit", "bed", "nightstand",
+      "wardrobe", "dining_table", "dining_chair", "kitchen_counter",
+      "refrigerator", "toilet", "basin", "shower", "outdoor_chair",
+      "outdoor_table", "planter"
+    ];
+
+    let loadedCount = 0;
+    const totalCount = furnitureModels.length;
+
+    furnitureModels.forEach((name) => {
       loader.load(
-        path,
+        `/models/furniture/${name}.glb`,
         (gltf) => {
           if (!mounted) return;
           gltf.scene.traverse((child) => {
@@ -233,20 +210,37 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               child.receiveShadow = true;
             }
           });
-          loadedModelsRef.current[key as keyof LandscapingAssets] = gltf.scene;
-          loaded++;
-          if (loaded === total) {
-            setModelsLoaded(true);
-          }
+          loadedFurnitureRef.current[name] = gltf.scene;
+          loadedCount++;
+          if (loadedCount === totalCount) setAssetsReady(true);
         },
         undefined,
-        (err) => {
-          console.warn(`Error loading model ${path}:`, err);
-          loaded++;
-          if (loaded === total) {
-            setModelsLoaded(true);
-          }
+        () => {
+          loadedCount++;
+          if (loadedCount === totalCount) setAssetsReady(true);
         }
+      );
+    });
+
+    // Nature Kit Models
+    const natureModels: Record<string, string> = {
+      bush: "/models/bush.glb",
+      bushDetailed: "/models/bush_detailed.glb",
+      flowerPurple: "/models/flower_purple.glb",
+      flowerRed: "/models/flower_red.glb",
+      flowerYellow: "/models/flower_yellow.glb",
+      treeSmall: "/models/tree_small.glb",
+    };
+
+    Object.entries(natureModels).forEach(([k, path]) => {
+      loader.load(
+        path,
+        (gltf) => {
+          if (!mounted) return;
+          loadedNatureRef.current[k] = gltf.scene;
+        },
+        undefined,
+        () => {}
       );
     });
 
@@ -255,20 +249,17 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     };
   }, []);
 
-  // ==========================================
-  // PROCEDURAL HIGH-QUALITY PBR TEXTURES
-  // ==========================================
-  const createWoodTexture = useCallback((isDark: boolean, tintHex: string = "#E4D5B7") => {
+  // Procedural Wood / Marble / Plaster Texture Generators
+  const woodTexture = useMemo(() => {
+    if (typeof window === "undefined") return null;
     const canvas = document.createElement("canvas");
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return new THREE.Texture();
-
-    ctx.fillStyle = isDark ? "#2C2218" : tintHex;
+    if (!ctx) return null;
+    ctx.fillStyle = "#C49A6C";
     ctx.fillRect(0, 0, 512, 512);
-
-    ctx.fillStyle = isDark ? "#1C150F" : "rgba(0,0,0,0.08)";
+    ctx.fillStyle = "rgba(0,0,0,0.06)";
     for (let y = 0; y < 512; y += 32) {
       ctx.fillRect(0, y, 512, 1.5);
       const offset = (y / 32) % 2 === 0 ? 128 : 256;
@@ -276,25 +267,24 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         ctx.fillRect(x, y, 1.5, 32);
       }
     }
-
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(3, 3);
+    tex.repeat.set(4, 4);
     return tex;
   }, []);
 
-  const createTileTexture = useCallback((isDark: boolean, baseColor: string = "#FAF9F6", gridColor: string = "#E2DDD5") => {
+  const tileTexture = useMemo(() => {
+    if (typeof window === "undefined") return null;
     const canvas = document.createElement("canvas");
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return new THREE.Texture();
-
-    ctx.fillStyle = isDark ? "#262626" : baseColor;
+    if (!ctx) return null;
+    ctx.fillStyle = "#F5F6F8";
     ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = isDark ? "#3F3F46" : gridColor;
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#E2E4E8";
+    ctx.lineWidth = 2;
     for (let i = 0; i <= 512; i += 64) {
       ctx.beginPath();
       ctx.moveTo(i, 0);
@@ -305,293 +295,297 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       ctx.lineTo(512, i);
       ctx.stroke();
     }
-
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2, 2);
+    tex.repeat.set(3, 3);
     return tex;
   }, []);
 
-  const createGrassTexture = useCallback(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return new THREE.Texture();
+  // PBR Materials System
+  const materials = useMemo(() => {
+    return {
+      // Exterior Stucco / Plaster
+      extPlaster: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#33353A" : "#F3EFEA",
+        roughness: 0.85,
+        metalness: 0.02,
+      }),
+      // Accent Architectural Stone / Siding
+      accentStone: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#1F232B" : "#2B303A",
+        roughness: 0.62,
+        metalness: 0.05,
+      }),
+      // Interior Plaster Partition
+      intPlaster: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#27292D" : "#FAF8F5",
+        roughness: 0.88,
+        metalness: 0.01,
+      }),
+      // Concrete Plinth Foundation
+      plinthMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#26282E" : "#D1D5DB",
+        roughness: 0.72,
+        metalness: 0.04,
+      }),
+      // Concrete Intermediate Slabs & Roof
+      slabMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#2D3036" : "#E5E7EB",
+        roughness: 0.68,
+        metalness: 0.03,
+      }),
+      // Hardwood Oak Floor
+      woodFloor: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#3A291C" : "#C49A6C",
+        roughness: 0.38,
+        metalness: 0.04,
+        map: woodTexture || undefined,
+      }),
+      // Marble Tile Floor
+      marbleFloor: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#22252A" : "#F8F9FA",
+        roughness: 0.16,
+        metalness: 0.06,
+        map: tileTexture || undefined,
+      }),
+      // Architectural Transparent Glass
+      glassMat: new THREE.MeshStandardMaterial({
+        color: "#D0E7F9",
+        transparent: true,
+        opacity: 0.38,
+        roughness: 0.05,
+        metalness: 0.15,
+      }),
+      // Dark Aluminum Frame
+      frameMat: new THREE.MeshStandardMaterial({
+        color: "#1E2229",
+        roughness: 0.4,
+        metalness: 0.82,
+      }),
+      // Wooden Door Leaf
+      doorLeafMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#362215" : "#6E4527",
+        roughness: 0.45,
+        metalness: 0.05,
+      }),
+      // Polished Chrome Hardware
+      chromeMat: new THREE.MeshStandardMaterial({
+        color: "#E2E8F0",
+        roughness: 0.15,
+        metalness: 0.95,
+      }),
+      // Coping Cap
+      copingMat: new THREE.MeshStandardMaterial({
+        color: "#374151",
+        roughness: 0.6,
+      }),
+      // Entrance Canopy
+      canopyMat: new THREE.MeshStandardMaterial({
+        color: "#1F2937",
+        roughness: 0.3,
+        metalness: 0.85,
+      }),
+      // Fallback Furniture Materials
+      furnitureWood: new THREE.MeshStandardMaterial({ color: "#8A6D4B", roughness: 0.55 }),
+      furnitureFabric: new THREE.MeshStandardMaterial({ color: "#D4CCC0", roughness: 0.85 }),
+    };
+  }, [isDarkMode, woodTexture, tileTexture]);
 
-    ctx.fillStyle = "#4E8A37";
-    ctx.fillRect(0, 0, 512, 512);
-
-    // Subtle natural grass blades and organic noise
-    for (let i = 0; i < 4000; i++) {
-      const gx = Math.random() * 512;
-      const gy = Math.random() * 512;
-      const shade = Math.random() > 0.5 ? "#3F752B" : "#5DA143";
-      ctx.fillStyle = shade;
-      ctx.fillRect(gx, gy, 2, 4);
-    }
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(6, 6);
-    return tex;
-  }, []);
-
-  const createPaverTexture = useCallback(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return new THREE.Texture();
-
-    ctx.fillStyle = "#D6D3D1";
-    ctx.fillRect(0, 0, 512, 512);
-
-    ctx.strokeStyle = "#A8A29E";
-    ctx.lineWidth = 3;
-    for (let y = 0; y < 512; y += 64) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(512, y);
-      ctx.stroke();
-
-      const offset = (y / 64) % 2 === 0 ? 0 : 32;
-      for (let x = offset; x <= 512; x += 64) {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y + 64);
-        ctx.stroke();
-      }
-    }
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(4, 4);
-    return tex;
-  }, []);
-
-  const createStoneAccentTexture = useCallback(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return new THREE.Texture();
-
-    ctx.fillStyle = "#2D323E";
-    ctx.fillRect(0, 0, 512, 512);
-
-    ctx.fillStyle = "#374151";
-    for (let y = 0; y < 512; y += 40) {
-      ctx.fillRect(0, y, 512, 2);
-      for (let x = (y % 80 === 0 ? 0 : 60); x < 512; x += 120) {
-        ctx.fillRect(x, y, 2, 40);
-      }
-    }
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2, 2);
-    return tex;
-  }, []);
-
-  // Room Type to Floor Material Mapper (matches 2D floor plan color language)
+  // Floor Material Mapper
   const getRoomFloorMaterial = useCallback(
-    (room: Room, isDark: boolean): THREE.MeshStandardMaterial => {
+    (room: Room): THREE.MeshStandardMaterial => {
       const type = (room.type || "").toLowerCase();
       const name = (room.name || "").toLowerCase();
-
-      // Master Bedroom: Rich Warm Oak Hardwood
-      if (type.includes("master") || name.includes("master")) {
-        return new THREE.MeshStandardMaterial({
-          color: isDark ? "#38271A" : "#C49A6C",
-          roughness: 0.42,
-          metalness: 0.04,
-          map: createWoodTexture(isDark, "#C49A6C"),
-        });
+      if (type.includes("bed") || name.includes("bed") || type.includes("living") || name.includes("living")) {
+        return materials.woodFloor;
       }
-
-      // Guest / Other Bedrooms: Smoked Walnut Wood
-      if (type.includes("bed") || name.includes("bed") || type.includes("guest")) {
-        return new THREE.MeshStandardMaterial({
-          color: isDark ? "#281D14" : "#A67C52",
-          roughness: 0.46,
-          metalness: 0.03,
-          map: createWoodTexture(isDark, "#A67C52"),
-        });
-      }
-
-      // Kitchen: Ivory Porcellanato Tile
-      if (type.includes("kitchen") || name.includes("kitchen")) {
-        return new THREE.MeshStandardMaterial({
-          color: isDark ? "#2A2A2E" : "#EAE5DC",
-          roughness: 0.28,
-          metalness: 0.08,
-          map: createTileTexture(isDark, "#EAE5DC", "#D3CCC1"),
-        });
-      }
-
-      // Bathrooms / Toilet / Powder: Calacatta White Marble Tile
-      if (type.includes("bath") || type.includes("toilet") || type.includes("powder") || name.includes("bath")) {
-        return new THREE.MeshStandardMaterial({
-          color: isDark ? "#202226" : "#F5F6F8",
-          roughness: 0.18,
-          metalness: 0.12,
-          map: createTileTexture(isDark, "#F5F6F8", "#E2E4E8"),
-        });
-      }
-
-      // Living Room: Travertine / Terrazzo Stone
-      if (type.includes("living") || name.includes("living") || type.includes("drawing")) {
-        return new THREE.MeshStandardMaterial({
-          color: isDark ? "#2E2A25" : "#EFE8DC",
-          roughness: 0.48,
-          metalness: 0.04,
-        });
-      }
-
-      // Dining: Polished Natural Wood / Stone
-      if (type.includes("dining") || name.includes("dining")) {
-        return new THREE.MeshStandardMaterial({
-          color: isDark ? "#33261C" : "#E5D9C8",
-          roughness: 0.45,
-          metalness: 0.04,
-          map: createWoodTexture(isDark, "#E5D9C8"),
-        });
-      }
-
-      // Pooja Sanctuary: Teakwood / Rosewood
-      if (type.includes("pooja") || name.includes("pooja") || type.includes("mandir")) {
-        return new THREE.MeshStandardMaterial({
-          color: isDark ? "#301509" : "#6E331A",
-          roughness: 0.38,
-          metalness: 0.05,
-        });
-      }
-
-      // Foyer & Circulation: Honed Limestone
-      return new THREE.MeshStandardMaterial({
-        color: isDark ? "#242528" : "#EBE6DD",
-        roughness: 0.52,
-        metalness: 0.03,
-      });
+      return materials.marbleFloor;
     },
-    [createWoodTexture, createTileTexture]
+    [materials]
   );
 
-  // ==========================================
-  // BUILD SINGLE FLOOR ARCHITECTURAL GEOMETRY
-  // ==========================================
+  // Helper to place GLTF or fallback procedural furniture
+  const placeFurniturePiece = useCallback(
+    (item: FurnitureItem, hostGroup: THREE.Group, floorBaseY: number) => {
+      const type = (item.type || "").toLowerCase();
+      const fw = Math.max(1.0, Number(item.width) || 3.0);
+      const fl = Math.max(1.0, Number(item.length) || 3.0);
+      const fx = item.x !== undefined ? item.x : 0;
+      const fz = item.y !== undefined ? item.y : 0;
+      const rotY = -THREE.MathUtils.degToRad(item.rotation || 0);
+
+      // Match item to GLB model
+      let modelKey = "sofa";
+      if (type.includes("bed")) modelKey = "bed";
+      else if (type.includes("nightstand") || type.includes("side_table")) modelKey = "nightstand";
+      else if (type.includes("wardrobe") || type.includes("closet")) modelKey = "wardrobe";
+      else if (type.includes("coffee")) modelKey = "coffee_table";
+      else if (type.includes("tv")) modelKey = "tv_unit";
+      else if (type.includes("dining_table")) modelKey = "dining_table";
+      else if (type.includes("chair")) modelKey = "dining_chair";
+      else if (type.includes("counter") || type.includes("kitchen")) modelKey = "kitchen_counter";
+      else if (type.includes("fridge") || type.includes("refrigerator")) modelKey = "refrigerator";
+      else if (type.includes("toilet") || type.includes("wc")) modelKey = "toilet";
+      else if (type.includes("basin") || type.includes("vanity")) modelKey = "basin";
+      else if (type.includes("shower")) modelKey = "shower";
+      else if (type.includes("outdoor") && type.includes("chair")) modelKey = "outdoor_chair";
+      else if (type.includes("outdoor") && type.includes("table")) modelKey = "outdoor_table";
+      else if (type.includes("plant") || type.includes("planter")) modelKey = "planter";
+
+      const cachedModel = loadedFurnitureRef.current[modelKey];
+      if (cachedModel) {
+        const cloned = cachedModel.clone(true);
+        cloned.position.set(fx, floorBaseY + 0.02, fz);
+        cloned.rotation.y = rotY;
+        cloned.userData = { furnitureId: item.id, type: "furniture" };
+        hostGroup.add(cloned);
+      } else {
+        // Fallback procedural box
+        const boxGeo = new THREE.BoxGeometry(fw, 1.2, fl);
+        const boxMesh = new THREE.Mesh(boxGeo, materials.furnitureFabric);
+        boxMesh.position.set(fx, floorBaseY + 0.6, fz);
+        boxMesh.rotation.y = rotY;
+        boxMesh.castShadow = true;
+        boxMesh.receiveShadow = true;
+        boxMesh.userData = { furnitureId: item.id, type: "furniture" };
+        hostGroup.add(boxMesh);
+      }
+    },
+    [materials]
+  );
+
+  // Build Staircase connecting floorBaseY to floorBaseY + floorHeight
+  const buildArchitecturalStaircase = useCallback(
+    (rect: Rect, baseElevation: number): THREE.Group => {
+      const group = new THREE.Group();
+      const sw = Math.max(3.0, rect.width || 6.0);
+      const sl = Math.max(6.0, rect.length || 10.0);
+      const sx = rect.x + sw / 2;
+      const sz = rect.y + sl / 2;
+      const numSteps = 16;
+      const stepH = floorHeight / numSteps;
+      const stepD = sl / (numSteps / 2); // Dog-legged flight run
+      const flightW = sw / 2 - 0.2;
+
+      // Flight 1 (Rising to mid landing)
+      for (let i = 0; i < numSteps / 2; i++) {
+        const stepGeo = new THREE.BoxGeometry(flightW, stepH, stepD);
+        const stepMesh = new THREE.Mesh(stepGeo, materials.woodFloor);
+        stepMesh.position.set(
+          sx - flightW / 2 - 0.1,
+          baseElevation + (i + 0.5) * stepH,
+          sz - sl / 2 + (i + 0.5) * stepD
+        );
+        stepMesh.castShadow = true;
+        stepMesh.receiveShadow = true;
+        group.add(stepMesh);
+      }
+
+      // Mid-landing slab
+      const landingH = (numSteps / 2) * stepH;
+      const landingGeo = new THREE.BoxGeometry(sw, 0.4, sl * 0.35);
+      const landingMesh = new THREE.Mesh(landingGeo, materials.slabMat);
+      landingMesh.position.set(sx, baseElevation + landingH - 0.2, sz + sl / 2 - (sl * 0.35) / 2);
+      landingMesh.castShadow = true;
+      group.add(landingMesh);
+
+      // Flight 2 (Rising to top floor)
+      for (let i = numSteps / 2; i < numSteps; i++) {
+        const stepIdx = i - numSteps / 2;
+        const stepGeo = new THREE.BoxGeometry(flightW, stepH, stepD);
+        const stepMesh = new THREE.Mesh(stepGeo, materials.woodFloor);
+        stepMesh.position.set(
+          sx + flightW / 2 + 0.1,
+          baseElevation + (i + 0.5) * stepH,
+          sz + sl / 2 - sl * 0.35 - (stepIdx + 0.5) * stepD
+        );
+        stepMesh.castShadow = true;
+        stepMesh.receiveShadow = true;
+        group.add(stepMesh);
+      }
+
+      // Handrail
+      const railGeo = new THREE.CylinderGeometry(0.04, 0.04, sl * 0.85, 8);
+      const railMesh = new THREE.Mesh(railGeo, materials.frameMat);
+      railMesh.rotation.x = Math.PI / 4.2;
+      railMesh.position.set(sx - flightW, baseElevation + landingH / 2 + 2.5, sz - 0.5);
+      group.add(railMesh);
+
+      return group;
+    },
+    [floorHeight, materials]
+  );
+
+  // Build Single Floor Architectural Geometry
   const buildFloorGeometry = useCallback(
     (
       floor: FloorPlan,
       floorIndex: number,
-      yOffset: number,
-      isExteriorView: boolean,
-      materials: Record<string, THREE.Material>,
-      interiorLights: THREE.Group
+      floorBaseY: number,
+      isCutaway: boolean,
+      interiorLights: THREE.Group,
+      houseCenter: { x: number; z: number }
     ): THREE.Group => {
       const floorGroup = new THREE.Group();
-      floorGroup.position.y = yOffset;
 
-      const {
-        extWallMat,
-        extWallAccentMat,
-        intWallMat,
-        wallTrimMat,
-        glassMat,
-        frameMat,
-        doorLeafMat,
-        curtainMat,
-      } = materials;
-
-      const effectiveWallH = isExteriorView
-        ? effectiveWallHeightMode === "cutaway"
-          ? cutawayWallHeight
-          : fullWallHeight
-        : cutawayWallHeight;
-
-      // 1. Structural Finished Floor Slabs for each Room
+      // 1. Room Finished Floor Slabs
       (floor.rooms || []).forEach((room) => {
         if (!room || !room.rect) return;
-        const rw = Math.max(1, room.rect.width);
-        const rl = Math.max(1, room.rect.length);
+        const rw = Math.max(1.0, room.rect.width);
+        const rl = Math.max(1.0, room.rect.length);
         const rx = room.rect.x + rw / 2;
         const rz = room.rect.y + rl / 2;
 
-        const floorMat = getRoomFloorMaterial(room, isDarkMode);
-
-        // Finished Floor Surface (Raised slightly above 0.5ft plinth to prevent clipping)
-        const floorGeo = new THREE.PlaneGeometry(Math.max(0.1, rw - 0.04), Math.max(0.1, rl - 0.04));
+        const floorMat = getRoomFloorMaterial(room);
+        const floorGeo = new THREE.PlaneGeometry(rw - 0.04, rl - 0.04);
         const floorMesh = new THREE.Mesh(floorGeo, floorMat);
         floorMesh.rotation.x = -Math.PI / 2;
-        floorMesh.position.set(rx, 0.52, rz);
+        floorMesh.position.set(rx, floorBaseY + 0.02, rz);
         floorMesh.receiveShadow = true;
         floorMesh.userData = { roomId: room.id, type: "room_floor" };
         floorGroup.add(floorMesh);
 
         // Highlight selected room
         if (selectedRoomId === room.id) {
-          const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(rw, 0.08, rl));
+          const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(rw, 0.1, rl));
           const lineMat = new THREE.LineBasicMaterial({ color: 0xc48446, linewidth: 3 });
           const wireframe = new THREE.LineSegments(edges, lineMat);
-          wireframe.position.set(rx, 0.56, rz);
+          wireframe.position.set(rx, floorBaseY + 0.06, rz);
           floorGroup.add(wireframe);
         }
 
-        // Room Downlights in dusk and night modes
+        // Warm Interior Ceiling Light
         if (effectiveLightingPreset === "sunset" || effectiveLightingPreset === "night") {
-          const roomLight = new THREE.PointLight(
+          const light = new THREE.PointLight(
             0xffeed1,
-            effectiveLightingPreset === "night" ? 1.15 : 0.55,
+            effectiveLightingPreset === "night" ? 1.4 : 0.65,
             24
           );
-          roomLight.position.set(rx, 0.52 + 7.5, rz);
-          roomLight.castShadow = false;
-          interiorLights.add(roomLight);
+          light.position.set(rx, floorBaseY + 8.2, rz);
+          interiorLights.add(light);
         }
 
-        // 2. Furnished Interior (Rendered in interior mode when furniture toggle is active)
-        if (!isExteriorView && showFurnitureState) {
+        // Interior Furniture
+        if (showFurnitureState) {
           (room.furniture || []).forEach((item) => {
-            if (!item) return;
-            const fMesh = buildArchitecturalFurniture(item, room.type, isDarkMode, selectedFurnitureId === item.id);
-            if (fMesh) {
-              const itemX = item.x !== undefined ? item.x : rx;
-              const itemZ = item.y !== undefined ? item.y : rz;
-              fMesh.position.set(itemX, 0.52, itemZ);
-              fMesh.rotation.y = -THREE.MathUtils.degToRad(item.rotation || 0);
-              fMesh.userData = { furnitureId: item.id, roomId: room.id };
-              floorGroup.add(fMesh);
-            }
+            placeFurniturePiece(item, floorGroup, floorBaseY);
           });
         }
       });
 
-      // 3. Real Architectural Staircase connecting floors (Rendered in Interior mode)
-      if (!isExteriorView) {
-        const stairRooms = (floor.rooms || []).filter(
-          (r) => r.type === "staircase" || r.name.toLowerCase().includes("stair")
-        );
-        stairRooms.forEach((stairRoom) => {
-          if (!stairRoom.rect) return;
-          const stairMesh = buildArchitecturalStaircase(
-            stairRoom.rect,
-            floorElevation,
-            materials.wallTrimMat,
-            materials.frameMat
-          );
-          if (stairMesh) {
-            stairMesh.position.y = 0.52;
-            floorGroup.add(stairMesh);
-          }
-        });
-      }
+      // 2. Staircase
+      const stairRooms = (floor.rooms || []).filter(
+        (r) => r.type === "staircase" || r.name.toLowerCase().includes("stair")
+      );
+      stairRooms.forEach((sr) => {
+        if (sr.rect) {
+          const stairMesh = buildArchitecturalStaircase(sr.rect, floorBaseY);
+          floorGroup.add(stairMesh);
+        }
+      });
 
-      // 4. Canonical Wall Network with PHYSICAL OPENINGS & ARCHITECTURAL JOINERY
+      // 3. Canonical Wall Network with Door/Window Cutouts
       const allWalls: Wall[] = [
         ...(floor.exterior_walls || []).map((w) => ({ ...w, is_exterior: true })),
         ...(floor.interior_walls || []).map((w) => ({ ...w, is_exterior: false })),
@@ -601,26 +595,40 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         const dx = wall.x2 - wall.x1;
         const dz = wall.y2 - wall.y1;
         const wallLen = Math.hypot(dx, dz);
-        if (wallLen < 0.3) return;
+        if (wallLen < 0.25) return;
 
         const angle = Math.atan2(dz, dx);
         const ux = dx / wallLen;
         const uz = dz / wallLen;
-
         const isExt = wall.is_exterior;
-        const thickness = wall.thickness || (isExt ? 0.75 : 0.375);
+        const thickness = wall.thickness || (isExt ? 0.75 : 0.38);
 
-        // Exterior multi-material distinction: Alternate accent stone on certain exterior walls
+        // Architectural Cutaway Determination:
+        // Front-facing exterior walls are cut to cutawayWallHeight (3.2 ft) in cutaway mode
+        let curWallH = fullWallHeight;
+        if (isCutaway && isExt) {
+          const midX = (wall.x1 + wall.x2) / 2;
+          const midZ = (wall.y1 + wall.y2) / 2;
+          let isFrontFacing = false;
+
+          if (resolvedFacing === "south" && midZ >= houseCenter.z) isFrontFacing = true;
+          else if (resolvedFacing === "north" && midZ <= houseCenter.z) isFrontFacing = true;
+          else if (resolvedFacing === "east" && midX >= houseCenter.x) isFrontFacing = true;
+          else if (resolvedFacing === "west" && midX <= houseCenter.x) isFrontFacing = true;
+
+          if (isFrontFacing) {
+            curWallH = cutawayWallHeight;
+          }
+        }
+
         const wallMat = isExt
           ? wallIdx % 3 === 0
-            ? extWallAccentMat
-            : extWallMat
-          : intWallMat;
+            ? materials.accentStone
+            : materials.extPlaster
+          : materials.intPlaster;
 
-        const activeH = effectiveWallH;
-
-        // Detect openings hosted along this wall
-        type OpeningInterval = {
+        // Collect openings on this wall
+        interface Opening {
           type: "door" | "window";
           id: string;
           start: number;
@@ -628,9 +636,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           width: number;
           midX: number;
           midZ: number;
-        };
-
-        const openings: OpeningInterval[] = [];
+        }
+        const openings: Opening[] = [];
 
         (floor.doors || []).forEach((d) => {
           const dmx = (d.x1 + d.x2) / 2;
@@ -652,17 +659,17 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           }
         });
 
-        (floor.windows || []).forEach((w) => {
-          const wmx = (w.x1 + w.x2) / 2;
-          const wmz = (w.y1 + w.y2) / 2;
+        (floor.windows || []).forEach((win) => {
+          const wmx = (win.x1 + win.x2) / 2;
+          const wmz = (win.y1 + win.y2) / 2;
           const distToStart = Math.hypot(wmx - wall.x1, wmz - wall.y1);
           const distToEnd = Math.hypot(wmx - wall.x2, wmz - wall.y2);
           if (Math.abs(distToStart + distToEnd - wallLen) < 0.6) {
             const sMid = (wmx - wall.x1) * ux + (wmz - wall.y1) * uz;
-            const winW = Math.max(2.0, w.width || 4.0);
+            const winW = Math.max(2.0, win.width || 4.0);
             openings.push({
               type: "window",
-              id: w.id,
+              id: win.id,
               start: Math.max(0, sMid - winW / 2),
               end: Math.min(wallLen, sMid + winW / 2),
               width: winW,
@@ -672,17 +679,20 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           }
         });
 
+        // Render wall segments
         if (openings.length === 0) {
-          // Solid Wall Segment
-          const geo = new THREE.BoxGeometry(wallLen, activeH, thickness);
+          const geo = new THREE.BoxGeometry(wallLen, curWallH, thickness);
           const mesh = new THREE.Mesh(geo, wallMat);
-          mesh.position.set((wall.x1 + wall.x2) / 2, 0.5 + activeH / 2, (wall.y1 + wall.y2) / 2);
+          mesh.position.set(
+            (wall.x1 + wall.x2) / 2,
+            floorBaseY + curWallH / 2,
+            (wall.y1 + wall.y2) / 2
+          );
           mesh.rotation.y = -angle;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
           floorGroup.add(mesh);
         } else {
-          // Subdivided Wall Segments with Openings
           openings.sort((a, b) => a.start - b.start);
           let currentS = 0;
 
@@ -692,225 +702,106 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               const segMidS = currentS + segLen / 2;
               const mx = wall.x1 + ux * segMidS;
               const mz = wall.y1 + uz * segMidS;
-
-              const geo = new THREE.BoxGeometry(segLen, activeH, thickness);
+              const geo = new THREE.BoxGeometry(segLen, curWallH, thickness);
               const mesh = new THREE.Mesh(geo, wallMat);
-              mesh.position.set(mx, 0.5 + activeH / 2, mz);
+              mesh.position.set(mx, floorBaseY + curWallH / 2, mz);
               mesh.rotation.y = -angle;
               mesh.castShadow = true;
               mesh.receiveShadow = true;
               floorGroup.add(mesh);
             }
 
-            // Window Elements: Lintel, Projecting Stone Sill, 4-Sided Frame, Glass Pane, Mullion
+            // Window Joinery
             if (op.type === "window") {
               const sillH = 2.8;
               const headH = 7.0;
               const winH = headH - sillH;
 
-              // Sill Wall below window
-              if (activeH >= sillH) {
-                const sH = Math.min(sillH, activeH);
-                const sGeo = new THREE.BoxGeometry(op.width, sH, thickness);
-                const sMesh = new THREE.Mesh(sGeo, wallMat);
-                sMesh.position.set(op.midX, 0.5 + sH / 2, op.midZ);
+              // Sill wall below window
+              if (curWallH >= sillH) {
+                const sH = Math.min(sillH, curWallH);
+                const sMesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, sH, thickness), wallMat);
+                sMesh.position.set(op.midX, floorBaseY + sH / 2, op.midZ);
                 sMesh.rotation.y = -angle;
                 sMesh.castShadow = true;
                 sMesh.receiveShadow = true;
                 floorGroup.add(sMesh);
               }
 
-              // Lintel Wall above window (in full height exterior view)
-              if (activeH >= fullWallHeight) {
+              // Lintel wall above window (in full height walls)
+              if (curWallH >= fullWallHeight) {
                 const lH = fullWallHeight - headH;
-                const lGeo = new THREE.BoxGeometry(op.width, lH, thickness);
-                const lMesh = new THREE.Mesh(lGeo, wallMat);
-                lMesh.position.set(op.midX, 0.5 + headH + lH / 2, op.midZ);
+                const lMesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, lH, thickness), wallMat);
+                lMesh.position.set(op.midX, floorBaseY + headH + lH / 2, op.midZ);
                 lMesh.rotation.y = -angle;
                 lMesh.castShadow = true;
-                lMesh.receiveShadow = true;
                 floorGroup.add(lMesh);
               }
 
-              // Detailed Architectural Window Joinery & Glass
-              if (activeH >= sillH + 0.5) {
-                const renderWinH = Math.min(winH, activeH - sillH);
-                const frameThick = 0.14;
-
-                // 1. Projecting Architectural Stone Window Sill (0.35ft projection)
-                const sillProj = 0.35;
-                const sillOverhang = 0.3;
-                const normX = -Math.sin(angle);
-                const normZ = Math.cos(angle);
-                const sillGeo = new THREE.BoxGeometry(op.width + sillOverhang, 0.16, thickness + sillProj);
-                const sillMesh = new THREE.Mesh(sillGeo, materials.terraceMat);
-                sillMesh.position.set(
-                  op.midX + (isExt ? normX * (sillProj / 2) : 0),
-                  0.5 + sillH - 0.08,
-                  op.midZ + (isExt ? normZ * (sillProj / 2) : 0)
+              // Glass and aluminum frame
+              if (curWallH >= sillH + 0.5) {
+                const renderWinH = Math.min(winH, curWallH - sillH);
+                const gMesh = new THREE.Mesh(
+                  new THREE.BoxGeometry(op.width - 0.2, renderWinH - 0.2, 0.08),
+                  materials.glassMat
                 );
-                sillMesh.rotation.y = -angle;
-                sillMesh.castShadow = true;
-                sillMesh.receiveShadow = true;
-                floorGroup.add(sillMesh);
-
-                // 2. Semi-Transparent Reflective Glass Pane
-                const gGeo = new THREE.BoxGeometry(
-                  Math.max(0.1, op.width - frameThick * 2),
-                  Math.max(0.1, renderWinH - frameThick * 2),
-                  0.06
-                );
-                const gMesh = new THREE.Mesh(gGeo, glassMat);
-                gMesh.position.set(op.midX, 0.5 + sillH + renderWinH / 2, op.midZ);
+                gMesh.position.set(op.midX, floorBaseY + sillH + renderWinH / 2, op.midZ);
                 gMesh.rotation.y = -angle;
                 floorGroup.add(gMesh);
 
-                // 3. 4-Sided Perimeter Aluminum Frame (Top, Bottom, Left Jamb, Right Jamb)
-                const fTop = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.04), frameMat);
-                fTop.position.set(op.midX, 0.5 + sillH + renderWinH - frameThick / 2, op.midZ);
-                fTop.rotation.y = -angle;
-
-                const fBot = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.04), frameMat);
-                fBot.position.set(op.midX, 0.5 + sillH + frameThick / 2, op.midZ);
-                fBot.rotation.y = -angle;
-
-                const fLeft = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderWinH, thickness + 0.04), frameMat);
-                fLeft.position.set(
-                  op.midX - (ux * (op.width / 2 - frameThick / 2)),
-                  0.5 + sillH + renderWinH / 2,
-                  op.midZ - (uz * (op.width / 2 - frameThick / 2))
+                const fMesh = new THREE.Mesh(
+                  new THREE.BoxGeometry(op.width, renderWinH, thickness + 0.05),
+                  materials.frameMat
                 );
-                fLeft.rotation.y = -angle;
-
-                const fRight = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderWinH, thickness + 0.04), frameMat);
-                fRight.position.set(
-                  op.midX + (ux * (op.width / 2 - frameThick / 2)),
-                  0.5 + sillH + renderWinH / 2,
-                  op.midZ + (uz * (op.width / 2 - frameThick / 2))
-                );
-                fRight.rotation.y = -angle;
-
-                floorGroup.add(fTop, fBot, fLeft, fRight);
-
-                // 4. Central Mullion Divider for Windows wider than 3ft
-                if (op.width > 3.0) {
-                  const mullion = new THREE.Mesh(new THREE.BoxGeometry(frameThick * 0.85, renderWinH, thickness + 0.04), frameMat);
-                  mullion.position.set(op.midX, 0.5 + sillH + renderWinH / 2, op.midZ);
-                  mullion.rotation.y = -angle;
-                  floorGroup.add(mullion);
-                }
-
-                // 5. Indian Architectural RCC Chajja (Sunshade) on Exterior Windows
-                if (isExt) {
-                  const chajjaProj = 1.5;
-                  const chajjaThick = 0.25;
-                  const chajjaW = op.width + 1.0;
-                  const chajjaGeo = new THREE.BoxGeometry(chajjaW, chajjaThick, chajjaProj);
-                  const chajjaMesh = new THREE.Mesh(chajjaGeo, materials.terraceMat);
-                  chajjaMesh.position.set(
-                    op.midX + normX * (chajjaProj / 2 + thickness / 2),
-                    0.5 + headH + chajjaThick / 2,
-                    op.midZ + normZ * (chajjaProj / 2 + thickness / 2)
-                  );
-                  chajjaMesh.rotation.y = -angle;
-                  chajjaMesh.castShadow = true;
-                  chajjaMesh.receiveShadow = true;
-                  floorGroup.add(chajjaMesh);
-                }
-
-                // Curtained Windows in Bedrooms
-                if (!isExteriorView) {
-                  const curtainL = new THREE.Mesh(new THREE.BoxGeometry(0.5, renderWinH * 0.95, 0.2), curtainMat);
-                  const offsetNormX = -Math.sin(angle) * 0.35;
-                  const offsetNormZ = Math.cos(angle) * 0.35;
-                  curtainL.position.set(op.midX - (ux * op.width) / 2 + 0.3 + offsetNormX, 0.5 + sillH + renderWinH / 2, op.midZ - (uz * op.width) / 2 + offsetNormZ);
-                  curtainL.rotation.y = -angle;
-                  const curtainR = curtainL.clone();
-                  curtainR.position.set(op.midX + (ux * op.width) / 2 - 0.3 + offsetNormX, 0.5 + sillH + renderWinH / 2, op.midZ + (uz * op.width) / 2 + offsetNormZ);
-                  floorGroup.add(curtainL, curtainR);
-                }
+                fMesh.position.set(op.midX, floorBaseY + sillH + renderWinH / 2, op.midZ);
+                fMesh.rotation.y = -angle;
+                floorGroup.add(fMesh);
               }
             }
 
-            // Door Opening: Lintel + Architectural Frame + Recessed Leaf + Lever Handle
+            // Door Joinery
             if (op.type === "door") {
               const doorHeadH = 7.0;
-              if (activeH >= fullWallHeight) {
+              if (curWallH >= fullWallHeight) {
                 const lH = fullWallHeight - doorHeadH;
-                const lGeo = new THREE.BoxGeometry(op.width, lH, thickness);
-                const lMesh = new THREE.Mesh(lGeo, wallMat);
-                lMesh.position.set(op.midX, 0.5 + doorHeadH + lH / 2, op.midZ);
+                const lMesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, lH, thickness), wallMat);
+                lMesh.position.set(op.midX, floorBaseY + doorHeadH + lH / 2, op.midZ);
                 lMesh.rotation.y = -angle;
-                lMesh.castShadow = true;
-                lMesh.receiveShadow = true;
                 floorGroup.add(lMesh);
               }
 
-              const renderDoorH = Math.min(doorHeadH, activeH);
-              const frameThick = 0.12;
-
-              // 1. 3-Sided Architectural Door Frame (Left Jamb, Right Jamb, Header)
-              const jambL = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderDoorH, thickness + 0.04), frameMat);
-              jambL.position.set(
-                op.midX - (ux * (op.width / 2 - frameThick / 2)),
-                0.5 + renderDoorH / 2,
-                op.midZ - (uz * (op.width / 2 - frameThick / 2))
+              const renderDoorH = Math.min(doorHeadH, curWallH);
+              // Door frame
+              const frameMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(op.width, renderDoorH, thickness + 0.04),
+                materials.frameMat
               );
-              jambL.rotation.y = -angle;
+              frameMesh.position.set(op.midX, floorBaseY + renderDoorH / 2, op.midZ);
+              frameMesh.rotation.y = -angle;
+              floorGroup.add(frameMesh);
 
-              const jambR = new THREE.Mesh(new THREE.BoxGeometry(frameThick, renderDoorH, thickness + 0.04), frameMat);
-              jambR.position.set(
-                op.midX + (ux * (op.width / 2 - frameThick / 2)),
-                0.5 + renderDoorH / 2,
-                op.midZ + (uz * (op.width / 2 - frameThick / 2))
+              // Recessed leaf
+              const leafMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(op.width - 0.2, renderDoorH - 0.1, 0.12),
+                materials.doorLeafMat
               );
-              jambR.rotation.y = -angle;
-
-              const jambTop = new THREE.Mesh(new THREE.BoxGeometry(op.width, frameThick, thickness + 0.04), frameMat);
-              jambTop.position.set(op.midX, 0.5 + renderDoorH - frameThick / 2, op.midZ);
-              jambTop.rotation.y = -angle;
-              floorGroup.add(jambL, jambR, jambTop);
-
-              // 2. Recessed Door Leaf Panel
-              const leafW = Math.max(1.2, op.width - frameThick * 2);
-              const leafH = Math.max(1.5, renderDoorH - frameThick);
-              const leafGeo = new THREE.BoxGeometry(leafW, leafH, 0.12);
-              const leafMesh = new THREE.Mesh(leafGeo, doorLeafMat);
-              leafMesh.position.set(op.midX, 0.5 + leafH / 2, op.midZ);
+              leafMesh.position.set(op.midX, floorBaseY + renderDoorH / 2, op.midZ);
               leafMesh.rotation.y = -angle;
-              leafMesh.castShadow = true;
               floorGroup.add(leafMesh);
-
-              // 3. Ergonomic Lever Handle (Chrome at 3.0ft ergonomic height)
-              if (renderDoorH >= 3.5) {
-                const handleHeight = 0.5 + 3.0;
-                const handleOffsetAlong = leafW / 2 - 0.35;
-                const hx = op.midX + ux * handleOffsetAlong;
-                const hz = op.midZ + uz * handleOffsetAlong;
-
-                const handleBar = new THREE.Mesh(
-                  new THREE.BoxGeometry(0.35, 0.06, thickness + 0.16),
-                  (materials.chromeMat as THREE.Material) || frameMat
-                );
-                handleBar.position.set(hx, handleHeight, hz);
-                handleBar.rotation.y = -angle;
-                floorGroup.add(handleBar);
-              }
             }
 
             currentS = op.end;
           });
 
-          // Final wall segment after last opening
+          // Final wall segment
           if (wallLen - currentS > 0.25) {
             const segLen = wallLen - currentS;
             const segMidS = currentS + segLen / 2;
             const mx = wall.x1 + ux * segMidS;
             const mz = wall.y1 + uz * segMidS;
-
-            const geo = new THREE.BoxGeometry(segLen, activeH, thickness);
+            const geo = new THREE.BoxGeometry(segLen, curWallH, thickness);
             const mesh = new THREE.Mesh(geo, wallMat);
-            mesh.position.set(mx, 0.5 + activeH / 2, mz);
+            mesh.position.set(mx, floorBaseY + curWallH / 2, mz);
             mesh.rotation.y = -angle;
             mesh.castShadow = true;
             mesh.receiveShadow = true;
@@ -923,21 +814,19 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     },
     [
       getRoomFloorMaterial,
-      isDarkMode,
+      materials,
+      effectiveLightingPreset,
+      showFurnitureState,
+      placeFurniturePiece,
+      buildArchitecturalStaircase,
       fullWallHeight,
       cutawayWallHeight,
-      floorElevation,
+      resolvedFacing,
       selectedRoomId,
-      selectedFurnitureId,
-      effectiveLightingPreset,
-      effectiveWallHeightMode,
-      showFurnitureState,
     ]
   );
 
-  // ==========================================
-  // BUILD COMPLETE 3D SCENE
-  // ==========================================
+  // Complete 3D Scene Rebuild
   const rebuildScene = useCallback(() => {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -949,139 +838,12 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     scene.add(rootGroup);
     houseRootRef.current = rootGroup;
 
-    if (interiorLightsGroupRef.current) {
-      scene.remove(interiorLightsGroupRef.current);
-    }
     const interiorLights = new THREE.Group();
-    scene.add(interiorLights);
+    rootGroup.add(interiorLights);
     interiorLightsGroupRef.current = interiorLights;
 
-    // Architectural PBR Materials
-    const materials: Record<string, THREE.Material> = {
-      // Primary Exterior Wall: Warm Off-White Stucco
-      extWallMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2D3039" : "#F4F1EA",
-        roughness: 0.82,
-        metalness: 0.02,
-      }),
-      // Accent Exterior Wall: Dark Charcoal Stone Cladding
-      extWallAccentMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#1F232B" : "#2E333D",
-        roughness: 0.65,
-        metalness: 0.05,
-        map: createStoneAccentTexture(),
-      }),
-      // Interior Partition Plaster
-      intWallMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#26282E" : "#FAF8F5",
-        roughness: 0.78,
-      }),
-      wallTrimMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#453325" : "#6B4423",
-        roughness: 0.45,
-      }),
-      // Semi-Transparent Reflective Window Glass
-      glassMat: new THREE.MeshStandardMaterial({
-        color: "#7DD3FC",
-        transparent: true,
-        opacity: 0.38,
-        roughness: 0.08,
-        metalness: 0.25,
-        depthWrite: false,
-      }),
-      // Aluminum Window Frame
-      frameMat: new THREE.MeshStandardMaterial({
-        color: "#1E242B",
-        roughness: 0.4,
-        metalness: 0.85,
-      }),
-      // Architectural Chrome / Metal Hardware
-      chromeMat: new THREE.MeshStandardMaterial({
-        color: "#E2E8F0",
-        roughness: 0.15,
-        metalness: 0.9,
-      }),
-      // Wooden Door Leaf
-      doorLeafMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#3D2617" : "#78350F",
-        roughness: 0.5,
-      }),
-      // Bedroom Curtains
-      curtainMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#4B463E" : "#D4CCC0",
-        roughness: 0.9,
-      }),
-      // RCC Slab / Terrace
-      terraceMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#27272A" : "#C4C8CC",
-        roughness: 0.85,
-        metalness: 0.05,
-      }),
-      // Plinth Foundation
-      plinthMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#1E2024" : "#CBD5E1",
-        roughness: 0.85,
-        metalness: 0.05,
-      }),
-      // Boundary Masonry Wall
-      boundaryMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2D3036" : "#E8E4DC",
-        roughness: 0.85,
-      }),
-      // Wall / Parapet Coping
-      copingMat: new THREE.MeshStandardMaterial({
-        color: "#27272A",
-        roughness: 0.5,
-      }),
-      // Steel Gate
-      gateMat: new THREE.MeshStandardMaterial({
-        color: "#18181B",
-        roughness: 0.35,
-        metalness: 0.85,
-      }),
-      // Entrance Canopy
-      canopyMat: new THREE.MeshStandardMaterial({
-        color: "#C48446",
-        roughness: 0.5,
-        metalness: 0.2,
-      }),
-      // Paved Walkway & Driveway
-      paverMat: new THREE.MeshStandardMaterial({
-        color: "#ECEAE6",
-        map: paverTexture || createPaverTexture(),
-        roughness: 0.72,
-      }),
-      // Natural Grass Ground
-      grassMat: new THREE.MeshStandardMaterial({
-        color: "#5B8C3A",
-        map: grassTexture || createGrassTexture(),
-        roughness: 0.88,
-        metalness: 0.02,
-      }),
-      // Dark Soil / Mulch Beds
-      soilMat: new THREE.MeshStandardMaterial({
-        color: "#30251C",
-        roughness: 0.95,
-      }),
-      // Carport Pergola
-      carportMat: new THREE.MeshStandardMaterial({
-        color: "#27272A",
-        roughness: 0.45,
-        metalness: 0.7,
-      }),
-      // Stone Curbing
-      curbMat: new THREE.MeshStandardMaterial({
-        color: "#3F3F46",
-        roughness: 0.65,
-      }),
-    };
-
-    // 1. BUILDING FOOTPRINT CALCULATION & FOUNDATION PLINTH
-    let minBx = Infinity;
-    let maxBx = -Infinity;
-    let minBz = Infinity;
-    let maxBz = -Infinity;
-
+    // Calculate Canonical Bounding Footprint
+    let minBx = Infinity, maxBx = -Infinity, minBz = Infinity, maxBz = -Infinity;
     (layout.rooms || []).forEach((r) => {
       if (r.rect) {
         minBx = Math.min(minBx, r.rect.x);
@@ -1097,27 +859,22 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     const plinthX = hasRooms ? (minBx + maxBx) / 2 : cx;
     const plinthZ = hasRooms ? (minBz + maxBz) / 2 : cz;
 
-    // Raised Plinth Foundation (Height 0.5ft, finished top at y=0.5)
-    const plinthGeo = new THREE.BoxGeometry(plinthW, 0.5, plinthL);
+    // 1. Plinth Foundation (Elevation 0 to plinthHeight)
+    const plinthGeo = new THREE.BoxGeometry(plinthW, plinthHeight, plinthL);
     const plinthMesh = new THREE.Mesh(plinthGeo, materials.plinthMat);
-    plinthMesh.position.set(plinthX, 0.25, plinthZ);
+    plinthMesh.position.set(plinthX, plinthHeight / 2, plinthZ);
     plinthMesh.receiveShadow = true;
     rootGroup.add(plinthMesh);
 
-    // 2. SITE & CANONICAL RESIDENTIAL ARCHITECTURAL LANDSCAPE
-    const isLandscape = presentationMode === "landscape" || presentationMode === "all";
-    const isExterior = presentationMode === "exterior" || presentationMode === "all";
-    const isExteriorView = presentationMode === "all" || isLandscape || isExterior;
-    const showSiteAndLandscape = effectiveShowLandscape || presentationMode === "all" || isLandscape || isExterior;
-
-    if (showSiteAndLandscape) {
+    // 2. Site Landscaping
+    if (effectiveShowLandscape) {
       const landscapeModel = generateArchitecturalLandscape(layout);
       const landscapeScene = buildArchitecturalLandscapeScene(
         landscapeModel,
-        materials,
-        loadedModelsRef.current as Record<string, THREE.Group>,
+        materials as any,
+        loadedNatureRef.current as any,
         {
-          filterCategory: showVegetationState ? landscapeCategory : "paths",
+          filterCategory: showVegetationState ? "all" : "paths",
           lightingPreset: effectiveLightingPreset,
           isDarkMode,
         }
@@ -1125,12 +882,10 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       rootGroup.add(landscapeScene);
     }
 
-    // 3. FLOORS GENERATION (SINGLE FLOOR OR MULTI-FLOOR STACKED)
+    // 3. Multi-Floor / Single Floor Construction
     const numFloors = Math.max(1, layout.floors?.length || layout.num_floors || 1);
-    const floorSpacing = multiFloorStacked && explodedFloors ? floorElevation + 8.0 : floorElevation;
 
     if (multiFloorStacked) {
-      // Stack all floors in full architectural residence mode
       (layout.floors || [layout]).forEach((fl, fIdx) => {
         const floorPlan: FloorPlan =
           layout.floors && layout.floors[fIdx]
@@ -1145,226 +900,134 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                 windows: layout.windows || [],
               };
 
-        const yOffset = fIdx * floorSpacing;
-        const flGroup = buildFloorGeometry(
-          floorPlan,
-          fIdx,
-          yOffset,
-          isExteriorView,
-          materials,
-          interiorLights
-        );
-        rootGroup.add(flGroup);
+        const floorBaseY = plinthHeight + fIdx * floorHeight;
 
         // Intermediate RCC Slab between floors
         if (fIdx > 0) {
-          const slabGeo = new THREE.BoxGeometry(plinthW, 0.6, plinthL);
-          const slabMesh = new THREE.Mesh(slabGeo, materials.terraceMat);
-          slabMesh.position.set(plinthX, yOffset - 0.3, plinthZ);
+          const slabGeo = new THREE.BoxGeometry(plinthW, slabThickness, plinthL);
+          const slabMesh = new THREE.Mesh(slabGeo, materials.slabMat);
+          slabMesh.position.set(plinthX, floorBaseY - slabThickness / 2, plinthZ);
           slabMesh.castShadow = true;
           slabMesh.receiveShadow = true;
           rootGroup.add(slabMesh);
         }
-      });
-    } else {
-      // Single isolated floor
-      const activeFl: FloorPlan =
-        layout.floors && layout.floors[activeFloorIndex]
-          ? layout.floors[activeFloorIndex]
-          : {
-              floor_number: activeFloorIndex + 1,
-              floor_name: `Level ${activeFloorIndex + 1}`,
-              rooms: layout.rooms || [],
-              exterior_walls: layout.exterior_walls || [],
-              interior_walls: layout.interior_walls || [],
-              doors: layout.doors || [],
-              windows: layout.windows || [],
-            };
 
-      const yOffset = isExteriorView ? activeFloorIndex * floorElevation : 0;
-      const flGroup = buildFloorGeometry(
-        activeFl,
-        activeFloorIndex,
-        yOffset,
-        isExteriorView,
-        materials,
-        interiorLights
-      );
-      rootGroup.add(flGroup);
+        const flGroup = buildFloorGeometry(
+          floorPlan,
+          fIdx,
+          floorBaseY,
+          isCutawayMode,
+          interiorLights,
+          { x: plinthX, z: plinthZ }
+        );
+        rootGroup.add(flGroup);
+      });
     }
 
-    // 3b. Column and Beam Structural Layer (when effectiveShowStructure is enabled)
-    if (effectiveShowStructure && layout.structural_planning?.columns) {
-      const colMat = new THREE.MeshStandardMaterial({
-        color: "#374151",
-        roughness: 0.6,
-        metalness: 0.3,
-      });
-      const beamMat = new THREE.MeshStandardMaterial({
-        color: "#4B5563",
-        roughness: 0.7,
-        metalness: 0.2,
-      });
-      layout.structural_planning.columns.forEach((col) => {
-        const colW = col.width || 0.75;
-        const totalColH = floorSpacing * numFloors;
-        const colGeo = new THREE.BoxGeometry(colW, totalColH, colW);
-        const colMesh = new THREE.Mesh(colGeo, colMat);
-        colMesh.position.set(col.x, totalColH / 2 + 0.5, col.y);
-        colMesh.castShadow = true;
-        rootGroup.add(colMesh);
-      });
-      // Ring tie beams at each floor slab level
-      for (let fIdx = 0; fIdx < numFloors; fIdx++) {
-        const beamY = (fIdx + 1) * floorSpacing - 0.3;
-        (layout.exterior_walls || []).forEach((w) => {
-          const bdx = w.x2 - w.x1;
-          const bdz = w.y2 - w.y1;
-          const bLen = Math.hypot(bdx, bdz);
-          if (bLen < 1.0) return;
-          const bAngle = Math.atan2(bdz, bdx);
-          const beamGeo = new THREE.BoxGeometry(bLen, 0.6, 0.75);
-          const beamMesh = new THREE.Mesh(beamGeo, beamMat);
-          beamMesh.position.set((w.x1 + w.x2) / 2, beamY, (w.y1 + w.y2) / 2);
-          beamMesh.rotation.y = -bAngle;
-          rootGroup.add(beamMesh);
-        });
+    // 4. RCC Roof Slab & Parapet Wall
+    const topFloorBaseY = plinthHeight + (numFloors - 1) * floorHeight;
+    const roofBaseY = topFloorBaseY + fullWallHeight;
+    const roofW = plinthW + 1.2;
+    const roofL = plinthL + 1.2;
+
+    if (effectiveShowRoof) {
+      if (!isCutawayMode) {
+        // Complete roof slab
+        const roofGeo = new THREE.BoxGeometry(roofW, slabThickness, roofL);
+        const roofMesh = new THREE.Mesh(roofGeo, materials.slabMat);
+        roofMesh.position.set(plinthX, roofBaseY + slabThickness / 2, plinthZ);
+        roofMesh.castShadow = true;
+        roofMesh.receiveShadow = true;
+        rootGroup.add(roofMesh);
+
+        // Parapet Walls
+        const parapetH = 2.5;
+        const parapetThick = 0.5;
+        const pFront = new THREE.Mesh(new THREE.BoxGeometry(roofW, parapetH, parapetThick), materials.extPlaster);
+        pFront.position.set(plinthX, roofBaseY + slabThickness + parapetH / 2, plinthZ + roofL / 2 - parapetThick / 2);
+        const pRear = pFront.clone();
+        pRear.position.z = plinthZ - roofL / 2 + parapetThick / 2;
+
+        const pLeft = new THREE.Mesh(new THREE.BoxGeometry(parapetThick, parapetH, roofL), materials.extPlaster);
+        pLeft.position.set(plinthX - roofW / 2 + parapetThick / 2, roofBaseY + slabThickness + parapetH / 2, plinthZ);
+        const pRight = pLeft.clone();
+        pRight.position.x = plinthX + roofW / 2 - parapetThick / 2;
+
+        rootGroup.add(pFront, pRear, pLeft, pRight);
+
+        // Stair Mumty Tower
+        const mumtyGeo = new THREE.BoxGeometry(10.0, 7.5, 12.0);
+        const mumtyMesh = new THREE.Mesh(mumtyGeo, materials.accentStone);
+        mumtyMesh.position.set(plinthX - plinthW * 0.15, roofBaseY + slabThickness + 3.75, plinthZ - plinthL * 0.15);
+        mumtyMesh.castShadow = true;
+        rootGroup.add(mumtyMesh);
+      } else {
+        // Cutaway Roof: Retain rear half to reveal interior while maintaining architectural massing
+        const cutawayL = roofL * 0.45;
+        const roofGeo = new THREE.BoxGeometry(roofW, slabThickness, cutawayL);
+        const roofMesh = new THREE.Mesh(roofGeo, materials.slabMat);
+        roofMesh.position.set(plinthX, roofBaseY + slabThickness / 2, plinthZ - roofL / 2 + cutawayL / 2);
+        rootGroup.add(roofMesh);
+
+        const pRear = new THREE.Mesh(new THREE.BoxGeometry(roofW, 2.5, 0.5), materials.extPlaster);
+        pRear.position.set(plinthX, roofBaseY + slabThickness + 1.25, plinthZ - roofL / 2 + 0.25);
+        rootGroup.add(pRear);
       }
     }
 
-    // 4. RCC ROOF SLAB, PARAPET & STAIR MUMTY (IN EXTERIOR & LANDSCAPE MODES)
-    if (isExteriorView && effectiveShowRoof) {
-      const topFloorY = multiFloorStacked
-        ? (numFloors - 1) * floorSpacing + fullWallHeight
-        : (activeFloorIndex + 1) * floorElevation;
+    // 5. Entrance Porch Canopy & Stone Steps
+    const groundDoors = layout.floors?.[0]?.doors || layout.doors || [];
+    const mainDoor =
+      groundDoors.find((d) => d.door_type === "entrance" || d.door_type === "entry") ||
+      groundDoors[0];
 
-      // Cantilevered RCC Roof Slab (1.2ft overhang)
-      const roofW = plinthW + 1.6;
-      const roofL = plinthL + 1.6;
-      const roofGeo = new THREE.BoxGeometry(roofW, 0.6, roofL);
-      const roofMesh = new THREE.Mesh(roofGeo, materials.terraceMat);
-      roofMesh.position.set(plinthX, topFloorY + 0.3, plinthZ);
-      roofMesh.castShadow = true;
-      roofMesh.receiveShadow = true;
-      rootGroup.add(roofMesh);
-
-      // Perimeter Parapet Wall (2.5ft height with coping)
-      const parapetH = 2.5;
-      const parapetThick = 0.5;
-      const pFront = new THREE.Mesh(
-        new THREE.BoxGeometry(roofW, parapetH, parapetThick),
-        materials.extWallMat
-      );
-      pFront.position.set(plinthX, topFloorY + 0.6 + parapetH / 2, plinthZ + roofL / 2 - parapetThick / 2);
-      const pRear = pFront.clone();
-      pRear.position.z = plinthZ - roofL / 2 + parapetThick / 2;
-
-      const pLeft = new THREE.Mesh(
-        new THREE.BoxGeometry(parapetThick, parapetH, roofL),
-        materials.extWallMat
-      );
-      pLeft.position.set(plinthX - roofW / 2 + parapetThick / 2, topFloorY + 0.6 + parapetH / 2, plinthZ);
-      const pRight = pLeft.clone();
-      pRight.position.x = plinthX + roofW / 2 - parapetThick / 2;
-
-      rootGroup.add(pFront, pRear, pLeft, pRight);
-
-      // Coping Cap along Parapet
-      const copingH = 0.15;
-      const cFront = new THREE.Mesh(new THREE.BoxGeometry(roofW + 0.2, copingH, parapetThick + 0.2), materials.copingMat);
-      cFront.position.set(plinthX, topFloorY + 0.6 + parapetH + copingH / 2, plinthZ + roofL / 2 - parapetThick / 2);
-      const cRear = cFront.clone();
-      cRear.position.z = plinthZ - roofL / 2 + parapetThick / 2;
-      const cLeft = new THREE.Mesh(new THREE.BoxGeometry(parapetThick + 0.2, copingH, roofL + 0.2), materials.copingMat);
-      cLeft.position.set(plinthX - roofW / 2 + parapetThick / 2, topFloorY + 0.6 + parapetH + copingH / 2, plinthZ);
-      const cRight = cLeft.clone();
-      cRight.position.x = plinthX + roofW / 2 - parapetThick / 2;
-      rootGroup.add(cFront, cRear, cLeft, cRight);
-
-      // Staircase Mumty Tower (Overhead Headroom Box on Roof)
-      const mumtyW = 10.0;
-      const mumtyL = 12.0;
-      const mumtyH = 7.5;
-      const mumtyGeo = new THREE.BoxGeometry(mumtyW, mumtyH, mumtyL);
-      const mumtyMesh = new THREE.Mesh(mumtyGeo, materials.extWallAccentMat);
-      mumtyMesh.position.set(plinthX - plinthW * 0.15, topFloorY + 0.6 + mumtyH / 2, plinthZ - plinthL * 0.15);
-      mumtyMesh.castShadow = true;
-      mumtyMesh.receiveShadow = true;
-      rootGroup.add(mumtyMesh);
-    }
-
-    // 5. FRONT ENTRANCE PORCH CANOPY & STONE STEPS
-    const mainDoor = (layout.doors || []).find((d) => d.door_type === "entry") || (layout.doors || [])[0];
     if (mainDoor) {
-      const stepW = (mainDoor.width || 3.2) + 1.6;
-      const stepRun = 0.9;
       const mdx = (mainDoor.x1 + mainDoor.x2) / 2;
       const mdz = (mainDoor.y1 + mainDoor.y2) / 2;
-      const dAngle = Math.atan2(mainDoor.y2 - mainDoor.y1, mainDoor.x2 - mainDoor.x1);
-      const nx = -Math.sin(dAngle);
-      const nz = Math.cos(dAngle);
+      const stepW = (mainDoor.width || 3.2) + 2.0;
 
-      // 3 Architectural Stone Entrance Treads
-      for (let sIdx = 0; sIdx < 3; sIdx++) {
-        const sGeo = new THREE.BoxGeometry(stepW + sIdx * 0.4, 0.16, stepRun);
-        const sMesh = new THREE.Mesh(sGeo, materials.terraceMat);
-        sMesh.position.set(
-          mdx + nx * (1.2 + sIdx * stepRun),
-          0.5 - (sIdx + 1) * 0.16 + 0.08,
-          mdz + nz * (1.2 + sIdx * stepRun)
-        );
-        sMesh.rotation.y = -dAngle;
-        sMesh.castShadow = true;
-        sMesh.receiveShadow = true;
-        rootGroup.add(sMesh);
+      // 3 Architectural Plinth Steps
+      for (let s = 0; s < 3; s++) {
+        const stepGeo = new THREE.BoxGeometry(stepW + s * 0.4, 0.18, 1.0);
+        const stepMesh = new THREE.Mesh(stepGeo, materials.slabMat);
+        let offZ = (s + 1) * 1.0;
+        if (resolvedFacing === "north") offZ = -offZ;
+        stepMesh.position.set(mdx, plinthHeight - (s + 1) * 0.18 + 0.09, mdz + offZ);
+        stepMesh.castShadow = true;
+        stepMesh.receiveShadow = true;
+        rootGroup.add(stepMesh);
       }
 
-      // Modern Cantilevered Porch Canopy
-      const canopyW = stepW + 2.5;
-      const canopyProj = 4.5;
-      const canopyGeo = new THREE.BoxGeometry(canopyW, 0.35, canopyProj);
+      // Porch Canopy
+      const canopyGeo = new THREE.BoxGeometry(stepW + 2.0, 0.35, 4.5);
       const canopyMesh = new THREE.Mesh(canopyGeo, materials.canopyMat);
-      canopyMesh.position.set(mdx + nx * (canopyProj / 2 + 0.4), 8.5, mdz + nz * (canopyProj / 2 + 0.4));
-      canopyMesh.rotation.y = -dAngle;
+      canopyMesh.position.set(mdx, plinthHeight + 8.5, mdz + (resolvedFacing === "north" ? -2.25 : 2.25));
       canopyMesh.castShadow = true;
       rootGroup.add(canopyMesh);
-
-      // Warm Porch Downlight in dusk & night mode
-      if (effectiveLightingPreset === "sunset" || effectiveLightingPreset === "night") {
-        const porchLight = new THREE.PointLight(0xf59e0b, effectiveLightingPreset === "night" ? 2.2 : 1.2, 20);
-        porchLight.position.set(mdx + nx * 2.0, 7.8, mdz + nz * 2.0);
-        interiorLights.add(porchLight);
-      }
     }
   }, [
-    createGrassTexture,
-    createPaverTexture,
-    createStoneAccentTexture,
-    buildFloorGeometry,
     layout,
-    presentationMode,
-    multiFloorStacked,
-    activeFloorIndex,
-    effectiveShowRoof,
-    isDarkMode,
     pw,
     pl,
     cx,
     cz,
+    plinthHeight,
+    floorHeight,
     fullWallHeight,
-    floorElevation,
-    modelsLoaded,
-    grassTexture,
-    paverTexture,
+    slabThickness,
+    materials,
+    multiFloorStacked,
+    isCutawayMode,
+    effectiveShowRoof,
     effectiveShowLandscape,
-    effectiveShowStructure,
-    explodedFloors,
-    landscapeCategory,
     showVegetationState,
     effectiveLightingPreset,
+    isDarkMode,
+    resolvedFacing,
+    buildFloorGeometry,
   ]);
 
-  // Three.js Mount & Animation Loop
+  // Three.js Mount, HDRI Environment, Postprocessing & Animation Loop
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
@@ -1374,969 +1037,535 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
     // 1. Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDarkMode ? "#121214" : "#F3F4F6");
+    scene.background = new THREE.Color(isDarkMode ? "#0E1015" : "#F3F4F6");
     sceneRef.current = scene;
 
-    // 2. Camera
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 500);
-    // Initial camera position based on mode
-    if (presentationMode === "landscape") {
-      camera.position.set(cx + pw * 1.35, pl * 1.05, cz + pl * 1.45);
-    } else if (presentationMode === "exterior") {
-      camera.position.set(cx + pw * 1.05, pl * 0.7, cz + pl * 1.15);
-    } else {
-      camera.position.set(cx + pw * 0.35, pl * 1.35, cz + pl * 0.85);
-    }
+    // 2. Camera: Elevated 3/4 Dollhouse Perspective framing the building
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.5, 600);
     cameraRef.current = camera;
-    targetCamPos.current.copy(camera.position);
 
-    // 3. Renderer with Soft Shadows
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // 3. Renderer with ACES Filmic Tone Mapping and Shadows
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    rendererRef.current = renderer;
     mount.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
-    // 4. OrbitControls
+    // 4. Post-processing Composer
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, height),
+      0.18, // subtle architectural bloom
+      0.4,
+      0.85
+    );
+    composer.addPass(bloomPass);
+
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+    composerRef.current = composer;
+
+    // 5. OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.maxPolarAngle = Math.PI / 2 - 0.02;
-    controls.minDistance = 8;
-    controls.maxDistance = 250;
-    if (presentationMode === "landscape") {
-      controls.target.set(cx, 2.5, cz);
-    } else if (presentationMode === "exterior") {
-      controls.target.set(cx, 4.0, cz);
-    } else {
-      controls.target.set(cx, 0.5, cz);
-    }
+    controls.maxPolarAngle = Math.PI / 2 - 0.02; // Don't dip below horizon
+    controls.minDistance = 15;
+    controls.maxDistance = 220;
+    controls.target.set(cx, plinthHeight + 4.0, cz);
     controlsRef.current = controls;
-    targetControlsTarget.current.copy(controls.target);
 
-    // 5. Lighting: Sun (DirectionalLight) & Sky (HemisphereLight)
-    const skyLight = new THREE.HemisphereLight(0xffffff, 0xcbd5e1, 0.95);
-    scene.add(skyLight);
-    skyLightRef.current = skyLight;
+    // 6. HDRI Environment via RGBELoader + PMREMGenerator
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
 
-    const sunLight = new THREE.DirectionalLight(0xfffbf0, 1.45);
-    sunLight.position.set(cx + 40, 55, cz + 30);
+    const rgbeLoader = new RGBELoader();
+    rgbeLoader.load(
+      "/environments/sky_architectural.hdr",
+      (texture) => {
+        const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+        scene.environment = envMap;
+        texture.dispose();
+        pmremGenerator.dispose();
+      },
+      undefined,
+      (err) => {
+        console.warn("[Notice] Fallback ambient environment will be used:", err);
+      }
+    );
+
+    // 7. Architectural Sunlight and Sky Fill
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.8);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 1.0;
-    sunLight.shadow.camera.far = 180;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 300;
     const d = Math.max(pw, pl) * 0.9;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
     sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.0004;
+    sunLight.shadow.bias = -0.0003;
     scene.add(sunLight);
     sunLightRef.current = sunLight;
 
-    // Build the scene
-    rebuildScene();
+    const skyLight = new THREE.HemisphereLight(0xe0f2fe, 0x475569, 0.75);
+    scene.add(skyLight);
+    skyLightRef.current = skyLight;
 
+    // Set Default 3/4 Dollhouse Camera Position
+    const diag = Math.hypot(pw, pl);
+    let camX = cx + diag * 0.85;
+    let camZ = cz + diag * 0.95;
+    if (resolvedFacing === "west") {
+      camX = cx - diag * 0.95;
+      camZ = cz + diag * 0.65;
+    } else if (resolvedFacing === "east") {
+      camX = cx + diag * 0.95;
+      camZ = cz - diag * 0.65;
+    } else if (resolvedFacing === "north") {
+      camX = cx + diag * 0.65;
+      camZ = cz - diag * 0.95;
+    }
+    camera.position.set(camX, diag * 0.75, camZ);
+    controls.update();
+
+    // 8. Animation & Render Loop
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
-      // Smooth Camera & Orbit Lerp Transition
-      if (isTransitioningCamera.current && cameraRef.current && controlsRef.current) {
-        cameraRef.current.position.lerp(targetCamPos.current, 0.08);
-        controlsRef.current.target.lerp(targetControlsTarget.current, 0.08);
+      // Smooth camera transition
+      if (isTransitioningCamera.current) {
+        camera.position.lerp(targetCamPos.current, 0.08);
+        controls.target.lerp(targetControlsTarget.current, 0.08);
         if (
-          cameraRef.current.position.distanceTo(targetCamPos.current) < 0.2 &&
-          controlsRef.current.target.distanceTo(targetControlsTarget.current) < 0.2
+          camera.position.distanceTo(targetCamPos.current) < 0.2 &&
+          controls.target.distanceTo(targetControlsTarget.current) < 0.2
         ) {
           isTransitioningCamera.current = false;
         }
       }
 
       controls.update();
-      renderer.render(scene, camera);
+      if (composerRef.current) {
+        composerRef.current.render();
+      } else {
+        renderer.render(scene, camera);
+      }
     };
     animate();
 
+    // 9. Resize Handling
     const handleResize = () => {
-      if (!mount || !rendererRef.current || !cameraRef.current) return;
+      if (!mount) return;
       const w = mount.clientWidth;
       const h = mount.clientHeight;
-      cameraRef.current.aspect = w / h;
-      cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
     };
     window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animId);
-      controls.dispose();
+      window.removeEventListener("resize", handleResize);
       renderer.dispose();
+      pmremGenerator.dispose();
       if (mount && renderer.domElement) {
         mount.removeChild(renderer.domElement);
       }
     };
-  }, [cx, cz, isDarkMode, pl, pw, rebuildScene]);
+  }, [cx, cz, pw, pl, isDarkMode, resolvedFacing, plinthHeight]);
 
-  // Re-run geometry on dependency changes
+  // Lighting Mode Updates
+  useEffect(() => {
+    if (!sunLightRef.current || !skyLightRef.current) return;
+    const sun = sunLightRef.current;
+    const sky = skyLightRef.current;
+
+    const diag = Math.hypot(pw, pl);
+
+    if (effectiveLightingPreset === "day") {
+      sun.color.setHex(0xfffaed);
+      sun.intensity = 1.8;
+      sun.position.set(cx + diag * 0.6, diag * 0.9, cz + diag * 0.6);
+      sky.color.setHex(0xe0f2fe);
+      sky.groundColor.setHex(0x475569);
+      sky.intensity = 0.75;
+    } else if (effectiveLightingPreset === "sunset") {
+      sun.color.setHex(0xf59e0b);
+      sun.intensity = 1.3;
+      sun.position.set(cx - diag * 0.8, diag * 0.35, cz + diag * 0.4);
+      sky.color.setHex(0xfb923c);
+      sky.groundColor.setHex(0x1e1b4b);
+      sky.intensity = 0.55;
+    } else if (effectiveLightingPreset === "night") {
+      sun.color.setHex(0x93c5fd);
+      sun.intensity = 0.35;
+      sun.position.set(cx + diag * 0.5, diag * 0.8, cz - diag * 0.5);
+      sky.color.setHex(0x1e293b);
+      sky.groundColor.setHex(0x090a0f);
+      sky.intensity = 0.25;
+    }
+  }, [effectiveLightingPreset, cx, cz, pw, pl]);
+
+  // Trigger rebuild when layout, mode, or assets change
   useEffect(() => {
     rebuildScene();
-  }, [rebuildScene]);
+  }, [rebuildScene, assetsReady]);
 
-  // Mode Transition Handler (EXTERIOR | INTERIOR | LANDSCAPE | ALL)
-  const handleSwitchMode = (mode: PresentationMode) => {
-    setPresentationMode(mode);
-    if (!cameraRef.current || !controlsRef.current) return;
-
-    isTransitioningCamera.current = true;
-    if (mode === "all" || mode === "landscape") {
-      targetCamPos.current.set(cx + pw * 1.35, pl * 1.05, cz + pl * 1.45);
-      targetControlsTarget.current.set(cx, 2.5, cz);
-    } else if (mode === "exterior") {
-      targetCamPos.current.set(cx + pw * 1.05, pl * 0.7, cz + pl * 1.15);
-      targetControlsTarget.current.set(cx, 4.0, cz);
-    } else {
-      // Steep Cutaway Dollhouse View looking directly down into rooms
-      targetCamPos.current.set(cx + pw * 0.35, pl * 1.35, cz + pl * 0.85);
-      targetControlsTarget.current.set(cx, 0.5, cz);
-    }
-  };
-
-  // Lighting Preset Adjustments (Day, Dusk, Night)
-  useEffect(() => {
-    if (sunLightRef.current && skyLightRef.current && sceneRef.current) {
-      if (effectiveLightingPreset === "sunset") {
-        sunLightRef.current.color.set("#FF8E4D");
-        sunLightRef.current.intensity = 1.5;
-        sunLightRef.current.position.set(cx + 50, 20, cz - 20);
-        skyLightRef.current.color.set("#FED7AA");
-        skyLightRef.current.groundColor.set("#B45309");
-        sceneRef.current.background = new THREE.Color(isDarkMode ? "#181412" : "#FFF7ED");
-      } else if (effectiveLightingPreset === "night") {
-        sunLightRef.current.color.set("#60A5FA");
-        sunLightRef.current.intensity = 0.35;
-        sunLightRef.current.position.set(cx - 30, 60, cz - 30);
-        skyLightRef.current.color.set("#1E293B");
-        skyLightRef.current.groundColor.set("#0B0F19");
-        sceneRef.current.background = new THREE.Color("#0A0D14");
-      } else {
-        // Daylight
-        sunLightRef.current.color.set("#FFFBF0");
-        sunLightRef.current.intensity = 1.45;
-        sunLightRef.current.position.set(cx + 40, 55, cz + 30);
-        skyLightRef.current.color.set("#FFFFFF");
-        skyLightRef.current.groundColor.set("#CBD5E1");
-        sceneRef.current.background = new THREE.Color(isDarkMode ? "#121214" : "#F3F4F6");
-      }
-    }
-  }, [effectiveLightingPreset, isDarkMode, cx, cz]);
-
-  const handleResetCamera = () => {
-    if (!cameraRef.current || !controlsRef.current) return;
-    isTransitioningCamera.current = true;
-    if (presentationMode === "all" || presentationMode === "landscape") {
-      targetCamPos.current.set(cx + pw * 1.35, pl * 1.05, cz + pl * 1.45);
-      targetControlsTarget.current.set(cx, 2.5, cz);
-    } else if (presentationMode === "exterior") {
-      targetCamPos.current.set(cx + pw * 1.05, pl * 0.7, cz + pl * 1.15);
-      targetControlsTarget.current.set(cx, 4.0, cz);
-    } else {
-      targetCamPos.current.set(cx + pw * 0.35, pl * 1.35, cz + pl * 0.85);
-      targetControlsTarget.current.set(cx, 0.5, cz);
-    }
-  };
-
-  // 10 Camera View Presets with Smooth Transitions
+  // Camera Presets
   const handleCameraPreset = (preset: CameraPresetType) => {
     setCameraView(preset);
     setIsCameraMenuOpen(false);
     if (!cameraRef.current || !controlsRef.current) return;
     isTransitioningCamera.current = true;
 
-    if (preset === "exterior") {
-      targetCamPos.current.set(cx + pw * 1.05, pl * 0.7, cz + pl * 1.15);
-      targetControlsTarget.current.set(cx, 4.0, cz);
+    const diag = Math.hypot(pw, pl);
+
+    if (preset === "cutaway") {
+      setIsCutawayMode(true);
+      targetCamPos.current.set(cx + diag * 0.85, diag * 0.7, cz + diag * 0.95);
+      targetControlsTarget.current.set(cx, plinthHeight + 4.0, cz);
+    } else if (preset === "exterior") {
+      setIsCutawayMode(false);
+      targetCamPos.current.set(cx + diag * 0.95, diag * 0.65, cz + diag * 1.05);
+      targetControlsTarget.current.set(cx, plinthHeight + 4.5, cz);
     } else if (preset === "iso") {
-      targetCamPos.current.set(cx + pw * 1.15, pl * 0.95, cz + pl * 1.25);
-      targetControlsTarget.current.set(cx, 3.0, cz);
+      targetCamPos.current.set(cx + diag * 0.9, diag * 0.9, cz + diag * 0.9);
+      targetControlsTarget.current.set(cx, plinthHeight + 3.0, cz);
     } else if (preset === "top") {
-      targetCamPos.current.set(cx, pl * 2.2, cz + 0.01);
+      targetCamPos.current.set(cx, diag * 1.8, cz + 0.01);
       targetControlsTarget.current.set(cx, 0, cz);
     } else if (preset === "front") {
-      targetCamPos.current.set(cx, pl * 0.35, cz + pl * 1.45);
-      targetControlsTarget.current.set(cx, 4.0, cz);
-    } else if (preset === "side") {
-      targetCamPos.current.set(cx + pw * 1.5, pl * 0.4, cz);
-      targetControlsTarget.current.set(cx, 4.0, cz);
+      let fz = cz + diag * 1.2;
+      let fx = cx;
+      if (resolvedFacing === "north") fz = cz - diag * 1.2;
+      else if (resolvedFacing === "east") { fx = cx + diag * 1.2; fz = cz; }
+      else if (resolvedFacing === "west") { fx = cx - diag * 1.2; fz = cz; }
+      targetCamPos.current.set(fx, diag * 0.45, fz);
+      targetControlsTarget.current.set(cx, plinthHeight + 4.0, cz);
     } else if (preset === "entrance") {
-      const mainDoor = (layout.doors || []).find((d) => d.door_type === "entry") || (layout.doors || [])[0];
-      if (mainDoor) {
-        const mdx = (mainDoor.x1 + mainDoor.x2) / 2;
-        const mdz = (mainDoor.y1 + mainDoor.y2) / 2;
-        const dAngle = Math.atan2(mainDoor.y2 - mainDoor.y1, mainDoor.x2 - mainDoor.x1);
-        const nx = -Math.sin(dAngle);
-        const nz = Math.cos(dAngle);
-        targetCamPos.current.set(mdx + nx * 14, 5.5, mdz + nz * 14);
-        targetControlsTarget.current.set(mdx, 4.0, mdz);
-      } else {
-        targetCamPos.current.set(cx, 5.0, cz + pl * 0.6);
-        targetControlsTarget.current.set(cx, 3.5, cz);
-      }
-    } else if (preset === "living") {
-      const livingRoom = (layout.rooms || []).find((r) =>
-        (r.type || "").toLowerCase().includes("living") || (r.name || "").toLowerCase().includes("living")
+      targetCamPos.current.set(cx, plinthHeight + 5.5, cz + diag * 0.55);
+      targetControlsTarget.current.set(cx, plinthHeight + 3.5, cz);
+    } else if (preset === "living" || preset === "kitchen" || preset === "bedroom") {
+      const matchRoom = (layout.rooms || []).find((r) =>
+        (r.type || "").toLowerCase().includes(preset) || (r.name || "").toLowerCase().includes(preset)
       );
-      if (livingRoom && livingRoom.rect) {
-        const rx = livingRoom.rect.x + livingRoom.rect.width / 2;
-        const rz = livingRoom.rect.y + livingRoom.rect.length / 2;
-        targetCamPos.current.set(rx - 10, 12, rz + 12);
-        targetControlsTarget.current.set(rx, 2.0, rz);
-        setPresentationMode("interior");
-      }
-    } else if (preset === "kitchen") {
-      const kitchenRoom = (layout.rooms || []).find((r) =>
-        (r.type || "").toLowerCase().includes("kitchen") || (r.name || "").toLowerCase().includes("kitchen")
-      );
-      if (kitchenRoom && kitchenRoom.rect) {
-        const rx = kitchenRoom.rect.x + kitchenRoom.rect.width / 2;
-        const rz = kitchenRoom.rect.y + kitchenRoom.rect.length / 2;
-        targetCamPos.current.set(rx - 8, 11, rz + 9);
-        targetControlsTarget.current.set(rx, 2.0, rz);
-        setPresentationMode("interior");
-      }
-    } else if (preset === "bedroom") {
-      const bedRoom = (layout.rooms || []).find((r) =>
-        (r.type || "").toLowerCase().includes("master") || (r.type || "").toLowerCase().includes("bed")
-      );
-      if (bedRoom && bedRoom.rect) {
-        const rx = bedRoom.rect.x + bedRoom.rect.width / 2;
-        const rz = bedRoom.rect.y + bedRoom.rect.length / 2;
-        targetCamPos.current.set(rx - 9, 11, rz + 10);
-        targetControlsTarget.current.set(rx, 2.0, rz);
-        setPresentationMode("interior");
+      if (matchRoom && matchRoom.rect) {
+        const rx = matchRoom.rect.x + matchRoom.rect.width / 2;
+        const rz = matchRoom.rect.y + matchRoom.rect.length / 2;
+        targetCamPos.current.set(rx - 8, plinthHeight + 10, rz + 10);
+        targetControlsTarget.current.set(rx, plinthHeight + 2.0, rz);
+        setIsCutawayMode(true);
       }
     } else if (preset === "garden") {
-      targetCamPos.current.set(cx + pw * 0.55, 9.0, cz + pl * 0.7);
-      targetControlsTarget.current.set(cx, 1.5, cz + pl * 0.35);
-      setPresentationMode("landscape");
+      targetCamPos.current.set(cx + pw * 0.6, plinthHeight + 8, cz + pl * 0.7);
+      targetControlsTarget.current.set(cx, plinthHeight + 1.5, cz + pl * 0.3);
     }
   };
 
-  const handleSelectLighting = (preset: "day" | "sunset" | "night") => {
-    if (onChangeLightingPreset) {
-      onChangeLightingPreset(preset);
-    } else {
-      setInternalLightingPreset(preset);
+  // 3D Dimension Editing (Width / Depth increments without room dragging)
+  const handleAdjustRoomDimension = async (axis: "width" | "length", delta: number) => {
+    if (!selectedRoomId) return;
+    const room = (layout.rooms || []).find((r) => r.id === selectedRoomId);
+    if (!room || !room.rect) return;
+
+    setIsEditingRoom(true);
+    const newW = Math.max(6, Math.min(40, room.rect.width + (axis === "width" ? delta : 0)));
+    const newL = Math.max(6, Math.min(40, room.rect.length + (axis === "length" ? delta : 0)));
+
+    const proposedRect: Rect = {
+      x: room.rect.x,
+      y: room.rect.y,
+      width: newW,
+      length: newL,
+    };
+
+    try {
+      const res = await editRoomLayoutFull(layout, selectedRoomId, proposedRect, true);
+      if (res && res.layout) {
+        if (onUpdateLayout) {
+          onUpdateLayout(res.layout);
+        }
+      }
+    } catch (err) {
+      console.error("[3D EDIT ERROR] Could not adjust room dimension:", err);
+    } finally {
+      setIsEditingRoom(false);
     }
   };
 
-  const handleToggleRoofClick = () => {
-    if (onToggleRoof) {
-      onToggleRoof();
-    } else {
-      setInternalShowRoof((prev) => !prev);
+  // Pointer Click / Tap selection
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const mount = mountRef.current;
+    if (!mount || !cameraRef.current || !sceneRef.current) return;
+    const rect = mount.getBoundingClientRect();
+    pointer.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.current.setFromCamera(pointer.current, cameraRef.current);
+    const intersects = raycaster.current.intersectObjects(sceneRef.current.children, true);
+
+    for (const hit of intersects) {
+      const uData = hit.object.userData;
+      if (uData && uData.roomId) {
+        onSelectRoom(uData.roomId);
+        return;
+      }
     }
   };
 
-  const handleToggleWallsClick = () => {
-    if (onToggleWallHeightMode) {
-      onToggleWallHeightMode();
-    } else {
-      setInternalWallHeightMode((prev) => (prev === "cutaway" ? "full" : "cutaway"));
-    }
-  };
+  const selectedRoom = useMemo(() => {
+    if (!selectedRoomId) return null;
+    return (layout.rooms || []).find((r) => r.id === selectedRoomId);
+  }, [layout.rooms, selectedRoomId]);
 
   return (
-    <div className="relative w-full h-full select-none overflow-hidden bg-[#ECEEF2]">
-      {/* FLOATING 3D MINIMAL CONTROLS (TOP LEFT) */}
-      <div
-        className={`absolute left-3 sm:left-6 z-30 flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] pointer-events-auto transition-[top] duration-200 ${
-          hasOptimizationNotice
-            ? "top-[98px] sm:top-[118px]"
-            : "top-16 sm:top-20"
-        }`}
-      >
-        {/* 1. Primary Presentation Modes: EXTERIOR | INTERIOR | LANDSCAPE | ALL */}
-        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
+    <div
+      ref={mountRef}
+      onPointerDown={handlePointerDown}
+      className="relative w-full h-full select-none overflow-hidden bg-[#0E1015]"
+    >
+      {/* FLOATING TOP BAR CONTROLS */}
+      <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        {/* Left: Presentation Mode & Camera Presets */}
+        <div className="flex items-center gap-1.5 p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl pointer-events-auto text-xs font-mono text-[#9E9C98]">
           <button
-            onClick={() => handleSwitchMode("exterior")}
-            className={`px-3 py-1 rounded-full transition-all ${
-              presentationMode === "exterior"
-                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-sm"
-                : "hover:text-[#F5F3EF]"
+            type="button"
+            onClick={() => {
+              setIsCutawayMode(true);
+              setPresentationMode("cutaway");
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
+              isCutawayMode
+                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-md"
+                : "hover:text-white"
             }`}
           >
-            EXTERIOR
+            <Scissors className="w-3.5 h-3.5" />
+            DOLLHOUSE CUTAWAY
           </button>
           <button
-            onClick={() => handleSwitchMode("interior")}
-            className={`px-3 py-1 rounded-full transition-all ${
-              presentationMode === "interior"
-                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-sm"
-                : "hover:text-[#F5F3EF]"
+            type="button"
+            onClick={() => {
+              setIsCutawayMode(false);
+              setPresentationMode("exterior");
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
+              !isCutawayMode
+                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-md"
+                : "hover:text-white"
             }`}
           >
-            INTERIOR
+            <Building className="w-3.5 h-3.5" />
+            FULL EXTERIOR
           </button>
-          <button
-            onClick={() => handleSwitchMode("landscape")}
-            className={`px-3 py-1 rounded-full transition-all ${
-              presentationMode === "landscape"
-                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-          >
-            LANDSCAPE
-          </button>
-          <button
-            onClick={() => handleSwitchMode("all")}
-            className={`px-3 py-1 rounded-full transition-all ${
-              presentationMode === "all"
-                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-          >
-            ALL
-          </button>
-        </div>
 
-        {/* 2. Lighting: DAY | DUSK | NIGHT */}
-        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
-          <button
-            onClick={() => handleSelectLighting("day")}
-            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-              effectiveLightingPreset === "day"
-                ? "bg-[#F5F3EF] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-          >
-            DAY
-          </button>
-          <button
-            onClick={() => handleSelectLighting("sunset")}
-            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-              effectiveLightingPreset === "sunset"
-                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-          >
-            DUSK
-          </button>
-          <button
-            onClick={() => handleSelectLighting("night")}
-            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-              effectiveLightingPreset === "night"
-                ? "bg-[#38BDF8] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-          >
-            NIGHT
-          </button>
-        </div>
+          <div className="w-[1px] h-4 bg-white/10 mx-1" />
 
-        {/* 3. Floor Level Switcher: GROUND | FIRST | SECOND | ALL */}
-        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
-          {layout.floors && layout.floors.length > 1 ? (
-            layout.floors.map((fl, idx) => {
-              const label = fl.floor_name
-                ? fl.floor_name.replace(" Floor", "").toUpperCase()
-                : idx === 0
-                ? "GROUND"
-                : idx === 1
-                ? "FIRST"
-                : idx === 2
-                ? "SECOND"
-                : `L${fl.floor_number}`;
-              const isActive = !multiFloorStacked && activeFloorIndex === idx;
-              return (
-                <button
-                  key={fl.floor_number}
-                  onClick={() => {
-                    setMultiFloorStacked(false);
-                    onSelectFloor?.(idx);
-                  }}
-                  className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-                    isActive
-                      ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                      : "hover:text-[#F5F3EF]"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })
-          ) : (
+          {/* Camera Preset Dropdown */}
+          <div className="relative">
             <button
-              onClick={() => {
-                setMultiFloorStacked(false);
-                onSelectFloor?.(0);
-              }}
-              className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-                !multiFloorStacked
-                  ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                  : "hover:text-[#F5F3EF]"
-              }`}
+              type="button"
+              onClick={() => setIsCameraMenuOpen(!isCameraMenuOpen)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-white transition-all"
             >
-              GROUND
+              <Camera className="w-3.5 h-3.5 text-[#C48446]" />
+              <span className="capitalize">{cameraView} View</span>
+              <ChevronDown className="w-3 h-3 text-[#9E9C98]" />
             </button>
-          )}
-          <button
-            onClick={() => setMultiFloorStacked(true)}
-            className={`px-2.5 sm:px-3 py-1 rounded-full transition-all ${
-              multiFloorStacked
-                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-          >
-            ALL
-          </button>
-        </div>
 
-        {/* 4. 10 Camera View Presets Menu */}
-        <div className="relative">
-          <button
-            onClick={() => setIsCameraMenuOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-[10px] sm:text-[11px] font-mono shadow-2xl transition-all"
-          >
-            <Camera className="w-3.5 h-3.5 text-[#C48446]" />
-            <span className="uppercase">{cameraView}</span>
-            <ChevronDown className="w-3 h-3 text-[#9E9C98]" />
-          </button>
-
-          {isCameraMenuOpen && (
-            <div className="absolute top-full left-0 mt-1.5 w-44 p-1.5 rounded-2xl bg-[#12141A]/95 backdrop-blur-md border border-white/10 shadow-2xl z-50 flex flex-col gap-0.5 text-[10px] font-mono">
-              {(
-                [
-                  { id: "exterior", label: "Exterior (3/4)" },
-                  { id: "iso", label: "Isometric" },
+            {isCameraMenuOpen && (
+              <div className="absolute top-full left-0 mt-2 w-44 rounded-xl bg-[#161922] border border-white/10 shadow-2xl overflow-hidden py-1 z-30">
+                {[
+                  { id: "cutaway", label: "Dollhouse 3/4" },
+                  { id: "exterior", label: "Exterior Perspective" },
+                  { id: "iso", label: "Isometric 45°" },
                   { id: "top", label: "Top (Plan)" },
-                  { id: "front", label: "Front Elevation" },
-                  { id: "side", label: "Side Elevation" },
-                  { id: "entrance", label: "Entrance Porch" },
+                  { id: "front", label: "Front Facade" },
+                  { id: "entrance", label: "Main Entrance" },
                   { id: "living", label: "Living Room" },
                   { id: "kitchen", label: "Kitchen" },
-                  { id: "bedroom", label: "Bedroom" },
-                  { id: "garden", label: "Garden / Lawn" },
-                ] as const
-              ).map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => handleCameraPreset(preset.id)}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-colors flex items-center justify-between ${
-                    cameraView === preset.id
-                      ? "bg-[#C48446] text-black font-semibold"
-                      : "text-[#9E9C98] hover:text-[#F5F3EF] hover:bg-white/5"
-                  }`}
-                >
-                  <span>{preset.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+                  { id: "bedroom", label: "Master Bedroom" },
+                  { id: "garden", label: "Site & Garden" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleCameraPreset(item.id as CameraPresetType)}
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                      cameraView === item.id
+                        ? "bg-[#C48446]/20 text-[#C48446] font-semibold"
+                        : "text-[#9E9C98] hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* 5. Optional Toggles: Furniture, Vegetation, Roof, Walls */}
-        <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[10px] sm:text-[11px] font-mono text-[#9E9C98]">
+        {/* Right: Lighting Atmosphere & Realistic Photo Action */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Lighting Mode */}
+          <div className="flex items-center p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#9E9C98]">
+            <button
+              type="button"
+              onClick={() => {
+                if (onChangeLightingPreset) onChangeLightingPreset("day");
+                else setInternalLightingPreset("day");
+              }}
+              className={`p-1.5 px-2.5 rounded-full flex items-center gap-1 transition-all ${
+                effectiveLightingPreset === "day"
+                  ? "bg-white/20 text-white font-medium"
+                  : "hover:text-white"
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-300" />
+              Day
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (onChangeLightingPreset) onChangeLightingPreset("sunset");
+                else setInternalLightingPreset("sunset");
+              }}
+              className={`p-1.5 px-2.5 rounded-full flex items-center gap-1 transition-all ${
+                effectiveLightingPreset === "sunset"
+                  ? "bg-white/20 text-white font-medium"
+                  : "hover:text-white"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+              Dusk
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (onChangeLightingPreset) onChangeLightingPreset("night");
+                else setInternalLightingPreset("night");
+              }}
+              className={`p-1.5 px-2.5 rounded-full flex items-center gap-1 transition-all ${
+                effectiveLightingPreset === "night"
+                  ? "bg-white/20 text-white font-medium"
+                  : "hover:text-white"
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5 text-indigo-300" />
+              Night
+            </button>
+          </div>
+
+          {/* GENERATE REALISTIC PHOTO (BLENDER CYCLES) */}
           <button
-            onClick={() => setShowFurnitureState((prev) => !prev)}
-            className={`px-2.5 py-1 rounded-full transition-all ${
-              showFurnitureState
-                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-            title="Toggle Furniture"
+            type="button"
+            onClick={() => setIsRenderModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#C48446] to-[#E59E58] hover:from-[#B37438] hover:to-[#D48D47] text-[#0A0B0E] font-semibold text-xs shadow-xl hover:shadow-orange-500/25 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
           >
-            FURNITURE
-          </button>
-          <button
-            onClick={() => setShowVegetationState((prev) => !prev)}
-            className={`px-2.5 py-1 rounded-full transition-all ${
-              showVegetationState
-                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-            title="Toggle Vegetation"
-          >
-            VEGETATION
-          </button>
-          <button
-            onClick={handleToggleRoofClick}
-            className={`px-2.5 py-1 rounded-full transition-all ${
-              effectiveShowRoof
-                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-            title="Toggle Roof Slab"
-          >
-            ROOF
-          </button>
-          <button
-            onClick={handleToggleWallsClick}
-            className={`px-2.5 py-1 rounded-full transition-all ${
-              effectiveWallHeightMode === "full"
-                ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                : "hover:text-[#F5F3EF]"
-            }`}
-            title="Toggle Full vs Cutaway Walls"
-          >
-            WALLS
+            <Sparkles className="w-4 h-4 fill-current" />
+            <span>Generate Realistic Photo</span>
           </button>
         </div>
-
-        {/* Reset Camera Button */}
-        <button
-          onClick={handleResetCamera}
-          className="p-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 shadow-2xl transition-all"
-          title="Reset Camera View"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
       </div>
 
-      {/* 3D WebGL Canvas */}
-      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      {/* FLOATING SELECTED ROOM 3D DIMENSION CONTROLS */}
+      {selectedRoom && selectedRoom.rect && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 p-2 px-4 rounded-2xl bg-[#12141A]/95 backdrop-blur-md border border-[#C48446]/40 shadow-2xl text-white pointer-events-auto">
+          <div className="border-r border-white/10 pr-3">
+            <span className="text-[10px] font-mono text-[#C48446] block uppercase tracking-wider">
+              Selected Space
+            </span>
+            <span className="text-xs font-semibold block capitalize">
+              {selectedRoom.name || selectedRoom.type}
+            </span>
+            <span className="text-[11px] text-[#9E9C98] font-mono">
+              {Math.round(selectedRoom.rect.width)}&apos; × {Math.round(selectedRoom.rect.length)}&apos; ({Math.round(selectedRoom.rect.width * selectedRoom.rect.length)} sqft)
+            </span>
+          </div>
+
+          {/* Width adjustment */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-mono text-[#9E9C98]">Width:</span>
+            <button
+              type="button"
+              disabled={isEditingRoom}
+              onClick={() => handleAdjustRoomDimension("width", -1)}
+              className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
+              title="Decrease width by 1 ft"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              disabled={isEditingRoom}
+              onClick={() => handleAdjustRoomDimension("width", 1)}
+              className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
+              title="Increase width by 1 ft"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Length / Depth adjustment */}
+          <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
+            <span className="text-[11px] font-mono text-[#9E9C98]">Depth:</span>
+            <button
+              type="button"
+              disabled={isEditingRoom}
+              onClick={() => handleAdjustRoomDimension("length", -1)}
+              className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
+              title="Decrease depth by 1 ft"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              disabled={isEditingRoom}
+              onClick={() => handleAdjustRoomDimension("length", 1)}
+              className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
+              title="Increase depth by 1 ft"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onSelectRoom(null)}
+            className="text-[11px] text-[#9E9C98] hover:text-white ml-2 underline"
+          >
+            Deselect
+          </button>
+        </div>
+      )}
+
+      {/* ORIENTATION COMPASS INDICATOR (BOTTOM RIGHT) */}
+      <div className="absolute bottom-6 right-6 z-10 flex items-center gap-2 p-2 px-3 rounded-full bg-[#12141A]/80 backdrop-blur-sm border border-white/10 text-xs font-mono text-[#9E9C98] pointer-events-none">
+        <Compass className="w-4 h-4 text-[#C48446]" />
+        <span>Road Facing: <strong className="text-white uppercase">{resolvedFacing}</strong></span>
+      </div>
+
+      {/* PHOTOREALISTIC RENDER MODAL */}
+      <RealisticRenderModal
+        isOpen={isRenderModalOpen}
+        onClose={() => setIsRenderModalOpen(false)}
+        layout={layout}
+        currentLighting={effectiveLightingPreset}
+        isCutawayMode={isCutawayMode}
+      />
     </div>
   );
 };
-
-// ==========================================
-// PROCEDURAL ARCHITECTURAL STAIRCASE
-// ==========================================
-function buildArchitecturalStaircase(
-  rect: { x: number; y: number; width: number; length: number },
-  elevationH: number,
-  treadMat: THREE.Material,
-  railingMat: THREE.Material
-): THREE.Group {
-  const stairGroup = new THREE.Group();
-  const numSteps = 16;
-  const riserH = elevationH / numSteps;
-  const treadDepth = (rect.length * 0.85) / (numSteps / 2);
-  const flightW = Math.max(2.8, (rect.width - 0.4) / 2);
-
-  // Flight 1: Up to landing
-  const halfSteps = numSteps / 2;
-  for (let i = 0; i < halfSteps; i++) {
-    const stepGeo = new THREE.BoxGeometry(flightW, riserH, treadDepth);
-    const stepMesh = new THREE.Mesh(stepGeo, treadMat);
-    stepMesh.position.set(
-      rect.x + flightW / 2,
-      i * riserH + riserH / 2,
-      rect.y + i * treadDepth + treadDepth / 2
-    );
-    stepMesh.castShadow = true;
-    stepMesh.receiveShadow = true;
-    stairGroup.add(stepMesh);
-  }
-
-  // Mid Landing
-  const landingGeo = new THREE.BoxGeometry(rect.width, 0.4, 3.5);
-  const landingMesh = new THREE.Mesh(landingGeo, treadMat);
-  landingMesh.position.set(
-    rect.x + rect.width / 2,
-    halfSteps * riserH + 0.2,
-    rect.y + rect.length - 1.75
-  );
-  landingMesh.castShadow = true;
-  landingMesh.receiveShadow = true;
-  stairGroup.add(landingMesh);
-
-  // Flight 2: Landing to Next Floor
-  for (let i = 0; i < halfSteps; i++) {
-    const stepGeo = new THREE.BoxGeometry(flightW, riserH, treadDepth);
-    const stepMesh = new THREE.Mesh(stepGeo, treadMat);
-    stepMesh.position.set(
-      rect.x + rect.width - flightW / 2,
-      (halfSteps + i) * riserH + riserH / 2,
-      rect.y + rect.length - 3.5 - i * treadDepth - treadDepth / 2
-    );
-    stepMesh.castShadow = true;
-    stepMesh.receiveShadow = true;
-    stairGroup.add(stepMesh);
-  }
-
-  // Railing
-  const railGeo = new THREE.CylinderGeometry(0.04, 0.04, rect.length * 0.8, 8);
-  const rail1 = new THREE.Mesh(railGeo, railingMat);
-  rail1.position.set(rect.x + flightW, (halfSteps * riserH) / 2 + 2.8, rect.y + rect.length / 2 - 1.5);
-  rail1.rotation.x = Math.PI / 4;
-  stairGroup.add(rail1);
-
-  return stairGroup;
-}
-
-// ==========================================
-// PROCEDURAL ARCHITECTURAL 3D FURNITURE LIBRARY
-// ==========================================
-function buildArchitecturalFurniture(
-  item: FurnitureItem,
-  roomType: string,
-  isDark: boolean,
-  isSelected: boolean
-): THREE.Group | null {
-  const group = new THREE.Group();
-  const iw = Math.max(0.6, Number(item.width) || 2.0);
-  const il = Math.max(0.6, Number(item.length) || 2.0);
-  const type = (item.type || "").toLowerCase();
-
-  // Materials Library for Furniture
-  const oakMat = new THREE.MeshStandardMaterial({
-    color: isDark ? "#453325" : "#8A6D4B",
-    roughness: 0.55,
-  });
-  const darkWoodMat = new THREE.MeshStandardMaterial({
-    color: isDark ? "#241B14" : "#4A3525",
-    roughness: 0.6,
-  });
-  const whiteMat = new THREE.MeshStandardMaterial({
-    color: isDark ? "#E5E5E5" : "#FFFFFF",
-    roughness: 0.25,
-  });
-  const linenFabricMat = new THREE.MeshStandardMaterial({
-    color: isDark ? "#524E4A" : isSelected ? "#FDBA74" : "#D4CCC0",
-    roughness: 0.85,
-  });
-  const accentAmberMat = new THREE.MeshStandardMaterial({
-    color: "#D97706",
-    roughness: 0.8,
-  });
-  const metalMat = new THREE.MeshStandardMaterial({
-    color: "#1E242B",
-    roughness: 0.35,
-    metalness: 0.85,
-  });
-  const chromeMat = new THREE.MeshStandardMaterial({
-    color: "#E2E8F0",
-    roughness: 0.15,
-    metalness: 0.9,
-  });
-  const quartzMat = new THREE.MeshStandardMaterial({
-    color: isDark ? "#3F3F46" : "#F8F7F4",
-    roughness: 0.2,
-    metalness: 0.08,
-  });
-
-  // Bedding Color: Distinct per room type
-  let beddingColor = "#1E3A8A"; // Default Navy for Master
-  if (roomType.includes("guest") || type.includes("queen")) {
-    beddingColor = "#C2410C"; // Terracotta Rust
-  } else if (roomType.includes("2") || type.includes("single")) {
-    beddingColor = "#2D6A4F"; // Forest / Sage
-  }
-  const beddingMat = new THREE.MeshStandardMaterial({
-    color: isDark ? "#3B4252" : isSelected ? "#FDBA74" : beddingColor,
-    roughness: 0.82,
-  });
-
-  // 1. Bed (King, Queen, Single)
-  if (type.includes("bed")) {
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.45, il), oakMat);
-    plinth.position.y = 0.22;
-    plinth.castShadow = true;
-    group.add(plinth);
-
-    const mattress = new THREE.Mesh(new THREE.BoxGeometry(iw - 0.2, 0.75, il - 0.25), whiteMat);
-    mattress.position.y = 0.8;
-    mattress.castShadow = true;
-    group.add(mattress);
-
-    const headboard = new THREE.Mesh(new THREE.BoxGeometry(iw + 0.3, 2.6, 0.3), darkWoodMat);
-    headboard.position.set(0, 1.3, -il / 2 + 0.15);
-    headboard.castShadow = true;
-    group.add(headboard);
-
-    // Pillows
-    const pw = (iw - 0.6) / 2;
-    const p1 = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.25, 1.3), whiteMat);
-    p1.position.set(-pw / 2 - 0.1, 1.25, -il / 2 + 1.1);
-    p1.rotation.x = THREE.MathUtils.degToRad(12);
-    const p2 = p1.clone();
-    p2.position.x = pw / 2 + 0.1;
-    group.add(p1, p2);
-
-    // Colorful Duvet Runner
-    const runner = new THREE.Mesh(new THREE.BoxGeometry(iw - 0.15, 0.25, il * 0.55), beddingMat);
-    runner.position.set(0, 1.2, il / 2 - il * 0.27);
-    runner.castShadow = true;
-    group.add(runner);
-
-    return group;
-  }
-
-  // 2. Nightstand / Side Table
-  if (type.includes("side_table") || type.includes("nightstand")) {
-    const stand = new THREE.Mesh(new THREE.BoxGeometry(iw, 1.8, il), oakMat);
-    stand.position.y = 0.9;
-    stand.castShadow = true;
-    group.add(stand);
-
-    // Metallic drawer pull knob
-    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.08, 8), metalMat);
-    knob.rotation.x = Math.PI / 2;
-    knob.position.set(0, 1.2, il / 2 + 0.05);
-    group.add(knob);
-    return group;
-  }
-
-  // 3. Wardrobe / Closet
-  if (type.includes("wardrobe") || type.includes("closet")) {
-    const wardrobeH = 6.5;
-    const wardrobe = new THREE.Mesh(new THREE.BoxGeometry(iw, wardrobeH, il), darkWoodMat);
-    wardrobe.position.y = wardrobeH / 2;
-    wardrobe.castShadow = true;
-    group.add(wardrobe);
-
-    // Sliding door seam and vertical handles
-    const handleL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.8, 0.06), chromeMat);
-    handleL.position.set(-0.25, wardrobeH / 2, il / 2 + 0.04);
-    const handleR = handleL.clone();
-    handleR.position.x = 0.25;
-    group.add(handleL, handleR);
-    return group;
-  }
-
-  // 4. Sofa / Living Couch
-  if (type.includes("sofa") || type.includes("couch")) {
-    const base = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.4, il), darkWoodMat);
-    base.position.y = 0.2;
-    base.castShadow = true;
-    group.add(base);
-
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(iw - 0.2, 0.55, il - 0.6), linenFabricMat);
-    seat.position.set(0, 0.65, 0.15);
-    seat.castShadow = true;
-    group.add(seat);
-
-    const back = new THREE.Mesh(new THREE.BoxGeometry(iw, 1.4, 0.55), linenFabricMat);
-    back.position.set(0, 1.1, -il / 2 + 0.28);
-    back.castShadow = true;
-    group.add(back);
-
-    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.05, il), linenFabricMat);
-    armL.position.set(-iw / 2 + 0.22, 0.72, 0);
-    const armR = armL.clone();
-    armR.position.x = iw / 2 - 0.22;
-    group.add(armL, armR);
-
-    // Two Amber Throw Pillows
-    const pillow1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.35), accentAmberMat);
-    pillow1.position.set(-iw / 2 + 0.75, 1.0, 0);
-    pillow1.rotation.y = THREE.MathUtils.degToRad(20);
-    const pillow2 = pillow1.clone();
-    pillow2.position.x = iw / 2 - 0.75;
-    pillow2.rotation.y = THREE.MathUtils.degToRad(-20);
-    group.add(pillow1, pillow2);
-
-    return group;
-  }
-
-  // 5. Coffee Table
-  if (type.includes("coffee_table")) {
-    const top = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.12, il), oakMat);
-    top.position.y = 1.0;
-    top.castShadow = true;
-    group.add(top);
-
-    const legGeo = new THREE.CylinderGeometry(0.05, 0.04, 1.0, 8);
-    const ox = iw / 2 - 0.25;
-    const oz = il / 2 - 0.25;
-    [[-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]].forEach(([lx, lz]) => {
-      const leg = new THREE.Mesh(legGeo, metalMat);
-      leg.position.set(lx, 0.5, lz);
-      group.add(leg);
-    });
-    return group;
-  }
-
-  // 6. TV Unit / Media Console
-  if (type.includes("tv")) {
-    // Low credenza console
-    const credenza = new THREE.Mesh(new THREE.BoxGeometry(iw, 1.8, il), darkWoodMat);
-    credenza.position.y = 0.9;
-    credenza.castShadow = true;
-    group.add(credenza);
-
-    // Flat Screen TV
-    const tvScreen = new THREE.Mesh(
-      new THREE.BoxGeometry(Math.min(iw * 0.75, 5.5), 2.8, 0.15),
-      new THREE.MeshStandardMaterial({ color: "#0F172A", roughness: 0.15 })
-    );
-    tvScreen.position.set(0, 1.8 + 1.4, 0);
-    tvScreen.castShadow = true;
-    group.add(tvScreen);
-    return group;
-  }
-
-  // 7. Dining Table with 6 Chairs
-  if (type.includes("dining_table")) {
-    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.18, il), oakMat);
-    tableTop.position.y = 2.4;
-    tableTop.castShadow = true;
-    group.add(tableTop);
-
-    const legGeo = new THREE.BoxGeometry(0.18, 2.4, 0.18);
-    const ox = iw / 2 - 0.35;
-    const oz = il / 2 - 0.35;
-    [[-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]].forEach(([lx, lz]) => {
-      const leg = new THREE.Mesh(legGeo, oakMat);
-      leg.position.set(lx, 1.2, lz);
-      group.add(leg);
-    });
-
-    // 4 to 6 Dining Chairs around table
-    const chairW = 1.3;
-    const chairD = 1.3;
-    const chairSeatH = 1.5;
-    const chairBackH = 1.6;
-
-    const buildChair = (cx: number, cz: number, rotY: number) => {
-      const chair = new THREE.Group();
-      chair.position.set(cx, 0, cz);
-      chair.rotation.y = rotY;
-
-      const seat = new THREE.Mesh(new THREE.BoxGeometry(chairW, 0.12, chairD), linenFabricMat);
-      seat.position.y = chairSeatH;
-      const back = new THREE.Mesh(new THREE.BoxGeometry(chairW, chairBackH, 0.1), oakMat);
-      back.position.set(0, chairSeatH + chairBackH / 2, -chairD / 2);
-      chair.add(seat, back);
-
-      // 4 thin legs
-      const cLegGeo = new THREE.CylinderGeometry(0.04, 0.03, chairSeatH, 6);
-      [[-chairW / 2 + 0.15, -chairD / 2 + 0.15], [chairW / 2 - 0.15, -chairD / 2 + 0.15], [-chairW / 2 + 0.15, chairD / 2 - 0.15], [chairW / 2 - 0.15, chairD / 2 - 0.15]].forEach(([clx, clz]) => {
-        const leg = new THREE.Mesh(cLegGeo, oakMat);
-        leg.position.set(clx, chairSeatH / 2, clz);
-        chair.add(leg);
-      });
-      return chair;
-    };
-
-    // Place chairs on long sides
-    const spacing = il * 0.3;
-    group.add(buildChair(-iw / 2 - 0.7, -spacing, Math.PI / 2));
-    group.add(buildChair(-iw / 2 - 0.7, spacing, Math.PI / 2));
-    group.add(buildChair(iw / 2 + 0.7, -spacing, -Math.PI / 2));
-    group.add(buildChair(iw / 2 + 0.7, spacing, -Math.PI / 2));
-    return group;
-  }
-
-  // 8. Study Desk & Chair
-  if (type.includes("study") || type.includes("desk")) {
-    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.15, il), oakMat);
-    deskTop.position.y = 2.4;
-    deskTop.castShadow = true;
-    group.add(deskTop);
-
-    // Left leg and right drawer unit
-    const drawerUnit = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.3, il - 0.2), darkWoodMat);
-    drawerUnit.position.set(iw / 2 - 0.7, 1.15, 0);
-    const legL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.3, il - 0.2), metalMat);
-    legL.position.set(-iw / 2 + 0.2, 1.15, 0);
-    group.add(drawerUnit, legL);
-    return group;
-  }
-
-  // 9. Kitchen Cabinetry & Appliances
-  if (type.includes("counter") || type.includes("kitchen")) {
-    const base = new THREE.Mesh(new THREE.BoxGeometry(iw, 2.6, il), darkWoodMat);
-    base.position.y = 1.3;
-    base.castShadow = true;
-    group.add(base);
-
-    const top = new THREE.Mesh(new THREE.BoxGeometry(iw + 0.1, 0.16, il + 0.1), quartzMat);
-    top.position.y = 2.68;
-    group.add(top);
-    return group;
-  }
-
-  if (type.includes("cooktop") || type.includes("hob")) {
-    const hob = new THREE.Mesh(
-      new THREE.BoxGeometry(iw, 0.08, il),
-      new THREE.MeshStandardMaterial({ color: "#111827", roughness: 0.15 })
-    );
-    hob.position.y = 2.72;
-    // 3 circular burners
-    const burnerGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.06, 12);
-    const bMat = new THREE.MeshStandardMaterial({ color: "#374151", metalness: 0.8 });
-    const b1 = new THREE.Mesh(burnerGeo, bMat);
-    b1.position.set(-iw * 0.25, 2.76, 0);
-    const b2 = new THREE.Mesh(burnerGeo, bMat);
-    b2.position.set(iw * 0.25, 2.76, 0);
-    group.add(hob, b1, b2);
-    return group;
-  }
-
-  if (type.includes("sink")) {
-    const sink = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.06, il), chromeMat);
-    sink.position.y = 2.7;
-    // Faucet
-    const faucet = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8), chromeMat);
-    faucet.position.set(0, 3.15, -il / 2 + 0.2);
-    group.add(sink, faucet);
-    return group;
-  }
-
-  if (type.includes("fridge") || type.includes("refrigerator")) {
-    const fridgeH = 6.2;
-    const fridge = new THREE.Mesh(new THREE.BoxGeometry(iw, fridgeH, il), chromeMat);
-    fridge.position.y = fridgeH / 2;
-    fridge.castShadow = true;
-    group.add(fridge);
-    return group;
-  }
-
-  // 10. Bathroom Suite (Toilet, Basin, Shower, Bathtub)
-  if (type.includes("toilet") || type.includes("wc")) {
-    const cistern = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.8, 0.7), whiteMat);
-    cistern.position.set(0, 1.2, -0.45);
-    cistern.castShadow = true;
-    const bowl = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.5), whiteMat);
-    bowl.position.set(0, 0.55, 0.35);
-    bowl.castShadow = true;
-    group.add(cistern, bowl);
-    return group;
-  }
-
-  if (type.includes("basin") || type.includes("vanity")) {
-    const vanity = new THREE.Mesh(new THREE.BoxGeometry(iw, 2.2, il), darkWoodMat);
-    vanity.position.y = 1.1;
-    vanity.castShadow = true;
-    const sinkBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.45, 0.4, 16), whiteMat);
-    sinkBowl.position.set(0, 2.4, 0);
-    const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8), chromeMat);
-    tap.position.set(0, 2.8, -il / 2 + 0.25);
-    group.add(vanity, sinkBowl, tap);
-    return group;
-  }
-
-  if (type.includes("shower")) {
-    const tray = new THREE.Mesh(new THREE.BoxGeometry(iw, 0.15, il), whiteMat);
-    tray.position.y = 0.08;
-    const glassScreen = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 6.5, il * 0.7),
-      new THREE.MeshStandardMaterial({
-        color: "#7DD3FC",
-        transparent: true,
-        opacity: 0.4,
-        roughness: 0.1,
-      })
-    );
-    glassScreen.position.set(iw / 2 - 0.1, 3.25, 0);
-    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 6.0, 8), chromeMat);
-    column.position.set(-iw / 2 + 0.2, 3.0, -il / 2 + 0.2);
-    group.add(tray, glassScreen, column);
-    return group;
-  }
-
-  // Default clean geometric furniture
-  const box = new THREE.Mesh(new THREE.BoxGeometry(iw, 1.4, il), linenFabricMat);
-  box.position.y = 0.7;
-  box.castShadow = true;
-  group.add(box);
-  return group;
-}

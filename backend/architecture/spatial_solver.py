@@ -149,35 +149,90 @@ def solve_spatial_layout(
                 objective_terms.append(diff_aspect * 20)
 
             # Topological placement hints from scheme
+            road = site.road_side if (site and hasattr(site, "road_side") and site.road_side) else "south"
             if r.id in scheme.zone_placements:
                 hint = scheme.zone_placements[r.id]
                 rel_y = hint.get("rel_y")
                 rel_x = hint.get("rel_x")
 
-                road = site.road_side
                 if rel_y == "front":
-                    dev_y = model.NewIntVar(0, env_l_int, f"dev_front_{r.id}")
+                    dev_front = model.NewIntVar(0, env_l_int if road in ["north", "south"] else env_w_int, f"dev_front_{r.id}")
                     if road == "south":
-                        model.Add(dev_y >= env_l_int - (y + l))
-                    else:
-                        model.Add(dev_y >= y)
-                    objective_terms.append(dev_y * 8)
+                        model.Add(dev_front >= env_l_int - (y + l))
+                    elif road == "north":
+                        model.Add(dev_front >= y)
+                    elif road == "west":
+                        model.Add(dev_front >= x)
+                    elif road == "east":
+                        model.Add(dev_front >= env_w_int - (x + w))
+                    objective_terms.append(dev_front * 8)
                 elif rel_y == "rear":
-                    dev_y = model.NewIntVar(0, env_l_int, f"dev_rear_{r.id}")
+                    dev_rear = model.NewIntVar(0, env_l_int if road in ["north", "south"] else env_w_int, f"dev_rear_{r.id}")
                     if road == "south":
-                        model.Add(dev_y >= y)
-                    else:
-                        model.Add(dev_y >= env_l_int - (y + l))
-                    objective_terms.append(dev_y * 8)
+                        model.Add(dev_rear >= y)
+                    elif road == "north":
+                        model.Add(dev_rear >= env_l_int - (y + l))
+                    elif road == "west":
+                        model.Add(dev_rear >= env_w_int - (x + w))
+                    elif road == "east":
+                        model.Add(dev_rear >= x)
+                    objective_terms.append(dev_rear * 8)
 
-                if rel_x == "left":
-                    dev_x = model.NewIntVar(0, env_w_int, f"dev_left_{r.id}")
-                    model.Add(dev_x >= x)
-                    objective_terms.append(dev_x * 6)
-                elif rel_x == "right":
-                    dev_x = model.NewIntVar(0, env_w_int, f"dev_right_{r.id}")
-                    model.Add(dev_x >= env_w_int - (x + w))
-                    objective_terms.append(dev_x * 6)
+                if rel_x:
+                    if road in ["south", "north"]:
+                        if rel_x == "left":
+                            dev_x = model.NewIntVar(0, env_w_int, f"dev_left_{r.id}")
+                            model.Add(dev_x >= x)
+                            objective_terms.append(dev_x * 6)
+                        elif rel_x == "right":
+                            dev_x = model.NewIntVar(0, env_w_int, f"dev_right_{r.id}")
+                            model.Add(dev_x >= env_w_int - (x + w))
+                            objective_terms.append(dev_x * 6)
+                    elif road == "west":
+                        # Facing west: looking east, left is North (y=0), right is South (y=env_l)
+                        if rel_x == "left":
+                            dev_y_lat = model.NewIntVar(0, env_l_int, f"dev_w_left_{r.id}")
+                            model.Add(dev_y_lat >= y)
+                            objective_terms.append(dev_y_lat * 6)
+                        elif rel_x == "right":
+                            dev_y_lat = model.NewIntVar(0, env_l_int, f"dev_w_right_{r.id}")
+                            model.Add(dev_y_lat >= env_l_int - (y + l))
+                            objective_terms.append(dev_y_lat * 6)
+                    elif road == "east":
+                        # Facing east: looking west, left is South (y=env_l), right is North (y=0)
+                        if rel_x == "left":
+                            dev_y_lat = model.NewIntVar(0, env_l_int, f"dev_e_left_{r.id}")
+                            model.Add(dev_y_lat >= env_l_int - (y + l))
+                            objective_terms.append(dev_y_lat * 6)
+                        elif rel_x == "right":
+                            dev_y_lat = model.NewIntVar(0, env_l_int, f"dev_e_right_{r.id}")
+                            model.Add(dev_y_lat >= y)
+                            objective_terms.append(dev_y_lat * 6)
+
+            # Architectural Front Access Preference: Entrance Foyer and Public Spaces face road
+            if not is_pinned:
+                if r.type in ["entry_foyer", "foyer", "verandah"]:
+                    dev_ent = model.NewIntVar(0, env_l_int if road in ["north", "south"] else env_w_int, f"dev_ent_{r.id}")
+                    if road == "south":
+                        model.Add(dev_ent >= env_l_int - (y + l))
+                    elif road == "north":
+                        model.Add(dev_ent >= y)
+                    elif road == "west":
+                        model.Add(dev_ent >= x)
+                    elif road == "east":
+                        model.Add(dev_ent >= env_w_int - (x + w))
+                    objective_terms.append(dev_ent * 25)
+                elif r.type == "living_room" or r.zone == "public":
+                    dev_pub = model.NewIntVar(0, env_l_int if road in ["north", "south"] else env_w_int, f"dev_pub_{r.id}")
+                    if road == "south":
+                        model.Add(dev_pub >= env_l_int - (y + l))
+                    elif road == "north":
+                        model.Add(dev_pub >= y)
+                    elif road == "west":
+                        model.Add(dev_pub >= x)
+                    elif road == "east":
+                        model.Add(dev_pub >= env_w_int - (x + w))
+                    objective_terms.append(dev_pub * 10)
 
     # 1. HARD CONSTRAINT: No Overlap between any two rooms
     model.AddNoOverlap2D(x_intervals, y_intervals)

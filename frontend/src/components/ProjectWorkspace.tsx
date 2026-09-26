@@ -396,6 +396,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   }
                   showRoof={showRoof}
                   onToggleRoof={() => setShowRoof((r) => !r)}
+                  onUpdateLayout={handleUpdateLayout}
                   hasNotification={Boolean((layout as any)?.metadata?.optimization_note)}
                 />
               </ErrorBoundary>

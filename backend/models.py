@@ -1080,6 +1080,8 @@ class HouseLayout(BaseModel):
     landscape: Optional[LandscapePlan] = None
     floorplan_source: Optional[FloorPlanSource] = None
     materials: List[MaterialDefinition] = Field(default_factory=list)
+    facing: Optional[str] = "south"
+    orientation: Optional[str] = "south"
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     # Backwards compatibility flat properties for single-floor or legacy consumer code
@@ -1092,6 +1094,16 @@ class HouseLayout(BaseModel):
     entry_point: Dict[str, float] = {"x": 0.0, "y": 0.0, "direction": 0.0}
 
     def __init__(self, **data):
+        if "facing" not in data or not data["facing"]:
+            site_obj = data.get("site")
+            if site_obj and hasattr(site_obj, "road_side") and site_obj.road_side:
+                data["facing"] = str(site_obj.road_side).upper()
+            elif isinstance(site_obj, dict) and site_obj.get("road_side"):
+                data["facing"] = str(site_obj["road_side"]).upper()
+            else:
+                data["facing"] = str(data.get("orientation", "south")).upper()
+        if "orientation" not in data or not data["orientation"]:
+            data["orientation"] = str(data.get("facing", "south")).lower()
         if "project_id" not in data and "id" in data:
             data["project_id"] = data["id"]
         elif "id" not in data and "project_id" in data:
@@ -1191,7 +1203,9 @@ class IntakeRequest(BaseModel):
     bedrooms: Optional[int] = 3
     bathrooms: Optional[float] = 2.0
     attached_bathroom_count: Optional[int] = None
-    road_side: Optional[Literal["north", "south", "east", "west"]] = "south"
+    road_side: Optional[Literal["north", "south", "east", "west"]] = None
+    facing: Optional[str] = None
+    orientation: Optional[str] = None
     north_direction: Optional[float] = None
     parking_cars: Optional[int] = 1
     style: Optional[str] = "Modern Scandinavian"
@@ -1201,6 +1215,34 @@ class IntakeRequest(BaseModel):
     landscape_preferences: Optional[LandscapePreferences] = None
     room_allocations: Optional[List[RoomAllocationItem]] = None
     room_requirements: Optional[List[RoomAllocationItem]] = None
+
+    def __init__(self, **data):
+        facing_val = data.get("facing") or data.get("orientation")
+        road_val = data.get("road_side")
+        if facing_val:
+            f_str = str(facing_val).strip().lower()
+            for d in ["west", "east", "north", "south"]:
+                if d in f_str:
+                    data["facing"] = d
+                    data["orientation"] = d
+                    if not road_val or road_val == "south" or "facing" in data:
+                        data["road_side"] = d
+                    break
+        elif road_val:
+            r_str = str(road_val).strip().lower()
+            for d in ["west", "east", "north", "south"]:
+                if d in r_str:
+                    data["road_side"] = d
+                    data["facing"] = d
+                    data["orientation"] = d
+                    break
+        if "road_side" not in data or not data["road_side"]:
+            data["road_side"] = "south"
+        if "facing" not in data or not data["facing"]:
+            data["facing"] = data["road_side"]
+        if "orientation" not in data or not data["orientation"]:
+            data["orientation"] = data["road_side"]
+        super().__init__(**data)
 
     def to_architectural_requirements(self) -> ArchitecturalRequirements:
         special = list(self.special_rooms or [])
@@ -1222,10 +1264,27 @@ class IntakeRequest(BaseModel):
 
         allocs = self.room_requirements or self.room_allocations
 
+        resolved_road = "south"
+        for candidate in [self.facing, self.orientation, self.road_side]:
+            if candidate:
+                c_str = str(candidate).strip().lower()
+                if "west" in c_str:
+                    resolved_road = "west"
+                    break
+                elif "east" in c_str:
+                    resolved_road = "east"
+                    break
+                elif "north" in c_str:
+                    resolved_road = "north"
+                    break
+                elif "south" in c_str:
+                    resolved_road = "south"
+                    break
+
         return ArchitecturalRequirements(
             plot_width=pw,
             plot_length=pl,
-            road_side=self.road_side or "south",
+            road_side=resolved_road,
             north_direction=self.north_direction,
             num_floors=int(self.num_floors or 1),
             bedrooms=int(self.bedrooms or 3),

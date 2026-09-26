@@ -200,6 +200,9 @@ def generate_architectural_concepts_with_gemini(
     context = {
         "plot_dimensions": f"{req.plot_width}x{req.plot_length} ft",
         "num_floors": req.num_floors,
+        "facing": req.road_side,
+        "front_side": req.road_side,
+        "road_side": req.road_side,
         "road_orientation": req.road_side,
         "bedrooms": req.bedrooms,
         "bathrooms": req.bathrooms,

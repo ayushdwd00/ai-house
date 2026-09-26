@@ -207,18 +207,35 @@ def generate_landscape_plan(
 
     # 8. Lawns (Front and Rear Turf Surfaces)
     if prefs.front_garden and prefs.lawn_priority:
-        fl_y = round(plot_l - sb_front + 0.5 if road_side == "south" else 0.5, 1)
-        fl_l = max(3.0, sb_front - 1.0)
-        fl_x = sb_left
-        fl_w = max(3.0, round(plot_w - sb_left - sb_right, 1))
+        if road_side in ["south", "north"]:
+            fl_y = round(plot_l - sb_front + 0.5 if road_side == "south" else 0.5, 1)
+            fl_l = max(3.0, sb_front - 1.0)
+            fl_x = sb_left
+            fl_w = max(3.0, round(plot_w - sb_left - sb_right, 1))
 
-        if parking_rect:
-            if parking_rect.x < plot_w / 2.0:
-                fl_x = round(parking_rect.right + 1.0, 1)
-                fl_w = max(3.0, round((plot_w - sb_right) - fl_x, 1))
-            else:
-                fl_x = sb_left
-                fl_w = max(3.0, round(parking_rect.x - sb_left - 1.0, 1))
+            if parking_rect:
+                if parking_rect.x < plot_w / 2.0:
+                    fl_x = round(parking_rect.right + 1.0, 1)
+                    fl_w = max(3.0, round((plot_w - sb_right) - fl_x, 1))
+                else:
+                    fl_x = sb_left
+                    fl_w = max(3.0, round(parking_rect.x - sb_left - 1.0, 1))
+        elif road_side == "west":
+            fl_x = 0.5
+            fl_w = max(3.0, sb_front - 1.0)
+            fl_y = sb_left
+            fl_l = max(3.0, round(plot_l - sb_left - sb_right, 1))
+            if parking_rect:
+                fl_y = round(parking_rect.bottom + 1.0, 1)
+                fl_l = max(3.0, round((plot_l - sb_right) - fl_y, 1))
+        else:  # east
+            fl_x = round(plot_w - sb_front + 0.5, 1)
+            fl_w = max(3.0, sb_front - 1.0)
+            fl_y = sb_left
+            fl_l = max(3.0, round(plot_l - sb_left - sb_right, 1))
+            if parking_rect:
+                fl_y = round(parking_rect.bottom + 1.0, 1)
+                fl_l = max(3.0, round((plot_l - sb_right) - fl_y, 1))
 
         lawn_front = LandscapeElement(
             element_id="LAWN_FRONT",
@@ -233,10 +250,22 @@ def generate_landscape_plan(
         elements.append(lawn_front)
 
     if prefs.rear_garden and prefs.lawn_priority:
-        rl_w = max(6.0, plot_w - sb_left - sb_right - 2.0)
-        rl_x = round(sb_left + 1.0, 1)
-        rl_y = round(0.5 if road_side == "south" else (plot_l - sb_rear + 0.5), 1)
-        rl_l = max(3.0, sb_rear - 1.0)
+        if road_side in ["south", "north"]:
+            rl_w = max(6.0, plot_w - sb_left - sb_right - 2.0)
+            rl_x = round(sb_left + 1.0, 1)
+            rl_y = round(0.5 if road_side == "south" else (plot_l - sb_rear + 0.5), 1)
+            rl_l = max(3.0, sb_rear - 1.0)
+        elif road_side == "west":
+            rl_w = max(3.0, sb_rear - 1.0)
+            rl_x = round(plot_w - sb_rear + 0.5, 1)
+            rl_y = round(sb_left + 1.0, 1)
+            rl_l = max(6.0, plot_l - sb_left - sb_right - 2.0)
+        else:  # east
+            rl_w = max(3.0, sb_rear - 1.0)
+            rl_x = 0.5
+            rl_y = round(sb_left + 1.0, 1)
+            rl_l = max(6.0, plot_l - sb_left - sb_right - 2.0)
+
         lawn_rear = LandscapeElement(
             element_id="LAWN_REAR",
             type="lawn",
@@ -250,33 +279,63 @@ def generate_landscape_plan(
         elements.append(lawn_rear)
 
     # 9. Planters Flanking Entrance
-    p1_x = round(entry_pt.x - 3.5, 1)
-    p2_x = round(entry_pt.x + 3.5, 1)
-    p_y = round(entry_pt.y + (1.5 if road_side == "south" else -1.5), 1)
-    planter_left = LandscapeElement(
-        element_id="PLANTER_ENTRY_01",
-        type="planter",
-        x=p1_x,
-        y=p_y,
-        width=2.5,
-        length=1.5,
-        zone="entrance_pathway",
-        properties={"material": style_cfg.get("planter_style", "geometric_concrete")}
-    )
-    planter_right = LandscapeElement(
-        element_id="PLANTER_ENTRY_02",
-        type="planter",
-        x=p2_x,
-        y=p_y,
-        width=2.5,
-        length=1.5,
-        zone="entrance_pathway",
-        properties={"material": style_cfg.get("planter_style", "geometric_concrete")}
-    )
-    p1_box = box(p1_x - 1.25, p_y - 0.75, p1_x + 1.25, p_y + 0.75)
+    if road_side in ["south", "north"]:
+        p1_x = round(entry_pt.x - 3.5, 1)
+        p2_x = round(entry_pt.x + 3.5, 1)
+        p_y = round(entry_pt.y + (1.5 if road_side == "south" else -1.5), 1)
+        planter_left = LandscapeElement(
+            element_id="PLANTER_ENTRY_01",
+            type="planter",
+            x=p1_x,
+            y=p_y,
+            width=2.5,
+            length=2.5,
+            zone="front_garden",
+            properties={"plant": "Buxus Spheres & Ornamental Grass"}
+        )
+        planter_right = LandscapeElement(
+            element_id="PLANTER_ENTRY_02",
+            type="planter",
+            x=p2_x,
+            y=p_y,
+            width=2.5,
+            length=2.5,
+            zone="front_garden",
+            properties={"plant": "Buxus Spheres & Ornamental Grass"}
+        )
+    else:  # west, east
+        p_x = round(entry_pt.x + (-1.5 if road_side == "west" else 1.5), 1)
+        p1_y = round(entry_pt.y - 3.5, 1)
+        p2_y = round(entry_pt.y + 3.5, 1)
+        planter_left = LandscapeElement(
+            element_id="PLANTER_ENTRY_01",
+            type="planter",
+            x=p_x,
+            y=p1_y,
+            width=2.5,
+            length=2.5,
+            zone="front_garden",
+            properties={"plant": "Buxus Spheres & Ornamental Grass"}
+        )
+        planter_right = LandscapeElement(
+            element_id="PLANTER_ENTRY_02",
+            type="planter",
+            x=p_x,
+            y=p2_y,
+            width=2.5,
+            length=2.5,
+            zone="front_garden",
+            properties={"plant": "Buxus Spheres & Ornamental Grass"}
+        )
+        p1_box = box(p_x - 1.25, p1_y - 1.25, p_x + 1.25, p1_y + 1.25)
+        p2_box = box(p_x - 1.25, p2_y - 1.25, p_x + 1.25, p2_y + 1.25)
+
+    if road_side in ["north", "south"]:
+        p1_box = box(p1_x - 1.25, p_y - 0.75, p1_x + 1.25, p_y + 0.75)
+        p2_box = box(p2_x - 1.25, p_y - 0.75, p2_x + 1.25, p_y + 0.75)
+
     if not (building_footprint.intersects(p1_box) or (parking_poly and parking_poly.intersects(p1_box))):
         elements.append(planter_left)
-    p2_box = box(p2_x - 1.25, p_y - 0.75, p2_x + 1.25, p_y + 0.75)
     if not (building_footprint.intersects(p2_box) or (parking_poly and parking_poly.intersects(p2_box))):
         elements.append(planter_right)
 
@@ -305,44 +364,81 @@ def generate_landscape_plan(
             properties={"height": 4.5, "plant": "Boxwood Formal Hedge"}
         ))
         # Rear boundary hedge
-        elements.append(LandscapeElement(
-            element_id="HEDGE_REAR",
-            type="hedge",
-            x=round(plot_w / 2.0, 2),
-            y=round(BOUNDARY_HEDGE_WIDTH / 2.0 + 0.2 if road_side == "south" else (plot_l - BOUNDARY_HEDGE_WIDTH / 2.0 - 0.2), 2),
-            width=round(plot_w - 4.0, 2),
-            length=BOUNDARY_HEDGE_WIDTH,
-            zone="boundary_planting",
-            properties={"height": 5.0, "plant": "Dense Evergreen Privacy Screen"}
-        ))
+        if road_side in ["south", "north"]:
+            elements.append(LandscapeElement(
+                element_id="HEDGE_REAR",
+                type="hedge",
+                x=round(plot_w / 2.0, 2),
+                y=round(BOUNDARY_HEDGE_WIDTH / 2.0 + 0.2 if road_side == "south" else (plot_l - BOUNDARY_HEDGE_WIDTH / 2.0 - 0.2), 2),
+                width=round(plot_w - 4.0, 2),
+                length=BOUNDARY_HEDGE_WIDTH,
+                zone="boundary_planting",
+                properties={"height": 5.0, "plant": "Dense Evergreen Privacy Screen"}
+            ))
+        elif road_side == "west":
+            elements.append(LandscapeElement(
+                element_id="HEDGE_REAR",
+                type="hedge",
+                x=round(plot_w - BOUNDARY_HEDGE_WIDTH / 2.0 - 0.2, 2),
+                y=round(plot_l / 2.0, 2),
+                width=BOUNDARY_HEDGE_WIDTH,
+                length=round(plot_l - 4.0, 2),
+                zone="boundary_planting",
+                properties={"height": 5.0, "plant": "Dense Evergreen Privacy Screen"}
+            ))
+        else:  # east
+            elements.append(LandscapeElement(
+                element_id="HEDGE_REAR",
+                type="hedge",
+                x=round(BOUNDARY_HEDGE_WIDTH / 2.0 + 0.2, 2),
+                y=round(plot_l / 2.0, 2),
+                width=BOUNDARY_HEDGE_WIDTH,
+                length=round(plot_l - 4.0, 2),
+                zone="boundary_planting",
+                properties={"height": 5.0, "plant": "Dense Evergreen Privacy Screen"}
+            ))
 
     # 11. Deterministic Collision-Free Tree Placement
-    # Target tree count
     density_mult = {"low": 2, "medium": 4, "dense": 6, "high": 6}.get(prefs.greenery_level or prefs.tree_density, 3)
     target_trees = prefs.trees if prefs.trees is not None else min(style_cfg.get("max_trees", 4), density_mult)
     target_trees = max(1, min(8, target_trees))
 
     # Candidate tree locations in front, rear, and side setback corridors
     candidate_locs: List[Tuple[float, float, str]] = []
-    # Rear garden candidates (tested first because rear setback is typically open garden)
-    rg_y = max(TREE_PLOT_MARGIN + 0.5, sb_rear / 2.0) if road_side == "south" else (plot_l - max(TREE_PLOT_MARGIN + 0.5, sb_rear / 2.0))
-    candidate_locs.append((sb_left + 2.5, rg_y, "rear_garden"))
-    candidate_locs.append((plot_w - sb_right - 2.5, rg_y, "rear_garden"))
-    candidate_locs.append((plot_w * 0.35, rg_y, "rear_garden"))
-    candidate_locs.append((plot_w * 0.65, rg_y, "rear_garden"))
-    candidate_locs.append((plot_w / 2.0, rg_y, "rear_garden"))
+    if road_side in ["south", "north"]:
+        rg_y = max(TREE_PLOT_MARGIN + 0.5, sb_rear / 2.0) if road_side == "south" else (plot_l - max(TREE_PLOT_MARGIN + 0.5, sb_rear / 2.0))
+        candidate_locs.append((sb_left + 2.5, rg_y, "rear_garden"))
+        candidate_locs.append((plot_w - sb_right - 2.5, rg_y, "rear_garden"))
+        candidate_locs.append((plot_w * 0.35, rg_y, "rear_garden"))
+        candidate_locs.append((plot_w * 0.65, rg_y, "rear_garden"))
+        candidate_locs.append((plot_w / 2.0, rg_y, "rear_garden"))
 
-    # Front garden candidates
-    if road_side == "south":
-        fg_y = plot_l - max(TREE_PLOT_MARGIN + 0.5, sb_front / 2.0)
+        fg_y = (plot_l - max(TREE_PLOT_MARGIN + 0.5, sb_front / 2.0)) if road_side == "south" else max(TREE_PLOT_MARGIN + 0.5, sb_front / 2.0)
         candidate_locs.append((plot_w - sb_right - 3.0, fg_y, "front_garden"))
         candidate_locs.append((sb_left + 2.0, fg_y, "front_garden"))
         candidate_locs.append((plot_w / 2.0, fg_y, "front_garden"))
-    elif road_side == "north":
-        fg_y = max(TREE_PLOT_MARGIN + 0.5, sb_front / 2.0)
-        candidate_locs.append((plot_w - sb_right - 3.0, fg_y, "front_garden"))
-        candidate_locs.append((sb_left + 2.0, fg_y, "front_garden"))
-        candidate_locs.append((plot_w / 2.0, fg_y, "front_garden"))
+    elif road_side == "west":
+        rg_x = plot_w - max(TREE_PLOT_MARGIN + 0.5, sb_rear / 2.0)
+        candidate_locs.append((rg_x, sb_left + 2.5, "rear_garden"))
+        candidate_locs.append((rg_x, plot_l - sb_right - 2.5, "rear_garden"))
+        candidate_locs.append((rg_x, plot_l * 0.35, "rear_garden"))
+        candidate_locs.append((rg_x, plot_l * 0.65, "rear_garden"))
+
+        fg_x = max(TREE_PLOT_MARGIN + 0.5, sb_front / 2.0)
+        candidate_locs.append((fg_x, sb_left + 2.5, "front_garden"))
+        candidate_locs.append((fg_x, plot_l - sb_right - 2.5, "front_garden"))
+        candidate_locs.append((fg_x, plot_l / 2.0, "front_garden"))
+    else:  # east
+        rg_x = max(TREE_PLOT_MARGIN + 0.5, sb_rear / 2.0)
+        candidate_locs.append((rg_x, sb_left + 2.5, "rear_garden"))
+        candidate_locs.append((rg_x, plot_l - sb_right - 2.5, "rear_garden"))
+        candidate_locs.append((rg_x, plot_l * 0.35, "rear_garden"))
+        candidate_locs.append((rg_x, plot_l * 0.65, "rear_garden"))
+
+        fg_x = plot_w - max(TREE_PLOT_MARGIN + 0.5, sb_front / 2.0)
+        candidate_locs.append((fg_x, sb_left + 2.5, "front_garden"))
+        candidate_locs.append((fg_x, plot_l - sb_right - 2.5, "front_garden"))
+        candidate_locs.append((fg_x, plot_l / 2.0, "front_garden"))
 
     # Side corridor candidates
     if sb_left >= 3.0:

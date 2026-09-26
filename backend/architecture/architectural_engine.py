@@ -1369,7 +1369,20 @@ def generate_architectural_house_layout(
     if applied_optimization_note:
         designer_rationale = f"{applied_optimization_note}: Room proportions and circulation were efficiently tailored to fit within the buildable envelope without compromising functionality. {designer_rationale}"
 
-    entry_pt = Point2D(x=round(plot_width / 2.0, 1), y=site.setbacks.rear if road_side == "north" else (plot_length - site.setbacks.front))
+    # Locate actual main entrance door if available, else derive from road orientation
+    entry_doors = [d for d in ground_floor.doors if getattr(d, "door_type", "") in ["entry", "entrance"]]
+    if entry_doors:
+        d = entry_doors[0]
+        entry_pt = Point2D(x=round((d.x1 + d.x2) / 2.0, 1), y=round((d.y1 + d.y2) / 2.0, 1))
+    else:
+        if road_side == "west":
+            entry_pt = Point2D(x=round(site.setbacks.front, 1), y=round(plot_length / 2.0, 1))
+        elif road_side == "east":
+            entry_pt = Point2D(x=round(plot_width - site.setbacks.front, 1), y=round(plot_length / 2.0, 1))
+        elif road_side == "north":
+            entry_pt = Point2D(x=round(plot_width / 2.0, 1), y=round(site.setbacks.front, 1))
+        else:
+            entry_pt = Point2D(x=round(plot_width / 2.0, 1), y=round(plot_length - site.setbacks.front, 1))
 
     layout_id = f"layout_{uuid.uuid4().hex[:8]}"
     layout = HouseLayout(
@@ -1382,6 +1395,8 @@ def generate_architectural_house_layout(
         plot_length=plot_length,
         num_floors=num_floors,
         site=site,
+        facing=road_side.upper(),
+        orientation=road_side.lower(),
         stats=stats,
         scores=champion_scores,
         validation=champion_validation,
@@ -1399,6 +1414,8 @@ def generate_architectural_house_layout(
             "groq_critique": groq_critique_data,
             "style": style,
             "vastu_compliant": vastu_compliant,
+            "facing": road_side,
+            "front_side": road_side,
             "road_side": road_side,
             "optimization_note": applied_optimization_note
         },

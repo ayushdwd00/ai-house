@@ -978,3 +978,55 @@ async def export_project_svg(project_id: str = FastPath(...)):
         headers={"Content-Disposition": f'inline; filename="{project_id}.svg"'}
     )
 
+
+# ============================================================
+# BLENDER PHOTOREALISTIC RENDERING ENDPOINTS
+# ============================================================
+
+from render.render_service import render_layout_realistic, check_blender_status
+
+@app.get("/api/render-realistic/status")
+async def get_render_engine_status():
+    """Checks whether Blender is available in the current runtime environment."""
+    return check_blender_status()
+
+
+@app.post("/api/render-realistic")
+async def render_realistic_endpoint(request: Dict[str, Any]):
+    """
+    Renders high-fidelity architectural visualization using Blender / Cycles
+    from canonical HouseLayout.
+    """
+    layout_data = request.get("layout")
+    project_id = request.get("project_id")
+    
+    if not layout_data and project_id:
+        proj = get_project(project_id)
+        if proj:
+            layout_data = proj.model_dump() if hasattr(proj, "model_dump") else proj.dict()
+            
+    if not layout_data:
+        raise HTTPException(status_code=400, detail="Missing required layout or project_id in render request.")
+        
+    cutaway = bool(request.get("cutaway", True))
+    resolution = str(request.get("resolution", "1920x1080"))
+    samples = int(request.get("samples", 64))
+    lighting = str(request.get("lighting", "day"))
+    
+    # If layout_data is a Pydantic model instance
+    if hasattr(layout_data, "model_dump"):
+        layout_dict = layout_data.model_dump()
+    elif hasattr(layout_data, "dict"):
+        layout_dict = layout_data.dict()
+    else:
+        layout_dict = layout_data
+        
+    result = render_layout_realistic(
+        layout_data=layout_dict,
+        cutaway=cutaway,
+        resolution=resolution,
+        samples=samples,
+        lighting=lighting
+    )
+    return result
+

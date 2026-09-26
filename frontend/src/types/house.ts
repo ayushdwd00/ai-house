@@ -513,6 +513,7 @@ export interface HouseLayout {
   num_floors: number;
   site?: Site;
   facing?: string;
+  orientation?: string;
   total_area_sqft?: number;
   stats: HouseStats;
   floors: FloorPlan[];

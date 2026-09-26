@@ -302,4 +302,73 @@ export async function reviewLayoutWithGemini(
   }
 }
 
+/**
+ * Check whether Blender Cycles rendering is available on backend.
+ */
+export async function checkBlenderStatus(): Promise<{
+  available: boolean;
+  path?: string | null;
+  message: string;
+  instructions?: string;
+}> {
+  const url = `${API_BASE_URL}/api/render-realistic/status`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      return { available: false, message: "Could not query Blender status." };
+    }
+    return await res.json();
+  } catch (err) {
+    return { available: false, message: "Backend render status service unreachable." };
+  }
+}
+
+/**
+ * Request photorealistic Cycles render from canonical HouseLayout.
+ */
+export async function renderRealisticPhoto(options: {
+  layout: HouseLayout;
+  cutaway?: boolean;
+  resolution?: string;
+  samples?: number;
+  lighting?: string;
+  projectId?: string;
+}): Promise<{
+  status: "success" | "blender_not_installed" | "error" | "timeout";
+  available?: boolean;
+  image_base64?: string;
+  message?: string;
+  instructions?: string;
+  details?: string;
+  resolution?: string;
+  samples?: number;
+}> {
+  const url = `${API_BASE_URL}/api/render-realistic`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        layout: options.layout,
+        cutaway: options.cutaway ?? true,
+        resolution: options.resolution ?? "1920x1080",
+        samples: options.samples ?? 64,
+        lighting: options.lighting ?? "day",
+        project_id: options.projectId,
+      }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.detail || `Render failed with HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err: any) {
+    console.error("[API ERROR] renderRealisticPhoto failed:", err);
+    return {
+      status: "error",
+      message: err.message || "Failed to trigger realistic photo rendering.",
+    };
+  }
+}
+
 

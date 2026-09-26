@@ -150,25 +150,12 @@ VASTU_PREFERENCES: Dict[str, Dict[str, Any]] = {
 def compute_north_angle(road_side: str, explicit_north_deg: Optional[float] = None) -> float:
     """
     Returns the angle of North in degrees relative to the 2D CAD coordinate system
-    where +X is Right, +Y is Bottom (downwards screen coordinate).
-    Standard convention for house plans:
-    - Road 'south' implies frontage is at bottom (+Y), so North is towards top (-Y): 0 degrees (upwards).
-    - Road 'north' implies frontage is at bottom (facing road), North is towards bottom (+Y): 180 degrees.
-    - Road 'east' implies frontage is East: North is towards left (-X): 270 degrees.
-    - Road 'west' implies frontage is West: North is towards right (+X): 90 degrees.
+    where +X is Right (East), +Y is Bottom (South), and -Y is Top (North).
+    Geographic North is ALWAYS Top (0.0 degrees) unless explicitly overridden by the user.
+    'Facing' determines which plot edge is FRONT / ROAD, without rotating geographic North.
     """
     if explicit_north_deg is not None:
         return explicit_north_deg % 360.0
-
-    road = (road_side or "south").lower()
-    if road == "south":
-        return 0.0      # North is Top (-Y)
-    elif road == "north":
-        return 180.0    # North is Bottom (+Y)
-    elif road == "east":
-        return 270.0    # North is Left (-X)
-    elif road == "west":
-        return 90.0     # North is Right (+X)
     return 0.0
 
 
@@ -183,8 +170,11 @@ def get_vastu_zone_for_point(
     """
     Determines the authentic Vastu zone for a given coordinate (x, y)
     within a plot of dimensions (plot_width, plot_length).
-    Divides the site into a 3x3 Navagraha / Padavinyasa grid,
-    then rotates the sectors according to the true North orientation.
+    Geographic cardinal directions:
+    - Top (-Y) is North
+    - Bottom (+Y) is South
+    - Right (+X) is East
+    - Left (-X) is West
     """
     if plot_width <= 0 or plot_length <= 0:
         return "center"
@@ -197,29 +187,14 @@ def get_vastu_zone_for_point(
         return "center"
 
     # Screen quadrant relative to center:
-    # center is (0.5, 0.5)
     dx = norm_x - 0.5
     dy = norm_y - 0.5
 
-    # Screen angle in degrees (0 = +X / right, 90 = +Y / bottom, 180 = -X / left, 270 = -Y / top)
+    # Screen angle in degrees (0 = +X / right / East, 90 = +Y / bottom / South, 180 = -X / left / West, 270 = -Y / top / North)
     screen_angle = math.degrees(math.atan2(dy, dx)) % 360.0
 
-    # North orientation angle: where North points in screen coords
-    # Default for road_side="south": North is Top (-Y, 270 screen deg)
-    road = (road_side or "south").lower()
-    if north_deg is not None:
-        site_north_screen_angle = (270.0 + north_deg) % 360.0
-    else:
-        if road == "south":
-            site_north_screen_angle = 270.0  # Top is North
-        elif road == "north":
-            site_north_screen_angle = 90.0   # Bottom is North
-        elif road == "east":
-            site_north_screen_angle = 180.0  # Left is North
-        elif road == "west":
-            site_north_screen_angle = 0.0    # Right is North
-        else:
-            site_north_screen_angle = 270.0
+    # North orientation angle: where North points in screen coords (Top is 270 screen deg)
+    site_north_screen_angle = (270.0 + (north_deg or 0.0)) % 360.0
 
     # Angle relative to North (0 = North, 90 = East, 180 = South, 270 = West)
     angle_from_north = (screen_angle - site_north_screen_angle) % 360.0
@@ -450,41 +425,46 @@ def get_vastu_topological_scheme_placements(
             "center": {"rel_y": "middle", "rel_x": "center"},
         }
     elif road == "east":
-        # Front is East (+Y screen if rotated, or front is East)
+        # Front is East (+X), Rear is West (-X)
+        # In lateral (looking west from east road): left is South (+Y), right is North (-Y)
         zone_to_screen_rel = {
-            "northeast": {"rel_y": "rear", "rel_x": "left"},
+            "northeast": {"rel_y": "front", "rel_x": "right"},
             "southeast": {"rel_y": "front", "rel_x": "left"},
-            "southwest": {"rel_y": "front", "rel_x": "right"},
+            "southwest": {"rel_y": "rear", "rel_x": "left"},
             "northwest": {"rel_y": "rear", "rel_x": "right"},
-            "north": {"rel_y": "rear", "rel_x": "center"},
-            "south": {"rel_y": "front", "rel_x": "center"},
-            "east": {"rel_y": "middle", "rel_x": "left"},
-            "west": {"rel_y": "middle", "rel_x": "right"},
+            "north": {"rel_y": "middle", "rel_x": "right"},
+            "south": {"rel_y": "middle", "rel_x": "left"},
+            "east": {"rel_y": "front", "rel_x": "center"},
+            "west": {"rel_y": "rear", "rel_x": "center"},
             "center": {"rel_y": "middle", "rel_x": "center"},
         }
     else:  # west
+        # Front is West (-X), Rear is East (+X)
+        # In lateral (looking east from west road): left is North (-Y), right is South (+Y)
         zone_to_screen_rel = {
-            "northeast": {"rel_y": "rear", "rel_x": "right"},
-            "southeast": {"rel_y": "front", "rel_x": "right"},
-            "southwest": {"rel_y": "front", "rel_x": "left"},
-            "northwest": {"rel_y": "rear", "rel_x": "left"},
-            "north": {"rel_y": "rear", "rel_x": "center"},
-            "south": {"rel_y": "front", "rel_x": "center"},
-            "east": {"rel_y": "middle", "rel_x": "right"},
-            "west": {"rel_y": "middle", "rel_x": "left"},
+            "northwest": {"rel_y": "front", "rel_x": "left"},
+            "southwest": {"rel_y": "front", "rel_x": "right"},
+            "northeast": {"rel_y": "rear", "rel_x": "left"},
+            "southeast": {"rel_y": "rear", "rel_x": "right"},
+            "north": {"rel_y": "middle", "rel_x": "left"},
+            "south": {"rel_y": "middle", "rel_x": "right"},
+            "west": {"rel_y": "front", "rel_x": "center"},
+            "east": {"rel_y": "rear", "rel_x": "center"},
             "center": {"rel_y": "middle", "rel_x": "center"},
         }
 
     for r in rooms:
         r_type = getattr(r, "type", "").lower()
-        if "master_bedroom" in r_type:
+        if "entry" in r_type or "foyer" in r_type:
+            placements[r.id] = {"rel_y": "front", "rel_x": "center"}
+        elif "living" in r_type:
+            placements[r.id] = {"rel_y": "front", "rel_x": "center"}
+        elif "master_bedroom" in r_type:
             placements[r.id] = zone_to_screen_rel.get("southwest", {"rel_y": "rear", "rel_x": "left"})
         elif "kitchen" in r_type:
             placements[r.id] = zone_to_screen_rel.get("southeast", {"rel_y": "front", "rel_x": "right"})
         elif "pooja" in r_type:
             placements[r.id] = zone_to_screen_rel.get("northeast", {"rel_y": "rear", "rel_x": "right"})
-        elif "living" in r_type:
-            placements[r.id] = zone_to_screen_rel.get("north", {"rel_y": "front", "rel_x": "center"})
         elif "dining" in r_type:
             placements[r.id] = zone_to_screen_rel.get("west", {"rel_y": "middle", "rel_x": "left"})
         elif "guest" in r_type:

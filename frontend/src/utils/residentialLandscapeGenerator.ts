@@ -102,12 +102,13 @@ export interface ArchitecturalLandscapeModel {
   outdoorFurniture: OutdoorFurnitureItem[];
   bollardLights: LandscapeBollardLight[];
   boundaryWall: {
+    roadSide?: "north" | "south" | "east" | "west";
     rearWall: Rect;
     leftWall: Rect;
     rightWall: Rect;
     frontWallSegments: Rect[];
-    vehicleGate: { x: number; width: number };
-    pedestrianGate: { x: number; width: number };
+    vehicleGate: { x: number; y?: number; width: number };
+    pedestrianGate: { x: number; y?: number; width: number };
   };
 }
 
@@ -166,6 +167,12 @@ export function generateArchitecturalLandscape(layout: HouseLayout): Architectur
   const doorX = mainDoor ? (mainDoor.x1 + mainDoor.x2) / 2 : cx;
   const doorZ = mainDoor ? (mainDoor.y1 + mainDoor.y2) / 2 : maxBz;
 
+  const rawSide = String(layout.site?.road_side || layout.facing || "south").toLowerCase();
+  const roadSide: "north" | "south" | "east" | "west" =
+    rawSide.includes("west") ? "west" :
+    rawSide.includes("east") ? "east" :
+    rawSide.includes("north") ? "north" : "south";
+
   // 3. PARKING & DRIVEWAY
   const rawPkg = layout.site?.parking?.rect;
   let pkgRect: Rect;
@@ -174,30 +181,70 @@ export function generateArchitecturalLandscape(layout: HouseLayout): Architectur
       x: rawPkg.x,
       y: rawPkg.y,
       width: Math.max(9.0, rawPkg.width || 10.0),
-      length: Math.max(14.0, rawPkg.length || 16.0),
+      length: Math.max(9.0, rawPkg.length || 16.0),
     };
   } else {
-    // Put parking on opposite side of front door
-    const pkgOnLeft = doorX > cx;
-    pkgRect = {
-      x: pkgOnLeft ? 2.8 : pw - 12.8,
-      y: Math.max(minBz + 10, pl - 18.0),
-      width: 10.0,
-      length: 16.0,
-    };
+    // Put parking on road frontage
+    if (roadSide === "south") {
+      const pkgOnLeft = doorX > cx;
+      pkgRect = {
+        x: pkgOnLeft ? 2.8 : pw - 12.8,
+        y: Math.max(minBz + 10, pl - 18.0),
+        width: 10.0,
+        length: 16.0,
+      };
+    } else if (roadSide === "north") {
+      const pkgOnLeft = doorX > cx;
+      pkgRect = {
+        x: pkgOnLeft ? 2.8 : pw - 12.8,
+        y: 2.0,
+        width: 10.0,
+        length: 16.0,
+      };
+    } else if (roadSide === "west") {
+      const pkgOnTop = doorZ > cz;
+      pkgRect = {
+        x: 2.0,
+        y: pkgOnTop ? 2.8 : pl - 12.8,
+        width: 16.0,
+        length: 10.0,
+      };
+    } else { // east
+      const pkgOnTop = doorZ > cz;
+      pkgRect = {
+        x: Math.max(minBx + 10, pw - 18.0),
+        y: pkgOnTop ? 2.8 : pl - 12.8,
+        width: 16.0,
+        length: 10.0,
+      };
+    }
   }
 
-  const drvX = pkgRect.x + pkgRect.width / 2;
-  const drvW = pkgRect.width + 1.2;
-  const drvStartY = pkgRect.y + pkgRect.length;
-  const drvEndY = pl - 0.5;
-  const drvLen = Math.max(1.0, drvEndY - drvStartY);
-  const drivewayRect: Rect = {
-    x: drvX - drvW / 2,
-    y: drvStartY,
-    width: drvW,
-    length: drvLen,
-  };
+  let drivewayRect: Rect;
+  if (layout.site?.driveway) {
+    drivewayRect = layout.site.driveway;
+  } else {
+    if (roadSide === "south") {
+      const drvX = pkgRect.x + pkgRect.width / 2;
+      const drvW = pkgRect.width + 1.2;
+      const drvStartY = pkgRect.y + pkgRect.length;
+      const drvLen = Math.max(1.0, pl - 0.5 - drvStartY);
+      drivewayRect = { x: drvX - drvW / 2, y: drvStartY, width: drvW, length: drvLen };
+    } else if (roadSide === "north") {
+      const drvX = pkgRect.x + pkgRect.width / 2;
+      const drvW = pkgRect.width + 1.2;
+      drivewayRect = { x: drvX - drvW / 2, y: 0.5, width: drvW, length: Math.max(1.0, pkgRect.y - 0.5) };
+    } else if (roadSide === "west") {
+      const drvY = pkgRect.y + pkgRect.length / 2;
+      const drvH = pkgRect.length + 1.2;
+      drivewayRect = { x: 0.5, y: drvY - drvH / 2, width: Math.max(1.0, pkgRect.x - 0.5), length: drvH };
+    } else { // east
+      const drvY = pkgRect.y + pkgRect.length / 2;
+      const drvH = pkgRect.length + 1.2;
+      const drvStartX = pkgRect.x + pkgRect.width;
+      drivewayRect = { x: drvStartX, y: drvY - drvH / 2, width: Math.max(1.0, pw - 0.5 - drvStartX), length: drvH };
+    }
+  }
 
   // 4. PEDESTRIAN WALKWAY PATH
   let rawPoints: PathPoint[] = [];
@@ -209,18 +256,43 @@ export function generateArchitecturalLandscape(layout: HouseLayout): Architectur
   if (rawPoints.length >= 2) {
     pedestrianPath.push(...rawPoints);
     const last = pedestrianPath[pedestrianPath.length - 1];
-    if (Math.hypot(last.x - doorX, last.y - (doorZ + 2.0)) > 1.2) {
-      pedestrianPath.push({ x: doorX, y: doorZ + 2.0 });
+    if (Math.hypot(last.x - doorX, last.y - doorZ) > 1.5) {
+      pedestrianPath.push({ x: doorX, y: doorZ });
     }
   } else {
-    // Route from pedestrian gate to front door
-    const walkStartX = Math.min(pw - 4.5, Math.max(4.5, pkgRect.x > cx ? 6.5 : pw - 6.5));
-    pedestrianPath.push(
-      { x: walkStartX, y: pl - 0.5 },
-      { x: walkStartX, y: (pl + doorZ) / 2 + 1.0 },
-      { x: doorX, y: (pl + doorZ) / 2 + 1.0 },
-      { x: doorX, y: doorZ + 2.0 }
-    );
+    if (roadSide === "south") {
+      const walkStartX = Math.min(pw - 4.5, Math.max(4.5, pkgRect.x > cx ? 6.5 : pw - 6.5));
+      pedestrianPath.push(
+        { x: walkStartX, y: pl - 0.5 },
+        { x: walkStartX, y: (pl + doorZ) / 2 + 1.0 },
+        { x: doorX, y: (pl + doorZ) / 2 + 1.0 },
+        { x: doorX, y: doorZ + 2.0 }
+      );
+    } else if (roadSide === "north") {
+      const walkStartX = Math.min(pw - 4.5, Math.max(4.5, pkgRect.x > cx ? 6.5 : pw - 6.5));
+      pedestrianPath.push(
+        { x: walkStartX, y: 0.5 },
+        { x: walkStartX, y: doorZ / 2 },
+        { x: doorX, y: doorZ / 2 },
+        { x: doorX, y: doorZ - 2.0 }
+      );
+    } else if (roadSide === "west") {
+      const walkStartZ = Math.min(pl - 4.5, Math.max(4.5, pkgRect.y > cz ? 6.5 : pl - 6.5));
+      pedestrianPath.push(
+        { x: 0.5, y: walkStartZ },
+        { x: (minBx) / 2, y: walkStartZ },
+        { x: (minBx) / 2, y: doorZ },
+        { x: doorX - 2.0, y: doorZ }
+      );
+    } else { // east
+      const walkStartZ = Math.min(pl - 4.5, Math.max(4.5, pkgRect.y > cz ? 6.5 : pl - 6.5));
+      pedestrianPath.push(
+        { x: pw - 0.5, y: walkStartZ },
+        { x: (pw + maxBx) / 2, y: walkStartZ },
+        { x: (pw + maxBx) / 2, y: doorZ },
+        { x: doorX + 2.0, y: doorZ }
+      );
+    }
   }
 
   const walkwaySegments: PathwaySegment[] = [];
@@ -235,48 +307,77 @@ export function generateArchitecturalLandscape(layout: HouseLayout): Architectur
   // 5. BOUNDARY WALL & GATE INTERVALS
   const bwThick = 0.55;
   const bwH = 4.2;
-  const vehGate = { x: drvX, width: drvW + 1.0 };
-  const walkStart = pedestrianPath[0] || { x: cx + 2, y: pl };
-  const pedGate = { x: Math.min(pw - 3.5, Math.max(3.5, walkStart.x)), width: 4.0 };
-
   const frontWallSegments: Rect[] = [];
-  const intervals = [
-    { start: vehGate.x - vehGate.width / 2, end: vehGate.x + vehGate.width / 2 },
-    { start: pedGate.x - pedGate.width / 2, end: pedGate.x + pedGate.width / 2 },
-  ].sort((a, b) => a.start - b.start);
+  let vehGate: { x: number; y?: number; width: number };
+  let pedGate: { x: number; y?: number; width: number };
 
-  const mergedIntervals: Array<{ start: number; end: number }> = [];
-  intervals.forEach((iv) => {
-    if (mergedIntervals.length > 0 && iv.start <= mergedIntervals[mergedIntervals.length - 1].end + 0.6) {
-      mergedIntervals[mergedIntervals.length - 1].end = Math.max(
-        mergedIntervals[mergedIntervals.length - 1].end,
-        iv.end
-      );
-    } else {
-      mergedIntervals.push({ ...iv });
-    }
-  });
+  if (roadSide === "south" || roadSide === "north") {
+    const drvCenterX = drivewayRect.x + drivewayRect.width / 2;
+    const walkStart = pedestrianPath[0] || { x: cx + 2, y: roadSide === "south" ? pl : 0 };
+    const gateY = roadSide === "south" ? pl - bwThick / 2 : bwThick / 2;
+    vehGate = { x: drvCenterX, y: gateY, width: drivewayRect.width + 1.0 };
+    pedGate = { x: Math.min(pw - 3.5, Math.max(3.5, walkStart.x)), y: gateY, width: 4.0 };
 
-  let curX = 0;
-  mergedIntervals.forEach((mIv) => {
-    const segW = Math.max(0, mIv.start - curX);
-    if (segW > 0.5) {
-      frontWallSegments.push({
-        x: curX,
-        y: pl - bwThick,
-        width: segW,
-        length: bwThick,
-      });
-    }
-    curX = mIv.end;
-  });
-  if (pw - curX > 0.5) {
-    frontWallSegments.push({
-      x: curX,
-      y: pl - bwThick,
-      width: pw - curX,
-      length: bwThick,
+    const intervals = [
+      { start: vehGate.x - vehGate.width / 2, end: vehGate.x + vehGate.width / 2 },
+      { start: pedGate.x - pedGate.width / 2, end: pedGate.x + pedGate.width / 2 },
+    ].sort((a, b) => a.start - b.start);
+
+    const mergedIntervals: Array<{ start: number; end: number }> = [];
+    intervals.forEach((iv) => {
+      if (mergedIntervals.length > 0 && iv.start <= mergedIntervals[mergedIntervals.length - 1].end + 0.6) {
+        mergedIntervals[mergedIntervals.length - 1].end = Math.max(mergedIntervals[mergedIntervals.length - 1].end, iv.end);
+      } else {
+        mergedIntervals.push({ ...iv });
+      }
     });
+
+    let curX = 0;
+    const wallY = roadSide === "south" ? pl - bwThick : 0;
+    mergedIntervals.forEach((mIv) => {
+      const segW = Math.max(0, mIv.start - curX);
+      if (segW > 0.5) {
+        frontWallSegments.push({ x: curX, y: wallY, width: segW, length: bwThick });
+      }
+      curX = mIv.end;
+    });
+    if (pw - curX > 0.5) {
+      frontWallSegments.push({ x: curX, y: wallY, width: pw - curX, length: bwThick });
+    }
+  } else {
+    // roadSide === "west" || roadSide === "east"
+    const drvCenterY = drivewayRect.y + drivewayRect.length / 2;
+    const walkStart = pedestrianPath[0] || { x: roadSide === "west" ? 0 : pw, y: cz + 2 };
+    const gateX = roadSide === "west" ? bwThick / 2 : pw - bwThick / 2;
+    vehGate = { x: gateX, y: drvCenterY, width: drivewayRect.length + 1.0 };
+    pedGate = { x: gateX, y: Math.min(pl - 3.5, Math.max(3.5, walkStart.y)), width: 4.0 };
+
+    const intervals = [
+      { start: (vehGate.y || cz) - vehGate.width / 2, end: (vehGate.y || cz) + vehGate.width / 2 },
+      { start: (pedGate.y || cz) - pedGate.width / 2, end: (pedGate.y || cz) + pedGate.width / 2 },
+    ].sort((a, b) => a.start - b.start);
+
+    const mergedIntervals: Array<{ start: number; end: number }> = [];
+    intervals.forEach((iv) => {
+      if (mergedIntervals.length > 0 && iv.start <= mergedIntervals[mergedIntervals.length - 1].end + 0.6) {
+        mergedIntervals[mergedIntervals.length - 1].end = Math.max(mergedIntervals[mergedIntervals.length - 1].end, iv.end);
+      } else {
+        mergedIntervals.push({ ...iv });
+      }
+    });
+
+    let curY = 0;
+    const wallX = roadSide === "west" ? 0 : pw - bwThick;
+    mergedIntervals.forEach((mIv) => {
+      const segL = Math.max(0, mIv.start - curY);
+      if (segL > 0.5) {
+        frontWallSegments.push({ x: wallX, y: curY, width: bwThick, length: segL });
+      }
+      curY = mIv.end;
+    });
+    if (pl - curY > 0.5) {
+      frontWallSegments.push({ x: wallX, y: curY, width: bwThick, length: pl - curY });
+    }
   }
 
   // 6. COLLISION MASK FOR ALL HARDSCAPE / ARCHITECTURAL OBJECTS
@@ -883,12 +984,22 @@ export function buildArchitecturalLandscapeScene(
     root.add(drvMesh);
 
     // Driveway Stone Curbs
-    const drvCurbGeo = new THREE.BoxGeometry(0.2, 0.06, dr.length);
-    const curbL = new THREE.Mesh(drvCurbGeo, materials.curbMat);
-    curbL.position.set(dr.x - 0.1, 0.03, dr.y + dr.length / 2);
-    const curbR = new THREE.Mesh(drvCurbGeo, materials.curbMat);
-    curbR.position.set(dr.x + dr.width + 0.1, 0.03, dr.y + dr.length / 2);
-    root.add(curbL, curbR);
+    const roadSide = model.boundaryWall.roadSide || "south";
+    if (roadSide === "west" || roadSide === "east") {
+      const drvCurbGeo = new THREE.BoxGeometry(dr.width, 0.06, 0.2);
+      const curbT = new THREE.Mesh(drvCurbGeo, materials.curbMat);
+      curbT.position.set(dr.x + dr.width / 2, 0.03, dr.y - 0.1);
+      const curbB = new THREE.Mesh(drvCurbGeo, materials.curbMat);
+      curbB.position.set(dr.x + dr.width / 2, 0.03, dr.y + dr.length + 0.1);
+      root.add(curbT, curbB);
+    } else {
+      const drvCurbGeo = new THREE.BoxGeometry(0.2, 0.06, dr.length);
+      const curbL = new THREE.Mesh(drvCurbGeo, materials.curbMat);
+      curbL.position.set(dr.x - 0.1, 0.03, dr.y + dr.length / 2);
+      const curbR = new THREE.Mesh(drvCurbGeo, materials.curbMat);
+      curbR.position.set(dr.x + dr.width + 0.1, 0.03, dr.y + dr.length / 2);
+      root.add(curbL, curbR);
+    }
 
     // 5. PEDESTRIAN WALKWAY (Paved with Pavers + Curbs + Junction Caps)
     const walkwayGroup = new THREE.Group();
@@ -948,6 +1059,7 @@ export function buildArchitecturalLandscapeScene(
   const bw = model.boundaryWall;
   const bwH = 4.2;
   const bwThick = 0.55;
+  const roadSide = bw.roadSide || "south";
 
   const addCopedWall = (w: number, h: number, d: number, px: number, py: number, pz: number) => {
     const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), materials.boundaryMat);
@@ -964,29 +1076,65 @@ export function buildArchitecturalLandscapeScene(
     boundaryGroup.add(coping);
   };
 
-  // Rear Wall (North)
-  addCopedWall(pw, bwH, bwThick, cx, bwH / 2, bwThick / 2);
-  // Left Wall (West)
-  addCopedWall(bwThick, bwH, pl, bwThick / 2, bwH / 2, cz);
-  // Right Wall (East)
-  addCopedWall(bwThick, bwH, pl, pw - bwThick / 2, bwH / 2, cz);
-
-  // Front Wall Segments (South Road)
-  bw.frontWallSegments.forEach((seg) => {
-    addCopedWall(
-      seg.width,
-      bwH,
-      bwThick,
-      seg.x + seg.width / 2,
-      bwH / 2,
-      pl - bwThick / 2
-    );
-  });
+  if (roadSide === "south") {
+    // Rear Wall (North)
+    addCopedWall(pw, bwH, bwThick, cx, bwH / 2, bwThick / 2);
+    // Left Wall (West)
+    addCopedWall(bwThick, bwH, pl, bwThick / 2, bwH / 2, cz);
+    // Right Wall (East)
+    addCopedWall(bwThick, bwH, pl, pw - bwThick / 2, bwH / 2, cz);
+    // Front Wall Segments (South Road)
+    bw.frontWallSegments.forEach((seg) => {
+      addCopedWall(seg.width, bwH, bwThick, seg.x + seg.width / 2, bwH / 2, pl - bwThick / 2);
+    });
+  } else if (roadSide === "north") {
+    // Rear Wall (South)
+    addCopedWall(pw, bwH, bwThick, cx, bwH / 2, pl - bwThick / 2);
+    // Left Wall (West)
+    addCopedWall(bwThick, bwH, pl, bwThick / 2, bwH / 2, cz);
+    // Right Wall (East)
+    addCopedWall(bwThick, bwH, pl, pw - bwThick / 2, bwH / 2, cz);
+    // Front Wall Segments (North Road)
+    bw.frontWallSegments.forEach((seg) => {
+      addCopedWall(seg.width, bwH, bwThick, seg.x + seg.width / 2, bwH / 2, bwThick / 2);
+    });
+  } else if (roadSide === "west") {
+    // Rear Wall (East)
+    addCopedWall(bwThick, bwH, pl, pw - bwThick / 2, bwH / 2, cz);
+    // Top Wall (North)
+    addCopedWall(pw, bwH, bwThick, cx, bwH / 2, bwThick / 2);
+    // Bottom Wall (South)
+    addCopedWall(pw, bwH, bwThick, cx, bwH / 2, pl - bwThick / 2);
+    // Front Wall Segments (West Road)
+    bw.frontWallSegments.forEach((seg) => {
+      addCopedWall(bwThick, bwH, seg.length, bwThick / 2, bwH / 2, seg.y + seg.length / 2);
+    });
+  } else {
+    // roadSide === "east"
+    // Rear Wall (West)
+    addCopedWall(bwThick, bwH, pl, bwThick / 2, bwH / 2, cz);
+    // Top Wall (North)
+    addCopedWall(pw, bwH, bwThick, cx, bwH / 2, bwThick / 2);
+    // Bottom Wall (South)
+    addCopedWall(pw, bwH, bwThick, cx, bwH / 2, pl - bwThick / 2);
+    // Front Wall Segments (East Road)
+    bw.frontWallSegments.forEach((seg) => {
+      addCopedWall(bwThick, bwH, seg.length, pw - bwThick / 2, bwH / 2, seg.y + seg.length / 2);
+    });
+  }
 
   // Modern Steel Vehicle Gate (Posts & Slats)
   const vg = bw.vehicleGate;
   const vGateGroup = new THREE.Group();
-  vGateGroup.position.set(vg.x, 0, pl - bwThick / 2);
+  if (roadSide === "west" || roadSide === "east") {
+    const gateX = roadSide === "west" ? bwThick / 2 : pw - bwThick / 2;
+    vGateGroup.position.set(gateX, 0, vg.y || cz);
+    vGateGroup.rotation.y = Math.PI / 2;
+  } else {
+    const gateZ = roadSide === "north" ? bwThick / 2 : pl - bwThick / 2;
+    vGateGroup.position.set(vg.x, 0, gateZ);
+  }
+
   const vPostGeo = new THREE.BoxGeometry(0.9, bwH + 0.4, 0.9);
   const vPostL = new THREE.Mesh(vPostGeo, materials.boundaryMat);
   vPostL.position.set(-vg.width / 2, (bwH + 0.4) / 2, 0);
@@ -1011,9 +1159,21 @@ export function buildArchitecturalLandscapeScene(
 
   // Pedestrian Gate (if separated)
   const pg = bw.pedestrianGate;
-  if (Math.abs(pg.x - vg.x) > (vg.width + pg.width) / 2 + 0.8) {
+  const isPedSeparated = (roadSide === "west" || roadSide === "east")
+    ? Math.abs((pg.y || cz) - (vg.y || cz)) > (vg.width + pg.width) / 2 + 0.5
+    : Math.abs(pg.x - vg.x) > (vg.width + pg.width) / 2 + 0.8;
+
+  if (isPedSeparated) {
     const pGateGroup = new THREE.Group();
-    pGateGroup.position.set(pg.x, 0, pl - bwThick / 2);
+    if (roadSide === "west" || roadSide === "east") {
+      const gateX = roadSide === "west" ? bwThick / 2 : pw - bwThick / 2;
+      pGateGroup.position.set(gateX, 0, pg.y || cz);
+      pGateGroup.rotation.y = Math.PI / 2;
+    } else {
+      const gateZ = roadSide === "north" ? bwThick / 2 : pl - bwThick / 2;
+      pGateGroup.position.set(pg.x, 0, gateZ);
+    }
+
     const pPostGeo = new THREE.BoxGeometry(0.7, bwH + 0.2, 0.7);
     const pPostL = new THREE.Mesh(pPostGeo, materials.boundaryMat);
     pPostL.position.set(-pg.width / 2, (bwH + 0.2) / 2, 0);

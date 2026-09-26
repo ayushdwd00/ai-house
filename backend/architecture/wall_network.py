@@ -219,87 +219,99 @@ def generate_wall_network_and_openings(
 
     # Generate Doors
     # 1. Main Entrance Door on exterior wall of foyer or living room
+    road = site.road_side if site and hasattr(site, "road_side") and site.road_side else "south"
     entry_candidates = [r for r in rooms if r.type in ["entry_foyer", "living_room"] and r.rect]
-    entry_room = entry_candidates[0] if entry_candidates else (rooms[0] if rooms else None)
+    if not entry_candidates:
+        entry_candidates = [r for r in rooms if r.rect]
 
-    if entry_room:
-        road = site.road_side if site and hasattr(site, "road_side") and site.road_side else "south"
-        entry_walls = [
+    chosen_entry_wall = None
+    entry_room = None
+    for cand in entry_candidates:
+        cand_ext_walls = [
             w for w in walls
-            if w.wall_type == "exterior" and entry_room.id in w.adjacent_room_ids
+            if w.wall_type == "exterior" and cand.id in w.adjacent_room_ids
         ]
-        
-        chosen_entry_wall = None
-        # Prefer wall matching road side
-        road_matched_walls = [w for w in entry_walls if w.wall_orientation == road]
-        candidate_pool = road_matched_walls if road_matched_walls else entry_walls
-        for w in candidate_pool:
+        road_matched = [w for w in cand_ext_walls if w.wall_orientation == road]
+        for w in road_matched:
             w_len = math.hypot(w.end.x - w.start.x, w.end.y - w.start.y)
-            if w_len >= 3.5:
+            if w_len >= 3.0:
                 chosen_entry_wall = w
+                entry_room = cand
                 break
-        if not chosen_entry_wall and entry_walls:
-            chosen_entry_wall = entry_walls[0]
-
         if chosen_entry_wall:
-            d_id = f"D{door_counter:02d}"
-            door_counter += 1
-            d_pos_x = round((chosen_entry_wall.start.x + chosen_entry_wall.end.x) / 2.0, 2)
-            d_pos_y = round((chosen_entry_wall.start.y + chosen_entry_wall.end.y) / 2.0, 2)
-            d_pos = Point2D(x=d_pos_x, y=d_pos_y)
-            
-            # Wall vector and orientation
-            w_dir = chosen_entry_wall.wall_direction or "horizontal"
-            d_orient = chosen_entry_wall.wall_orientation or "south"
-            label_char = d_orient[0].upper()
-            dir_label = f"{d_id} · {label_char}"
+            break
 
-            # Calculate door start and end
-            if w_dir == "horizontal":
-                dx1, dx2 = d_pos_x - 1.75, d_pos_x + 1.75
-                dy1, dy2 = d_pos_y, d_pos_y
-            else:
-                dx1, dx2 = d_pos_x, d_pos_x
-                dy1, dy2 = d_pos_y - 1.75, d_pos_y + 1.75
+    if not chosen_entry_wall and entry_candidates:
+        for cand in entry_candidates:
+            cand_ext_walls = [
+                w for w in walls
+                if w.wall_type == "exterior" and cand.id in w.adjacent_room_ids
+            ]
+            if cand_ext_walls:
+                chosen_entry_wall = cand_ext_walls[0]
+                entry_room = cand
+                break
 
-            # 3ft clear swing zone in front of entrance
-            cz_x = max(0.0, d_pos_x - 1.75)
-            cz_y = max(0.0, d_pos_y - 1.75)
-            d_entry = Door(
-                id=d_id,
-                door_id=d_id,
-                floor_id=getattr(entry_room, "floor_id", "floor_1"),
-                wall_id=chosen_entry_wall.id,
-                host_wall_id=chosen_entry_wall.id,
-                room_id="outdoor",
-                from_room="outdoor",
-                from_room_id="outdoor",
-                connected_room_id=entry_room.id,
-                to_room=entry_room.id,
-                to_room_id=entry_room.id,
-                position_along_wall=0.5,
-                position=d_pos,
-                x=d_pos_x,
-                y=d_pos_y,
-                x1=round(dx1, 2),
-                y1=round(dy1, 2),
-                x2=round(dx2, 2),
-                y2=round(dy2, 2),
-                width=3.5,
-                height=7.0,
-                hinge_side="left",
-                swing_direction="inward",
-                swing_angle=90.0,
-                door_type="entrance",
-                orientation=d_orient,
-                direction_label=dir_label,
-                connects_room_ids=["outdoor", entry_room.id],
-                clearance_zone=Rect(x=cz_x, y=cz_y, width=3.5, length=3.0)
-            )
-            doors.append(d_entry)
-            chosen_entry_wall.openings.append(d_id)
-            if hasattr(entry_room, "door_ids") and entry_room.door_ids is not None:
-                entry_room.door_ids.append(d_id)
+    if chosen_entry_wall:
+        d_id = f"D{door_counter:02d}"
+        door_counter += 1
+        d_pos_x = round((chosen_entry_wall.start.x + chosen_entry_wall.end.x) / 2.0, 2)
+        d_pos_y = round((chosen_entry_wall.start.y + chosen_entry_wall.end.y) / 2.0, 2)
+        d_pos = Point2D(x=d_pos_x, y=d_pos_y)
+        
+        # Wall vector and orientation
+        w_dir = chosen_entry_wall.wall_direction or "horizontal"
+        d_orient = chosen_entry_wall.wall_orientation or "south"
+        label_char = d_orient[0].upper()
+        dir_label = f"{d_id} · {label_char}"
+
+        # Calculate door start and end
+        if w_dir == "horizontal":
+            dx1, dx2 = d_pos_x - 1.75, d_pos_x + 1.75
+            dy1, dy2 = d_pos_y, d_pos_y
+        else:
+            dx1, dx2 = d_pos_x, d_pos_x
+            dy1, dy2 = d_pos_y - 1.75, d_pos_y + 1.75
+
+        # 3ft clear swing zone in front of entrance
+        cz_x = max(0.0, d_pos_x - 1.75)
+        cz_y = max(0.0, d_pos_y - 1.75)
+        d_entry = Door(
+            id=d_id,
+            door_id=d_id,
+            floor_id=getattr(entry_room, "floor_id", "floor_1"),
+            wall_id=chosen_entry_wall.id,
+            host_wall_id=chosen_entry_wall.id,
+            room_id="outdoor",
+            from_room="outdoor",
+            from_room_id="outdoor",
+            connected_room_id=entry_room.id,
+            to_room=entry_room.id,
+            to_room_id=entry_room.id,
+            position_along_wall=0.5,
+            position=d_pos,
+            x=d_pos_x,
+            y=d_pos_y,
+            x1=round(dx1, 2),
+            y1=round(dy1, 2),
+            x2=round(dx2, 2),
+            y2=round(dy2, 2),
+            width=3.5,
+            height=7.0,
+            hinge_side="left",
+            swing_direction="inward",
+            swing_angle=90.0,
+            door_type="entrance",
+            type="entrance",
+            orientation=d_orient,
+            direction_label=dir_label,
+            connects_room_ids=["outdoor", entry_room.id],
+            clearance_zone=Rect(x=cz_x, y=cz_y, width=3.5, length=3.0)
+        )
+        doors.append(d_entry)
+        chosen_entry_wall.openings.append(d_id)
+        if hasattr(entry_room, "door_ids") and entry_room.door_ids is not None:
+            entry_room.door_ids.append(d_id)
 
     # 2. Interior doors connecting rooms to circulation or attached rooms
     for r in rooms:

@@ -132,14 +132,18 @@ def _deterministic_requirement_fallback(prompt: str) -> ArchitecturalRequirement
         else:
             plot_w, plot_l = 40.0, 50.0
 
-    # Road orientation
+    # Road orientation / facing direction
     road = "south"
-    if "north" in lower:
-        road = "north"
-    elif "east" in lower:
-        road = "east"
-    elif "west" in lower:
-        road = "west"
+    facing_match = re.search(r'(?:facing|frontage|road|access)\s*(?:to\s*|is\s*|on\s*)?(north|south|east|west)\b', lower)
+    if not facing_match:
+        facing_match = re.search(r'\b(north|south|east|west)\s*[- ]*(?:facing|frontage|road|access|entry|side|oriented)\b', lower)
+    if facing_match:
+        road = facing_match.group(1).lower()
+    else:
+        for d in ["west", "east", "north", "south"]:
+            if re.search(rf'\b{d}\b', lower):
+                road = d
+                break
 
     # Parking
     parking = 2 if ("2 car" in lower or "two car" in lower) else (0 if "no parking" in lower else 1)
@@ -537,6 +541,9 @@ def generate_architectural_concepts_with_groq(req: ArchitecturalRequirements) ->
     )
     context = {
         "plot_dimensions": f"{req.plot_width}x{req.plot_length} ft",
+        "facing": req.road_side,
+        "front_side": req.road_side,
+        "road_side": req.road_side,
         "road_orientation": req.road_side,
         "bedrooms": req.bedrooms,
         "bathrooms": req.bathrooms,

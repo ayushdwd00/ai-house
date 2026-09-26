@@ -24,11 +24,11 @@ from architecture.architectural_engine import generate_architectural_house_layou
 class TestVastuEngine(unittest.TestCase):
 
     def test_01_north_angle_computation(self):
-        """Validates orientation calculations for all four road sides."""
+        """Validates that geographic North is always Top (0.0) by default, while supporting explicit angles."""
         self.assertEqual(compute_north_angle("south"), 0.0)    # North is Top
-        self.assertEqual(compute_north_angle("north"), 180.0)  # North is Bottom
-        self.assertEqual(compute_north_angle("east"), 270.0)   # North is Left
-        self.assertEqual(compute_north_angle("west"), 90.0)    # North is Right
+        self.assertEqual(compute_north_angle("north"), 0.0)    # North remains Top
+        self.assertEqual(compute_north_angle("east"), 0.0)     # North remains Top
+        self.assertEqual(compute_north_angle("west"), 0.0)     # North remains Top
         self.assertEqual(compute_north_angle("south", explicit_north_deg=45.0), 45.0)
 
     def test_02_point_to_zone_mapping_south_facing(self):
@@ -50,13 +50,10 @@ class TestVastuEngine(unittest.TestCase):
         self.assertEqual(get_vastu_zone_for_point(5.0, 5.0, w, l, "south"), "northwest")
 
     def test_03_point_to_zone_mapping_north_facing(self):
-        """For north road (North at bottom, South at top): zones rotate 180 degrees."""
+        """For north road: geographic North remains top, so Top-Right is North-East, Bottom-Left is South-West."""
         w, l = 40.0, 50.0
-        # Bottom-Left is North-East when facing North road
-        self.assertEqual(get_vastu_zone_for_point(5.0, 45.0, w, l, "north"), "northeast")
-
-        # Top-Right is South-West when facing North road
-        self.assertEqual(get_vastu_zone_for_point(35.0, 5.0, w, l, "north"), "southwest")
+        self.assertEqual(get_vastu_zone_for_point(35.0, 5.0, w, l, "north"), "northeast")
+        self.assertEqual(get_vastu_zone_for_point(5.0, 45.0, w, l, "north"), "southwest")
 
     def test_04_individual_room_rule_evaluations(self):
         """Verifies rule evaluations for key residential rooms."""

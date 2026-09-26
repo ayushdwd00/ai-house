@@ -2090,6 +2090,148 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               {(layout.plot_width * layout.plot_length).toLocaleString()} SQ FT)
             </text>
 
+            {/* Canonical Road / Front Access Graphic (Oriented to matching plot edge) */}
+            {(() => {
+              const resolvedFacing = (layout.facing || layout.orientation || layout.site?.road_side || "south").toLowerCase();
+              if (resolvedFacing === "west") {
+                return (
+                  <g id="road-frontage-west" pointerEvents="none">
+                    <rect
+                      x={-34}
+                      y={-10}
+                      width={30}
+                      height={svgHeight + 20}
+                      fill="#F1F5F9"
+                      stroke="#94A3B8"
+                      strokeWidth={1.2}
+                      rx={2}
+                    />
+                    <line
+                      x1={-19}
+                      y1={-10}
+                      x2={-19}
+                      y2={svgHeight + 10}
+                      stroke="#CBD5E1"
+                      strokeWidth={1.2}
+                      strokeDasharray="6 4"
+                    />
+                    <g transform={`rotate(-90, -19, ${svgHeight / 2})`}>
+                      <text
+                        x={-19}
+                        y={svgHeight / 2 + 3}
+                        textAnchor="middle"
+                        fill="#334155"
+                        className="font-mono text-[9px] font-bold tracking-wider"
+                      >
+                        ROAD / FRONT ACCESS (WEST)
+                      </text>
+                    </g>
+                  </g>
+                );
+              } else if (resolvedFacing === "east") {
+                return (
+                  <g id="road-frontage-east" pointerEvents="none">
+                    <rect
+                      x={svgWidth + 4}
+                      y={-10}
+                      width={30}
+                      height={svgHeight + 20}
+                      fill="#F1F5F9"
+                      stroke="#94A3B8"
+                      strokeWidth={1.2}
+                      rx={2}
+                    />
+                    <line
+                      x1={svgWidth + 19}
+                      y1={-10}
+                      x2={svgWidth + 19}
+                      y2={svgHeight + 10}
+                      stroke="#CBD5E1"
+                      strokeWidth={1.2}
+                      strokeDasharray="6 4"
+                    />
+                    <g transform={`rotate(90, ${svgWidth + 19}, ${svgHeight / 2})`}>
+                      <text
+                        x={svgWidth + 19}
+                        y={svgHeight / 2 + 3}
+                        textAnchor="middle"
+                        fill="#334155"
+                        className="font-mono text-[9px] font-bold tracking-wider"
+                      >
+                        ROAD / FRONT ACCESS (EAST)
+                      </text>
+                    </g>
+                  </g>
+                );
+              } else if (resolvedFacing === "north") {
+                return (
+                  <g id="road-frontage-north" pointerEvents="none">
+                    <rect
+                      x={-10}
+                      y={-34}
+                      width={svgWidth + 20}
+                      height={30}
+                      fill="#F1F5F9"
+                      stroke="#94A3B8"
+                      strokeWidth={1.2}
+                      rx={2}
+                    />
+                    <line
+                      x1={-10}
+                      y1={-19}
+                      x2={svgWidth + 10}
+                      y2={-19}
+                      stroke="#CBD5E1"
+                      strokeWidth={1.2}
+                      strokeDasharray="6 4"
+                    />
+                    <text
+                      x={svgWidth / 2}
+                      y={-15}
+                      textAnchor="middle"
+                      fill="#334155"
+                      className="font-mono text-[9px] font-bold tracking-wider"
+                    >
+                      ROAD / FRONT ACCESS (NORTH)
+                    </text>
+                  </g>
+                );
+              } else {
+                return (
+                  <g id="road-frontage-south" pointerEvents="none">
+                    <rect
+                      x={-10}
+                      y={svgHeight + 4}
+                      width={svgWidth + 20}
+                      height={30}
+                      fill="#F1F5F9"
+                      stroke="#94A3B8"
+                      strokeWidth={1.2}
+                      rx={2}
+                    />
+                    <line
+                      x1={-10}
+                      y1={svgHeight + 19}
+                      x2={svgWidth + 10}
+                      y2={svgHeight + 19}
+                      stroke="#CBD5E1"
+                      strokeWidth={1.2}
+                      strokeDasharray="6 4"
+                    />
+                    <text
+                      x={svgWidth / 2}
+                      y={svgHeight + 23}
+                      textAnchor="middle"
+                      fill="#334155"
+                      className="font-mono text-[9px] font-bold tracking-wider"
+                    >
+                      ROAD / FRONT ACCESS (SOUTH)
+                    </text>
+                  </g>
+                );
+              }
+            })()}
+
             {/* Architectural Plot Boundary Dimension Chains */}
             <g id="dimension-chains" pointerEvents="none">
               {/* Top Dimension String */}
@@ -3305,7 +3447,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 PLOT: <tspan fill="#0F172A" fontWeight="bold">{layout.plot_width}&apos; × {layout.plot_length}&apos;</tspan> ({(layout.plot_width * layout.plot_length).toLocaleString()} SQ FT)
               </text>
               <text x={8} y={40} fill="#64748B" className="font-mono text-[7.5px]">
-                BUILT-UP: <tspan fill="#0F172A" fontWeight="bold">{layout.total_area_sqft || Math.round((currentFloor.rooms || []).reduce((acc, r) => acc + (r.area_sqft || (r.rect ? r.rect.width * r.rect.length : 0)), 0))} SQ FT</tspan> · FACING: <tspan fill="#0F172A" fontWeight="bold">{layout.facing || "EAST"}</tspan>
+                BUILT-UP: <tspan fill="#0F172A" fontWeight="bold">{layout.total_area_sqft || Math.round((currentFloor.rooms || []).reduce((acc, r) => acc + (r.area_sqft || (r.rect ? r.rect.width * r.rect.length : 0)), 0))} SQ FT</tspan> · FACING: <tspan fill="#0F172A" fontWeight="bold">{(layout.facing || layout.orientation || layout.site?.road_side || "SOUTH").toUpperCase()}</tspan>
               </text>
             </g>
           </svg>
