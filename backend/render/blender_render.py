@@ -23,7 +23,6 @@ except ImportError:
     sys.exit(1)
 
 def parse_args():
-    # Everything after '--' is for this script
     argv = sys.argv
     if "--" in argv:
         argv = argv[argv.index("--") + 1:]
@@ -42,7 +41,6 @@ def parse_args():
 def clear_scene():
     """Removes default cube, light, camera and meshes."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    # Ensure a collection exists
     if not bpy.data.collections:
         col = bpy.data.collections.new("ArchitecturalScene")
         bpy.context.scene.collection.children.link(col)
@@ -59,7 +57,6 @@ def create_pbr_material(name, base_color=(0.8, 0.8, 0.8, 1.0), roughness=0.5, me
     bsdf.inputs['Roughness'].default_value = roughness
     bsdf.inputs['Metallic'].default_value = metallic
     
-    # Transmission for glass (Blender 4.0+ uses 'Transmission Weight')
     if transmission > 0:
         if 'Transmission Weight' in bsdf.inputs:
             bsdf.inputs['Transmission Weight'].default_value = transmission
@@ -68,7 +65,6 @@ def create_pbr_material(name, base_color=(0.8, 0.8, 0.8, 1.0), roughness=0.5, me
         if 'IOR' in bsdf.inputs:
             bsdf.inputs['IOR'].default_value = ior
             
-    # Emission
     if emission_strength > 0:
         if 'Emission Color' in bsdf.inputs:
             bsdf.inputs['Emission Color'].default_value = emission_color
@@ -81,7 +77,6 @@ def create_pbr_material(name, base_color=(0.8, 0.8, 0.8, 1.0), roughness=0.5, me
     return mat
 
 def add_box(name, size, location, material=None, rotation=(0, 0, 0)):
-    """Creates a box mesh with given dimensions centered at location."""
     sx, sy, sz = size
     lx, ly, lz = location
     
@@ -109,277 +104,130 @@ def add_box(name, size, location, material=None, rotation=(0, 0, 0)):
         obj.data.materials.append(material)
     return obj
 
-def build_scene_from_layout(layout, is_cutaway=False, lighting="day"):
-    """Constructs the complete 3D architectural building from canonical HouseLayout."""
+def build_scene_from_layout(layout_data, is_cutaway=True, lighting="day"):
+    plot_w = float(layout_data.get("plot_width", 40.0))
+    plot_l = float(layout_data.get("plot_length", 60.0))
+    facing = layout_data.get("facing", "south").lower()
     
-    # 1. Materials setup
-    mat_plaster_ext = create_pbr_material("ExtPlaster", base_color=(0.93, 0.91, 0.88, 1.0), roughness=0.85)
-    mat_plaster_int = create_pbr_material("IntPlaster", base_color=(0.95, 0.94, 0.92, 1.0), roughness=0.88)
-    mat_stone_accent = create_pbr_material("StoneAccent", base_color=(0.25, 0.27, 0.30, 1.0), roughness=0.6)
-    mat_plinth = create_pbr_material("PlinthConcrete", base_color=(0.60, 0.62, 0.64, 1.0), roughness=0.75)
-    mat_slab = create_pbr_material("SlabConcrete", base_color=(0.88, 0.87, 0.85, 1.0), roughness=0.7)
+    # 1. PBR Materials
+    mat_white_wall = create_pbr_material("WhitePlaster", base_color=(0.92, 0.90, 0.88, 1.0), roughness=0.88)
+    mat_wood_floor = create_pbr_material("WoodFloor", base_color=(0.65, 0.45, 0.28, 1.0), roughness=0.45)
+    mat_tile_floor = create_pbr_material("TileFloor", base_color=(0.88, 0.86, 0.82, 1.0), roughness=0.25)
+    mat_slab = create_pbr_material("SlabConcrete", base_color=(0.78, 0.76, 0.74, 1.0), roughness=0.8)
+    mat_glass = create_pbr_material("WindowGlass", base_color=(0.95, 0.98, 1.0, 1.0), roughness=0.05, transmission=0.92)
+    mat_frame = create_pbr_material("DarkFrame", base_color=(0.15, 0.16, 0.18, 1.0), roughness=0.4, metallic=0.7)
+    mat_grass = create_pbr_material("GrassSite", base_color=(0.28, 0.48, 0.18, 1.0), roughness=0.9)
+    mat_paver = create_pbr_material("PaverDriveway", base_color=(0.75, 0.72, 0.68, 1.0), roughness=0.75)
     
-    mat_wood_floor = create_pbr_material("HardwoodFloor", base_color=(0.65, 0.46, 0.28, 1.0), roughness=0.35, metallic=0.03)
-    mat_marble_floor = create_pbr_material("MarbleFloor", base_color=(0.94, 0.95, 0.96, 1.0), roughness=0.15, metallic=0.05)
-    mat_tile_floor = create_pbr_material("TileFloor", base_color=(0.88, 0.85, 0.80, 1.0), roughness=0.28, metallic=0.04)
+    # 2. Site Ground Plane
+    add_box("SiteGrass", (plot_w * 2.5, plot_l * 2.5, 0.4), (plot_w / 2, plot_l / 2, -0.2), material=mat_grass)
     
-    mat_glass = create_pbr_material("ArchGlass", base_color=(0.9, 0.95, 1.0, 0.1), roughness=0.03, transmission=0.98, ior=1.52)
-    mat_frame = create_pbr_material("AlumFrame", base_color=(0.12, 0.14, 0.16, 1.0), roughness=0.35, metallic=0.85)
-    mat_door_wood = create_pbr_material("DoorWood", base_color=(0.35, 0.24, 0.16, 1.0), roughness=0.45)
-    mat_metal = create_pbr_material("MetalHardware", base_color=(0.75, 0.77, 0.80, 1.0), roughness=0.2, metallic=0.9)
-    mat_furniture_fabric = create_pbr_material("FurnitureFabric", base_color=(0.78, 0.76, 0.72, 1.0), roughness=0.85)
-    mat_furniture_wood = create_pbr_material("FurnitureWood", base_color=(0.45, 0.32, 0.22, 1.0), roughness=0.5)
-    
-    # 2. Elevation geometry tokens
-    plinth_height = 0.8
-    floor_height = 10.0
-    wall_height = 9.5
-    slab_thick = 0.6
-    
-    pw = layout.get("plot_width", 40)
-    pl = layout.get("plot_length", 50)
-    
-    # Calculate footprint
-    rooms = layout.get("rooms", [])
-    min_x, max_x = float('inf'), float('-inf')
-    min_y, max_y = float('inf'), float('-inf')
-    for r in rooms:
-        rect = r.get("rect", {})
-        if rect:
-            min_x = min(min_x, rect.get("x", 0))
-            max_x = max(max_x, rect.get("x", 0) + rect.get("width", 0))
-            min_y = min(min_y, rect.get("y", 0))
-            max_y = max(max_y, rect.get("y", 0) + rect.get("length", 0))
+    # Calculate house bounds
+    rooms = layout_data.get("rooms", [])
+    if not rooms and layout_data.get("floors"):
+        for fl in layout_data["floors"]:
+            rooms.extend(fl.get("rooms", []))
             
-    if not math.isfinite(min_x) or min_x >= max_x:
-        min_x, max_x = 0, pw * 0.7
-        min_y, max_y = 0, pl * 0.7
-        
-    house_w = max_x - min_x + 1.2
-    house_l = max_y - min_y + 1.2
-    house_cx = (min_x + max_x) / 2.0
-    house_cy = (min_y + max_y) / 2.0
+    min_x = min([r.get("rect", {}).get("x", 0) for r in rooms], default=5.0)
+    max_x = max([r.get("rect", {}).get("x", 0) + r.get("rect", {}).get("width", 10) for r in rooms], default=35.0)
+    min_y = min([r.get("rect", {}).get("y", 0) for r in rooms], default=5.0)
+    max_y = max([r.get("rect", {}).get("y", 0) + r.get("rect", {}).get("length", 10) for r in rooms], default=55.0)
     
-    # Facing / road direction
-    facing = (layout.get("facing") or layout.get("orientation") or "south").lower()
+    plinth_x = (min_x + max_x) / 2.0
+    plinth_y = (min_y + max_y) / 2.0
+    plinth_w = (max_x - min_x) + 2.0
+    plinth_l = (max_y - min_y) + 2.0
+    plinth_h = 1.5
     
-    # Plinth base foundation
-    add_box("PlinthFoundation", (house_w, house_l, plinth_height), (house_cx, house_cy, plinth_height / 2.0), mat_plinth)
+    # Plinth / Foundation Slab
+    add_box("PlinthSlab", (plinth_w, plinth_l, plinth_h), (plinth_x, plinth_y, plinth_h / 2.0), material=mat_slab)
     
-    floors = layout.get("floors", [])
+    # 3. Floors & Rooms Construction
+    floors = layout_data.get("floors", [])
     if not floors:
-        floors = [{
-            "floor_number": 1,
-            "rooms": rooms,
-            "exterior_walls": layout.get("exterior_walls", []),
-            "interior_walls": layout.get("interior_walls", []),
-            "doors": layout.get("doors", []),
-            "windows": layout.get("windows", [])
-        }]
+        floors = [{"floor_number": 1, "rooms": rooms, "exterior_walls": layout_data.get("exterior_walls", []), "interior_walls": layout_data.get("interior_walls", [])}]
         
-    num_floors = len(floors)
+    floor_height = 10.0
+    full_wall_height = 9.5
+    cutaway_wall_height = 4.2 if is_cutaway else full_wall_height
     
     for f_idx, fl in enumerate(floors):
-        floor_base_z = plinth_height + f_idx * floor_height
-        
-        # Intermediate slab
-        if f_idx > 0:
-            add_box(f"IntermediateSlab_F{f_idx}", (house_w, house_l, slab_thick), (house_cx, house_cy, floor_base_z - slab_thick / 2.0), mat_slab)
-            
+        fl_base_z = plinth_h + (f_idx * floor_height)
         fl_rooms = fl.get("rooms", [])
-        # 1. Room Floor Finishes
-        for r_idx, rm in enumerate(fl_rooms):
-            rect = rm.get("rect", {})
-            if not rect:
-                continue
-            rw = max(1.0, rect.get("width", 10))
-            rl = max(1.0, rect.get("length", 10))
-            rx = rect.get("x", 0) + rw / 2.0
-            ry = rect.get("y", 0) + rl / 2.0
+        
+        # Room floors & furniture
+        for r_idx, r in enumerate(fl_rooms):
+            rect = r.get("rect", {})
+            rw = float(rect.get("width", 12.0))
+            rl = float(rect.get("length", 12.0))
+            rx = float(rect.get("x", 0.0)) + rw / 2.0
+            ry = float(rect.get("y", 0.0)) + rl / 2.0
+            rtype = (r.get("type") or "").lower()
             
-            rm_type = (rm.get("type", "") + " " + rm.get("name", "")).lower()
-            if "master" in rm_type or "bed" in rm_type or "guest" in rm_type:
-                f_mat = mat_wood_floor
-            elif "bath" in rm_type or "toilet" in rm_type or "powder" in rm_type:
-                f_mat = mat_marble_floor
-            elif "kitchen" in rm_type or "dining" in rm_type:
-                f_mat = mat_tile_floor
-            else:
-                f_mat = mat_marble_floor
+            is_wet = "bath" in rtype or "toilet" in rtype or "kitchen" in rtype
+            fl_mat = mat_tile_floor if is_wet else mat_wood_floor
+            
+            add_box(f"Floor_{f_idx}_Room_{r_idx}", (rw - 0.2, rl - 0.2, 0.15), (rx, ry, fl_base_z + 0.075), material=fl_mat)
+            
+            # Simple decorative furniture proxy
+            for f_item in r.get("furniture", []):
+                fw = float(f_item.get("width", 3.0))
+                flen = float(f_item.get("length", 3.0))
+                fx = float(f_item.get("x", rx))
+                fy = float(f_item.get("y", ry))
+                fh = 2.5
+                add_box(f"Furn_{f_idx}_{f_item.get('id', 'item')}", (fw, flen, fh), (fx, fy, fl_base_z + fh / 2.0), material=mat_frame)
                 
-            add_box(f"RoomFloor_{f_idx}_{r_idx}", (rw - 0.05, rl - 0.05, 0.05), (rx, ry, floor_base_z + 0.025), f_mat)
-            
-            # Interior point lights in each room for realistic warm GI
-            room_light_data = bpy.data.lights.new(name=f"Light_F{f_idx}_{r_idx}", type='POINT')
-            room_light_data.energy = 85.0 if lighting == "night" else 45.0
-            room_light_data.color = (1.0, 0.92, 0.80) # Warm 3000K
-            room_light_data.shadow_soft_size = 0.5
-            light_obj = bpy.data.objects.new(name=f"RoomLightObj_{f_idx}_{r_idx}", object_data=room_light_data)
-            bpy.context.scene.collection.objects.link(light_obj)
-            light_obj.location = (rx, ry, floor_base_z + 8.2)
-            
-            # Furniture
-            for f_item in rm.get("furniture", []):
-                fw = max(1.0, float(f_item.get("width") or 2.5))
-                flen = max(1.0, float(f_item.get("length") or 2.5))
-                fx = float(f_item.get("x") or rx)
-                fy = float(f_item.get("y") or ry)
-                ftype = (f_item.get("type") or "").lower()
-                rot = math.radians(float(f_item.get("rotation") or 0))
-                
-                if "bed" in ftype:
-                    add_box(f"BedBase_{f_idx}", (fw, flen, 0.6), (fx, fy, floor_base_z + 0.3), mat_furniture_wood, (0, 0, rot))
-                    add_box(f"BedMattress_{f_idx}", (fw - 0.2, flen - 0.2, 0.7), (fx, fy, floor_base_z + 0.95), mat_furniture_fabric, (0, 0, rot))
-                    add_box(f"BedHeadboard_{f_idx}", (fw + 0.2, 0.35, 2.5), (fx, fy - flen/2.0 + 0.15, floor_base_z + 1.25), mat_furniture_wood, (0, 0, rot))
-                elif "sofa" in ftype:
-                    add_box(f"SofaSeat_{f_idx}", (fw, flen, 0.65), (fx, fy, floor_base_z + 0.5), mat_furniture_fabric, (0, 0, rot))
-                    add_box(f"SofaBack_{f_idx}", (fw, 0.45, 1.4), (fx, fy - flen/2.0 + 0.2, floor_base_z + 1.1), mat_furniture_fabric, (0, 0, rot))
-                elif "table" in ftype or "dining" in ftype:
-                    add_box(f"Table_{f_idx}", (fw, flen, 0.15), (fx, fy, floor_base_z + 2.4), mat_furniture_wood, (0, 0, rot))
-                    add_box(f"TableLeg1_{f_idx}", (0.2, 0.2, 2.3), (fx - fw/2 + 0.3, fy - flen/2 + 0.3, floor_base_z + 1.15), mat_furniture_wood, (0, 0, rot))
-                    add_box(f"TableLeg2_{f_idx}", (0.2, 0.2, 2.3), (fx + fw/2 - 0.3, fy + flen/2 - 0.3, floor_base_z + 1.15), mat_furniture_wood, (0, 0, rot))
-                elif "wardrobe" in ftype or "closet" in ftype:
-                    add_box(f"Wardrobe_{f_idx}", (fw, flen, 6.8), (fx, fy, floor_base_z + 3.4), mat_furniture_wood, (0, 0, rot))
-                elif "toilet" in ftype:
-                    add_box(f"Toilet_{f_idx}", (1.3, 1.8, 1.4), (fx, fy, floor_base_z + 0.7), mat_marble_floor, (0, 0, rot))
-                elif "counter" in ftype or "kitchen" in ftype:
-                    add_box(f"Counter_{f_idx}", (fw, flen, 2.7), (fx, fy, floor_base_z + 1.35), mat_stone_accent, (0, 0, rot))
-                else:
-                    add_box(f"Item_{f_idx}", (fw, flen, 1.2), (fx, fy, floor_base_z + 0.6), mat_furniture_fabric, (0, 0, rot))
-                    
-        # 2. Canonical Walls
+        # Walls
         ext_walls = fl.get("exterior_walls", [])
         int_walls = fl.get("interior_walls", [])
-        all_walls = [(w, True) for w in ext_walls] + [(w, False) for w in int_walls]
         
+        all_walls = [(w, True) for w in ext_walls] + [(w, False) for w in int_walls]
         for w_idx, (w, is_ext) in enumerate(all_walls):
-            x1, y1 = float(w.get("x1", 0)), float(w.get("y1", 0))
-            x2, y2 = float(w.get("x2", 0)), float(w.get("y2", 0))
-            dx, dy = x2 - x1, y2 - y1
-            w_len = math.hypot(dx, dy)
-            if w_len < 0.2:
-                continue
-            angle = math.atan2(dy, dx)
-            thick = float(w.get("thickness") or (0.75 if is_ext else 0.38))
+            start = w.get("start", {})
+            end = w.get("end", {})
+            sx, sy = float(start.get("x", 0)), float(start.get("y", 0))
+            ex, ey = float(end.get("x", 0)), float(end.get("y", 0))
             
-            # Selective architectural cutaway handling
-            # In cutaway mode: front-facing exterior walls are lowered to sill height to expose the interior
-            is_front_facing = False
-            if is_ext:
-                mid_x = (x1 + x2) / 2.0
-                mid_y = (y1 + y2) / 2.0
-                if facing == "south" and mid_y > house_cy:
-                    is_front_facing = True
-                elif facing == "north" and mid_y < house_cy:
-                    is_front_facing = True
-                elif facing == "east" and mid_x > house_cx:
-                    is_front_facing = True
-                elif facing == "west" and mid_x < house_cx:
-                    is_front_facing = True
-                    
-            if is_cutaway and is_front_facing:
-                cur_wall_h = 3.2 # Cutaway sill height
-            else:
-                cur_wall_h = wall_height
+            dx, dy = ex - sx, ey - sy
+            length = math.hypot(dx, dy)
+            if length < 0.2:
+                continue
                 
-            w_mat = mat_stone_accent if (is_ext and w_idx % 3 == 0) else (mat_plaster_ext if is_ext else mat_plaster_int)
+            angle = math.atan2(dy, dx)
+            mx, my = (sx + ex) / 2.0, (sy + ey) / 2.0
+            
+            thick = 0.75 if is_ext else 0.45
+            
+            # Cutaway wall elevation
+            wh = cutaway_wall_height if is_cutaway and (f_idx == len(floors) - 1) else full_wall_height
+            
             add_box(
                 f"Wall_{f_idx}_{w_idx}",
-                (w_len, thick, cur_wall_h),
-                ((x1 + x2) / 2.0, (y1 + y2) / 2.0, floor_base_z + cur_wall_h / 2.0),
-                w_mat,
-                (0, 0, angle)
+                (length, thick, wh),
+                (mx, my, fl_base_z + wh / 2.0),
+                material=mat_white_wall,
+                rotation=(0, 0, angle)
             )
-            
-        # 3. Doors & Windows Joinery
-        for d_idx, d in enumerate(fl.get("doors", [])):
-            dx1, dy1 = float(d.get("x1", 0)), float(d.get("y1", 0))
-            dx2, dy2 = float(d.get("x2", 0)), float(d.get("y2", 0))
-            dmx, dmy = (dx1 + dx2) / 2.0, (dy1 + dy2) / 2.0
-            dw = max(2.5, float(d.get("width") or 3.0))
-            d_angle = math.atan2(dy2 - dy1, dx2 - dx1)
-            add_box(f"DoorLeaf_{f_idx}_{d_idx}", (dw - 0.2, 0.15, 6.8), (dmx, dmy, floor_base_z + 3.4), mat_door_wood, (0, 0, d_angle))
-            add_box(f"DoorFrame_{f_idx}_{d_idx}", (dw, 0.35, 7.0), (dmx, dmy, floor_base_z + 3.5), mat_frame, (0, 0, d_angle))
-            
-        for win_idx, win in enumerate(fl.get("windows", [])):
-            wx1, wy1 = float(win.get("x1", 0)), float(win.get("y1", 0))
-            wx2, wy2 = float(win.get("x2", 0)), float(win.get("y2", 0))
-            wmx, wmy = (wx1 + wx2) / 2.0, (wy1 + wy2) / 2.0
-            ww = max(2.5, float(win.get("width") or 4.0))
-            win_angle = math.atan2(wy2 - wy1, wx2 - wx1)
-            # Glass pane + frame
-            add_box(f"WinGlass_{f_idx}_{win_idx}", (ww - 0.2, 0.08, 4.2), (wmx, wmy, floor_base_z + 2.8 + 2.1), mat_glass, (0, 0, win_angle))
-            add_box(f"WinFrame_{f_idx}_{win_idx}", (ww, 0.25, 4.4), (wmx, wmy, floor_base_z + 2.8 + 2.2), mat_frame, (0, 0, win_angle))
-            
-        # 4. Staircase
-        stair_rooms = [r for r in fl_rooms if "stair" in (r.get("type", "") + " " + r.get("name", "")).lower()]
-        for st_idx, sr in enumerate(stair_rooms):
-            s_rect = sr.get("rect", {})
-            if s_rect:
-                sw = max(3.0, s_rect.get("width", 6.0))
-                sl = max(6.0, s_rect.get("length", 10.0))
-                sx = s_rect.get("x", 0) + sw / 2.0
-                sy = s_rect.get("y", 0) + sl / 2.0
-                num_steps = 14
-                step_h = floor_height / num_steps
-                step_d = sl / num_steps
-                for step_i in range(num_steps):
-                    step_z = floor_base_z + (step_i + 0.5) * step_h
-                    step_y = sy - sl / 2.0 + (step_i + 0.5) * step_d
-                    add_box(f"StairStep_{f_idx}_{st_idx}_{step_i}", (sw, step_d, step_h), (sx, step_y, step_z), mat_wood_floor)
 
-    # 3. RCC Roof Slab & Parapet Wall
-    top_floor_base_z = plinth_height + (num_floors - 1) * floor_height
-    roof_z = top_floor_base_z + wall_height
-    
-    if not is_cutaway:
-        # Full roof slab
-        add_box("RoofSlab", (house_w + 1.2, house_l + 1.2, slab_thick), (house_cx, house_cy, roof_z + slab_thick / 2.0), mat_slab)
-        # Parapet wall
-        parapet_h = 2.5
-        parapet_thick = 0.5
-        # Front, rear, left, right parapets
-        add_box("ParapetFront", (house_w + 1.2, parapet_thick, parapet_h), (house_cx, house_cy + house_l/2.0, roof_z + slab_thick + parapet_h/2.0), mat_plaster_ext)
-        add_box("ParapetRear", (house_w + 1.2, parapet_thick, parapet_h), (house_cx, house_cy - house_l/2.0, roof_z + slab_thick + parapet_h/2.0), mat_plaster_ext)
-        add_box("ParapetLeft", (parapet_thick, house_l + 1.2, parapet_h), (house_cx - house_w/2.0, house_cy, roof_z + slab_thick + parapet_h/2.0), mat_plaster_ext)
-        add_box("ParapetRight", (parapet_thick, house_l + 1.2, parapet_h), (house_cx + house_w/2.0, house_cy, roof_z + slab_thick + parapet_h/2.0), mat_plaster_ext)
-    else:
-        # Cutaway roof: Retain rear half of roof to demonstrate building massing and cutaway cross-section
-        add_box("RoofSlabCutaway", (house_w + 1.2, house_l * 0.5, slab_thick), (house_cx, house_cy - house_l * 0.25, roof_z + slab_thick / 2.0), mat_slab)
-        add_box("ParapetRear", (house_w + 1.2, 0.5, 2.5), (house_cx, house_cy - house_l/2.0, roof_z + slab_thick + 1.25), mat_plaster_ext)
-
-    # 4. Architectural Camera (Dollhouse 3/4 Elevated Perspective framing the house)
-    cam_data = bpy.data.cameras.new("DollhouseCamera")
-    cam_data.lens = 45 # mm focal length
-    cam_data.sensor_width = 36 # full frame 35mm
-    cam_obj = bpy.data.objects.new("DollhouseCameraObj", cam_data)
+    # 4. Camera Setup: Reference 3/4 Dollhouse
+    cam_data = bpy.data.cameras.new(name="ArchitecturalCamera")
+    cam_data.lens = 45 # Moderate focal length
+    cam_obj = bpy.data.objects.new(name="CameraObj", object_data=cam_data)
     bpy.context.scene.collection.objects.link(cam_obj)
     bpy.context.scene.camera = cam_obj
     
-    # Calculate distance to fit house bounds
-    house_diag = math.hypot(house_w, house_l)
-    cam_dist = house_diag * 1.55
-    cam_elev = house_diag * 0.95
+    diag = math.hypot(plinth_w, plinth_l)
+    cam_dist = diag * 1.55
+    cam_height = diag * 1.25
     
-    # Place camera facing the entrance / orientation
-    if facing == "west":
-        cam_x = house_cx - cam_dist
-        cam_y = house_cy + cam_dist * 0.4
-    elif facing == "east":
-        cam_x = house_cx + cam_dist
-        cam_y = house_cy - cam_dist * 0.4
-    elif facing == "north":
-        cam_x = house_cx + cam_dist * 0.6
-        cam_y = house_cy - cam_dist
-    else: # south
-        cam_x = house_cx + cam_dist * 0.75
-        cam_y = house_cy + cam_dist
-        
-    cam_z = top_floor_base_z + cam_elev
-    cam_obj.location = (cam_x, cam_y, cam_z)
+    house_cx = plinth_x
+    house_cy = plinth_y
+    top_floor_base_z = plinth_h + ((len(floors) - 1) * floor_height)
     
-    # Point camera at house center
-    target = mathutils.Vector((house_cx, house_cy, (top_floor_base_z + wall_height) * 0.45))
+    cam_obj.location = (house_cx + cam_dist * 0.75, house_cy - cam_dist * 0.75, cam_height)
+    
+    target = mathutils.Vector((house_cx, house_cy, (top_floor_base_z + full_wall_height) * 0.45))
     direction = target - cam_obj.location
     rot_quat = direction.to_track_quat('-Z', 'Y')
     cam_obj.rotation_euler = rot_quat.to_euler()
@@ -387,7 +235,7 @@ def build_scene_from_layout(layout, is_cutaway=False, lighting="day"):
     # 5. Sun and Environment Lighting
     sun_data = bpy.data.lights.new(name="ArchitecturalSun", type='SUN')
     sun_data.energy = 5.5 if lighting == "day" else (3.2 if lighting == "sunset" else 0.4)
-    sun_data.angle = math.radians(1.2) # Soft architectural shadows
+    sun_data.angle = math.radians(1.2)
     if lighting == "sunset":
         sun_data.color = (1.0, 0.72, 0.45)
     elif lighting == "night":
@@ -401,7 +249,6 @@ def build_scene_from_layout(layout, is_cutaway=False, lighting="day"):
     sun_yaw = math.radians(55)
     sun_obj.rotation_euler = (sun_pitch, 0, sun_yaw)
     
-    # Sky Background in World
     world = bpy.data.worlds.new("ArchitecturalWorld")
     world.use_nodes = True
     bpy.context.scene.world = world
@@ -424,17 +271,14 @@ def build_scene_from_layout(layout, is_cutaway=False, lighting="day"):
 
 def setup_render_settings(output_path, resolution="1920x1080", samples=64):
     scene = bpy.context.scene
-    
-    # Try CYCLES first
     scene.render.engine = 'CYCLES'
     try:
-        scene.cycles.device = 'CPU' # Headless compatibility
+        scene.cycles.device = 'CPU'
         scene.cycles.samples = samples
         scene.cycles.use_denoising = True
     except Exception as e:
-        print(f"[NOTICE] Cycles configuration warning: {e}. Falling back to default settings.")
+        print(f"[NOTICE] Cycles configuration warning: {e}")
         
-    # Resolution
     try:
         rw, rh = resolution.lower().split("x")
         scene.render.resolution_x = int(rw)
@@ -447,8 +291,6 @@ def setup_render_settings(output_path, resolution="1920x1080", samples=64):
     scene.render.image_settings.file_format = 'PNG'
     scene.render.image_settings.color_mode = 'RGBA'
     scene.render.filepath = output_path
-    
-    # Color management: Filmic or AgX tone mapping
     scene.view_settings.view_transform = 'Filmic'
     scene.view_settings.look = 'Medium High Contrast'
 

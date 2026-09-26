@@ -1,45 +1,60 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import {
-  Camera,
-  ChevronDown,
-  RotateCcw,
-  Sun,
-  Moon,
-  Sparkles,
-  Layers,
-  Eye,
-  Scissors,
-  Building,
-  Plus,
-  Minus,
-  Maximize2,
-  Minimize2,
-  Compass,
-  Download,
-} from "lucide-react";
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import {
   HouseLayout,
   FloorPlan,
   Room,
   FurnitureItem,
   Wall,
-  Door,
-  WindowItem,
-  Rect,
 } from "@/types/house";
 import {
+  Engine,
+  Scene,
+  ArcRotateCamera,
+  Vector3,
+  Color3,
+  Color4,
+  HemisphericLight,
+  DirectionalLight,
+  PointLight,
+  ShadowGenerator,
+  MeshBuilder,
+  PBRMaterial,
+  StandardMaterial,
+  TransformNode,
+  AbstractMesh,
+  Mesh,
+  HDRCubeTexture,
+  Ray,
+  PointerEventTypes,
+  PointerInfo,
+  Animation,
+  EasingFunction,
+  CubicEase,
+  Matrix,
+} from "@babylonjs/core";
+import "@babylonjs/loaders/glTF";
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import {
+  Camera,
+  Compass,
+  Layers,
+  Sparkles,
+  Sun,
+  Moon,
+  ChevronDown,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Minus,
+  Check,
+  Scissors,
+  Home,
+  Info,
+} from "lucide-react";
+import {
   generateArchitecturalLandscape,
-  buildArchitecturalLandscapeScene,
 } from "@/utils/residentialLandscapeGenerator";
 import { RealisticRenderModal } from "@/components/RealisticRenderModal";
 import { editRoomLayoutFull } from "@/utils/api";
@@ -109,13 +124,13 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   initialPresentationMode,
   hasNotification,
 }) => {
-  const mountRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Authoritative Architectural Elevation Constants
   const plinthHeight = 0.8;   // Finished plinth at y = 0.8 ft
-  const floorHeight = 10.0;   // Height from floor level to next floor level (10 ft)
+  const floorHeight = 10.0;   // Height from floor to floor (10 ft)
   const fullWallHeight = 9.5; // Clear wall height (9.5 ft)
-  const cutawayWallHeight = 3.2; // Selective cutaway wall height
+  const cutawayWallHeight = 3.5; // Selective cutaway wall height (exposes interior)
   const slabThickness = 0.6;  // Concrete intermediate slab thickness (0.6 ft)
 
   const pw = layout.plot_width || 40;
@@ -153,1249 +168,704 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   const [internalShowLandscape, setInternalShowLandscape] = useState(true);
   const effectiveShowLandscape = showLandscape !== undefined ? showLandscape : internalShowLandscape;
 
-  // Realistic Render Modal
+  // Realistic Render Modal State
   const [isRenderModalOpen, setIsRenderModalOpen] = useState(false);
   const [isEditingRoom, setIsEditingRoom] = useState(false);
 
-  // Three.js Core Refs
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const composerRef = useRef<EffectComposer | null>(null);
-  const bloomPassRef = useRef<UnrealBloomPass | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const houseRootRef = useRef<THREE.Group | null>(null);
-  const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
-  const skyLightRef = useRef<THREE.HemisphereLight | null>(null);
-  const interiorLightsGroupRef = useRef<THREE.Group | null>(null);
+  // Babylon.js Core Refs
+  const engineRef = useRef<Engine | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const cameraRef = useRef<ArcRotateCamera | null>(null);
+  const sunLightRef = useRef<DirectionalLight | null>(null);
+  const skyLightRef = useRef<HemisphericLight | null>(null);
+  const shadowGenRef = useRef<ShadowGenerator | null>(null);
+  const houseRootRef = useRef<TransformNode | null>(null);
+  const interiorLightsRef = useRef<PointLight[]>([]);
 
-  // Camera Target Lerp
-  const targetCamPos = useRef(new THREE.Vector3());
-  const targetControlsTarget = useRef(new THREE.Vector3());
-  const isTransitioningCamera = useRef(false);
-
-  // Raycaster for touch/click interaction
-  const raycaster = useRef(new THREE.Raycaster());
-  const pointer = useRef(new THREE.Vector2());
-
-  // GLTF Asset Caches
-  const loadedFurnitureRef = useRef<Record<string, THREE.Group>>({});
-  const loadedNatureRef = useRef<Record<string, THREE.Group>>({});
+  // Asset Caches (AssetContainers for GLB instancing)
+  const loadedModelsRef = useRef<Record<string, any>>({});
   const [assetsReady, setAssetsReady] = useState(false);
 
-  // Preload CC0 / Procedural Textures & GLB Assets
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const loader = new GLTFLoader();
-    let mounted = true;
+  // --------------------------------------------------------------------------
+  // 1. BABYLON PBR MATERIAL PALETTE (Curated Architectural Finish Palette)
+  // --------------------------------------------------------------------------
+  const getOrCreatePBRMaterial = useCallback((name: string, scene: Scene, config: {
+    albedoHex: string;
+    roughness?: number;
+    metallic?: number;
+    alpha?: number;
+    emissiveHex?: string;
+  }): PBRMaterial => {
+    let mat = scene.getMaterialByName(name) as PBRMaterial;
+    if (!mat) {
+      mat = new PBRMaterial(name, scene);
+      mat.albedoColor = Color3.FromHexString(config.albedoHex);
+      mat.roughness = config.roughness ?? 0.85;
+      mat.metallic = config.metallic ?? 0.0;
+      if (config.alpha !== undefined && config.alpha < 1.0) {
+        mat.alpha = config.alpha;
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+      }
+      if (config.emissiveHex) {
+        mat.emissiveColor = Color3.FromHexString(config.emissiveHex);
+      }
+      mat.maxSimultaneousLights = 4;
+    }
+    return mat;
+  }, []);
 
-    // Furniture Library
-    const furnitureModels = [
-      "sofa", "coffee_table", "tv_unit", "bed", "nightstand",
-      "wardrobe", "dining_table", "dining_chair", "kitchen_counter",
-      "refrigerator", "toilet", "basin", "shower", "outdoor_chair",
-      "outdoor_table", "planter"
+  // --------------------------------------------------------------------------
+  // 2. INITIALIZE BABYLON.JS ENGINE & ARCHITECTURAL 3/4 CAMERA
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Create high-performance Babylon engine
+    const engine = new Engine(canvas, true, {
+      preserveDrawingBuffer: true,
+      stencil: true,
+      adaptToDeviceRatio: true,
+      powerPreference: "high-performance",
+    });
+    engineRef.current = engine;
+
+    const scene = new Scene(engine);
+    scene.clearColor = isDarkMode ? new Color4(0.06, 0.07, 0.09, 1.0) : new Color4(0.91, 0.93, 0.94, 1.0);
+    sceneRef.current = scene;
+
+    // ACES Tone Mapping & Color Management (Prevents overexposure & blown-out whites)
+    scene.imageProcessingConfiguration.toneMappingEnabled = true;
+    scene.imageProcessingConfiguration.toneMappingType = 1; // ACES Filmic Tone Mapping
+    scene.imageProcessingConfiguration.exposure = 0.88;
+    scene.imageProcessingConfiguration.contrast = 1.08;
+
+    // House diagonal & framing
+    const diag = Math.hypot(pw, pl);
+    const target = new Vector3(cx, plinthHeight + 3.8, cz);
+
+    // Initial 3/4 Perspective Camera matching Reference Image
+    // Elevated top-down 3/4 view: beta ~ 58° (1.02 rad), alpha ~ 45° (0.785 rad)
+    let initialAlpha = Math.PI * 0.25;
+    if (resolvedFacing === "west") initialAlpha = Math.PI * 0.75;
+    else if (resolvedFacing === "north") initialAlpha = Math.PI * 1.25;
+    else if (resolvedFacing === "east") initialAlpha = Math.PI * 1.75;
+
+    const camera = new ArcRotateCamera(
+      "archDollhouseCamera",
+      initialAlpha,
+      Math.PI * 0.32, // ~58 deg elevation angle
+      diag * 1.65,    // frames house filling 75-80% of viewport
+      target,
+      scene
+    );
+    camera.attachControl(canvas, true);
+    camera.wheelPrecision = 18;
+    camera.minZ = 0.5;
+    camera.maxZ = 1200;
+    camera.lowerBetaLimit = 0.08;
+    camera.upperBetaLimit = Math.PI / 2 - 0.04; // Don't dip below horizon
+    camera.lowerRadiusLimit = 12;
+    camera.upperRadiusLimit = 280;
+    camera.inertia = 0.82;
+    cameraRef.current = camera;
+
+    // ------------------------------------------------------------------------
+    // LIGHTING: Natural Daylight with Soft Architectural Contact Shadows
+    // ------------------------------------------------------------------------
+    const sunLight = new DirectionalLight(
+      "sunLight",
+      new Vector3(-0.6, -0.9, -0.6).normalize(),
+      scene
+    );
+    sunLight.position = new Vector3(cx + diag * 0.7, diag * 1.2, cz + diag * 0.7);
+    sunLight.diffuse = Color3.FromHexString("#FFFAED");
+    sunLight.intensity = 1.35;
+    sunLightRef.current = sunLight;
+
+    const skyLight = new HemisphericLight(
+      "skyLight",
+      new Vector3(0, 1, 0),
+      scene
+    );
+    skyLight.diffuse = Color3.FromHexString("#E2EAF4");
+    skyLight.groundColor = Color3.FromHexString("#475569");
+    skyLight.intensity = 0.42;
+    skyLightRef.current = skyLight;
+
+    // Shadow Generator
+    const shadowGen = new ShadowGenerator(2048, sunLight);
+    shadowGen.useBlurExponentialShadowMap = true;
+    shadowGen.blurKernel = 32;
+    shadowGen.darkness = 0.32;
+    shadowGen.bias = 0.0004;
+    shadowGenRef.current = shadowGen;
+
+    // HDRI Ambient Environment
+    try {
+      const hdrTexture = new HDRCubeTexture(
+        "/environments/sky_architectural.hdr",
+        scene,
+        256,
+        false,
+        true,
+        false,
+        true
+      );
+      scene.environmentTexture = hdrTexture;
+      scene.environmentIntensity = 0.35;
+    } catch (e) {
+      console.warn("[Notice] Fallback ambient environment will be used:", e);
+    }
+
+    // Root node for house architecture
+    const houseRoot = new TransformNode("houseRoot", scene);
+    houseRootRef.current = houseRoot;
+
+    // Preload GLB Furniture & Nature assets
+    const modelsToLoad = [
+      { id: "sofa", path: "/models/furniture/sofa.glb" },
+      { id: "bed", path: "/models/furniture/bed.glb" },
+      { id: "dining_table", path: "/models/furniture/dining_table.glb" },
+      { id: "dining_chair", path: "/models/furniture/dining_chair.glb" },
+      { id: "kitchen_counter", path: "/models/furniture/kitchen_counter.glb" },
+      { id: "coffee_table", path: "/models/furniture/coffee_table.glb" },
+      { id: "nightstand", path: "/models/furniture/nightstand.glb" },
+      { id: "tv_unit", path: "/models/furniture/tv_unit.glb" },
+      { id: "wardrobe", path: "/models/furniture/wardrobe.glb" },
+      { id: "toilet", path: "/models/furniture/toilet.glb" },
+      { id: "basin", path: "/models/furniture/basin.glb" },
+      { id: "shower", path: "/models/furniture/shower.glb" },
+      { id: "outdoor_table", path: "/models/furniture/outdoor_table.glb" },
+      { id: "outdoor_chair", path: "/models/furniture/outdoor_chair.glb" },
+      { id: "planter", path: "/models/furniture/planter.glb" },
+      { id: "tree_small", path: "/models/tree_small.glb" },
+      { id: "bush", path: "/models/bush.glb" },
     ];
 
     let loadedCount = 0;
-    const totalCount = furnitureModels.length;
-
-    furnitureModels.forEach((name) => {
-      loader.load(
-        `/models/furniture/${name}.glb`,
-        (gltf) => {
-          if (!mounted) return;
-          gltf.scene.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-            }
-          });
-          loadedFurnitureRef.current[name] = gltf.scene;
-          loadedCount++;
-          if (loadedCount === totalCount) setAssetsReady(true);
-        },
-        undefined,
-        () => {
-          loadedCount++;
-          if (loadedCount === totalCount) setAssetsReady(true);
+    modelsToLoad.forEach((item) => {
+      SceneLoader.LoadAssetContainer("", item.path, scene, (container) => {
+        loadedModelsRef.current[item.id] = container;
+        loadedCount++;
+        if (loadedCount >= modelsToLoad.length - 2) {
+          setAssetsReady(true);
         }
-      );
+      }, null, () => {
+        loadedCount++;
+        if (loadedCount >= modelsToLoad.length - 2) {
+          setAssetsReady(true);
+        }
+      });
     });
 
-    // Nature Kit Models
-    const natureModels: Record<string, string> = {
-      bush: "/models/bush.glb",
-      bushDetailed: "/models/bush_detailed.glb",
-      flowerPurple: "/models/flower_purple.glb",
-      flowerRed: "/models/flower_red.glb",
-      flowerYellow: "/models/flower_yellow.glb",
-      treeSmall: "/models/tree_small.glb",
+    // Raycast Interaction for selecting rooms
+    scene.onPointerObservable.add((pointerInfo: PointerInfo) => {
+      if (pointerInfo.type === PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo?.hit) {
+        const pickedMesh = pointerInfo.pickInfo.pickedMesh;
+        if (pickedMesh && pickedMesh.metadata?.roomId) {
+          onSelectRoom(pickedMesh.metadata.roomId);
+        }
+      }
+    });
+
+    // Render Loop
+    engine.runRenderLoop(() => {
+      scene.render();
+    });
+
+    // Resize Handling
+    const handleResize = () => {
+      engine.resize();
     };
-
-    Object.entries(natureModels).forEach(([k, path]) => {
-      loader.load(
-        path,
-        (gltf) => {
-          if (!mounted) return;
-          loadedNatureRef.current[k] = gltf.scene;
-        },
-        undefined,
-        () => {}
-      );
-    });
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      mounted = false;
+      window.removeEventListener("resize", handleResize);
+      engine.dispose();
     };
-  }, []);
+  }, [cx, cz, pw, pl, isDarkMode, resolvedFacing, plinthHeight]);
 
-  // Procedural Wood / Marble / Plaster Texture Generators
-  const woodTexture = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.fillStyle = "#C49A6C";
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.fillStyle = "rgba(0,0,0,0.06)";
-    for (let y = 0; y < 512; y += 32) {
-      ctx.fillRect(0, y, 512, 1.5);
-      const offset = (y / 32) % 2 === 0 ? 128 : 256;
-      for (let x = offset; x < 512; x += 256) {
-        ctx.fillRect(x, y, 1.5, 32);
+  // --------------------------------------------------------------------------
+  // 3. LIGHTING PRESETS DYNAMIC UPDATE (Day / Dusk / Night)
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    const sun = sunLightRef.current;
+    const sky = skyLightRef.current;
+    const scene = sceneRef.current;
+    if (!sun || !sky || !scene) return;
+
+    const diag = Math.hypot(pw, pl);
+
+    if (effectiveLightingPreset === "day") {
+      sun.diffuse = Color3.FromHexString("#FFFAED");
+      sun.intensity = 1.35;
+      sun.direction = new Vector3(-0.6, -0.9, -0.6).normalize();
+      sun.position = new Vector3(cx + diag * 0.7, diag * 1.2, cz + diag * 0.7);
+
+      sky.diffuse = Color3.FromHexString("#E2EAF4");
+      sky.groundColor = Color3.FromHexString("#475569");
+      sky.intensity = 0.42;
+
+      scene.environmentIntensity = 0.35;
+      scene.clearColor = isDarkMode ? new Color4(0.06, 0.07, 0.09, 1.0) : new Color4(0.91, 0.93, 0.94, 1.0);
+      scene.imageProcessingConfiguration.exposure = 0.88;
+
+      interiorLightsRef.current.forEach((l) => (l.intensity = 0.0));
+    } else if (effectiveLightingPreset === "sunset") {
+      sun.diffuse = Color3.FromHexString("#F59E0B");
+      sun.intensity = 1.05;
+      sun.direction = new Vector3(0.8, -0.4, -0.4).normalize();
+      sun.position = new Vector3(cx - diag * 0.9, diag * 0.5, cz + diag * 0.5);
+
+      sky.diffuse = Color3.FromHexString("#FB923C");
+      sky.groundColor = Color3.FromHexString("#1E1B4B");
+      sky.intensity = 0.35;
+
+      scene.environmentIntensity = 0.28;
+      scene.clearColor = isDarkMode ? new Color4(0.05, 0.06, 0.08, 1.0) : new Color4(0.82, 0.85, 0.88, 1.0);
+      scene.imageProcessingConfiguration.exposure = 0.92;
+
+      interiorLightsRef.current.forEach((l) => (l.intensity = 0.45));
+    } else if (effectiveLightingPreset === "night") {
+      sun.diffuse = Color3.FromHexString("#93C5FD");
+      sun.intensity = 0.28;
+      sun.direction = new Vector3(-0.5, -0.8, 0.5).normalize();
+      sun.position = new Vector3(cx + diag * 0.6, diag * 0.9, cz - diag * 0.6);
+
+      sky.diffuse = Color3.FromHexString("#1E293B");
+      sky.groundColor = Color3.FromHexString("#090A0F");
+      sky.intensity = 0.16;
+
+      scene.environmentIntensity = 0.15;
+      scene.clearColor = new Color4(0.03, 0.04, 0.06, 1.0);
+      scene.imageProcessingConfiguration.exposure = 0.98;
+
+      interiorLightsRef.current.forEach((l) => (l.intensity = 0.85));
+    }
+  }, [effectiveLightingPreset, cx, cz, pw, pl, isDarkMode]);
+
+  // --------------------------------------------------------------------------
+  // 4. ARCHITECTURAL SCENE REBUILD (Pure HouseLayout Single Source of Truth)
+  // --------------------------------------------------------------------------
+  const rebuildScene = useCallback(() => {
+    const scene = sceneRef.current;
+    const houseRoot = houseRootRef.current;
+    const shadowGen = shadowGenRef.current;
+    if (!scene || !houseRoot) return;
+
+    // Clean up existing house meshes & interior lights
+    houseRoot.getChildren().forEach((child) => child.dispose());
+    interiorLightsRef.current.forEach((l) => l.dispose());
+    interiorLightsRef.current = [];
+
+    // Materials Palette
+    const extPlaster = getOrCreatePBRMaterial("extPlaster", scene, { albedoHex: isDarkMode ? "#33353A" : "#ECE8E1", roughness: 0.88 });
+    const intPlaster = getOrCreatePBRMaterial("intPlaster", scene, { albedoHex: isDarkMode ? "#27292D" : "#F2EFE9", roughness: 0.90 });
+    const accentStone = getOrCreatePBRMaterial("accentStone", scene, { albedoHex: isDarkMode ? "#1C2028" : "#2E3440", roughness: 0.70 });
+    const woodFloor = getOrCreatePBRMaterial("woodFloor", scene, { albedoHex: isDarkMode ? "#3A291C" : "#A87948", roughness: 0.42 });
+    const marbleFloor = getOrCreatePBRMaterial("marbleFloor", scene, { albedoHex: isDarkMode ? "#22252A" : "#E8E6E1", roughness: 0.25 });
+    const slabMat = getOrCreatePBRMaterial("slabMat", scene, { albedoHex: isDarkMode ? "#2D3036" : "#D6D4CF", roughness: 0.82 });
+    const glassMat = getOrCreatePBRMaterial("glassMat", scene, { albedoHex: "#9AC4E8", roughness: 0.05, alpha: 0.28 });
+    const frameMat = getOrCreatePBRMaterial("frameMat", scene, { albedoHex: "#1C1E24", roughness: 0.45, metallic: 0.6 });
+    const grassMat = getOrCreatePBRMaterial("grassMat", scene, { albedoHex: isDarkMode ? "#1B2A15" : "#4A7C32", roughness: 0.92 });
+    const roadMat = getOrCreatePBRMaterial("roadMat", scene, { albedoHex: isDarkMode ? "#181A1F" : "#2A2D34", roughness: 0.85 });
+    const paverMat = getOrCreatePBRMaterial("paverMat", scene, { albedoHex: isDarkMode ? "#2A2825" : "#CFCAC2", roughness: 0.78 });
+    const curbMat = getOrCreatePBRMaterial("curbMat", scene, { albedoHex: isDarkMode ? "#2B2D33" : "#525660", roughness: 0.80 });
+    const boundaryMat = getOrCreatePBRMaterial("boundaryMat", scene, { albedoHex: isDarkMode ? "#2C2E34" : "#E2DFD8", roughness: 0.85 });
+    const gateMat = getOrCreatePBRMaterial("gateMat", scene, { albedoHex: "#1F232B", roughness: 0.40, metallic: 0.8 });
+    const carportMat = getOrCreatePBRMaterial("carportMat", scene, { albedoHex: "#272A30", roughness: 0.75 });
+    const soilMat = getOrCreatePBRMaterial("soilMat", scene, { albedoHex: isDarkMode ? "#1C1510" : "#33251A", roughness: 0.95 });
+    const terraceMat = getOrCreatePBRMaterial("terraceMat", scene, { albedoHex: "#BEB9B0", roughness: 0.70 });
+
+    // Calculate house bounding footprint
+    const allRooms: Room[] = [];
+    if (layout.floors && layout.floors.length > 0) {
+      layout.floors.forEach((fl) => allRooms.push(...(fl.rooms || [])));
+    } else {
+      allRooms.push(...(layout.rooms || []));
+    }
+
+    const minX = Math.min(...allRooms.map((r) => r.rect?.x ?? 5), 5);
+    const maxX = Math.max(...allRooms.map((r) => (r.rect?.x ?? 0) + (r.rect?.width ?? 10)), 35);
+    const minZ = Math.min(...allRooms.map((r) => r.rect?.y ?? 5), 5);
+    const maxZ = Math.max(...allRooms.map((r) => (r.rect?.y ?? 0) + (r.rect?.length ?? 10)), 45);
+
+    const plinthW = maxX - minX + 2.4;
+    const plinthL = maxZ - minZ + 2.4;
+    const plinthX = (minX + maxX) / 2;
+    const plinthZ = (minZ + maxZ) / 2;
+
+    // 1. PLINTH & FOUNDATION SLAB
+    const plinthMesh = MeshBuilder.CreateBox("plinthSlab", {
+      width: plinthW,
+      depth: plinthL,
+      height: plinthHeight,
+    }, scene);
+    plinthMesh.position = new Vector3(plinthX, plinthHeight / 2, plinthZ);
+    plinthMesh.material = slabMat;
+    plinthMesh.parent = houseRoot;
+    plinthMesh.receiveShadows = true;
+    if (shadowGen) shadowGen.addShadowCaster(plinthMesh);
+
+    // 2. LANDSCAPE & SITE INTEGRATION
+    if (effectiveShowLandscape) {
+      const siteGround = MeshBuilder.CreateBox("siteGround", {
+        width: pw * 2.2,
+        depth: pl * 2.2,
+        height: 0.2,
+      }, scene);
+      siteGround.position = new Vector3(cx, -0.1, cz);
+      siteGround.material = grassMat;
+      siteGround.parent = houseRoot;
+      siteGround.receiveShadows = true;
+
+      // Public Road
+      const roadW = pw * 2.4;
+      const roadD = 14.0;
+      let roadX = cx;
+      let roadZ = cz + pl / 2 + roadD / 2;
+      if (resolvedFacing === "north") roadZ = cz - pl / 2 - roadD / 2;
+      else if (resolvedFacing === "east") { roadX = cx + pw / 2 + roadD / 2; roadZ = cz; }
+      else if (resolvedFacing === "west") { roadX = cx - pw / 2 - roadD / 2; roadZ = cz; }
+
+      const roadMesh = MeshBuilder.CreateBox("publicRoad", { width: roadW, depth: roadD, height: 0.15 }, scene);
+      roadMesh.position = new Vector3(roadX, 0.05, roadZ);
+      roadMesh.material = roadMat;
+      roadMesh.parent = houseRoot;
+      roadMesh.receiveShadows = true;
+
+      // Entrance Walkway & Driveway Pavers
+      const drivewayMesh = MeshBuilder.CreateBox("drivewayPaver", {
+        width: plinthW * 0.9,
+        depth: Math.abs(cz + pl / 2 - plinthZ) * 0.95,
+        height: 0.18,
+      }, scene);
+      drivewayMesh.position = new Vector3(plinthX, 0.09, (cz + pl / 2 + plinthZ + plinthL / 2) / 2);
+      drivewayMesh.material = paverMat;
+      drivewayMesh.parent = houseRoot;
+      drivewayMesh.receiveShadows = true;
+
+      // Modern Pergola (Reference Architectural Feature)
+      const pergolaW = 12.0;
+      const pergolaL = 14.0;
+      const pergolaH = 9.0;
+      const pergX = plinthX - plinthW / 2 + 5.0;
+      const pergZ = plinthZ + plinthL / 2 - 2.0;
+
+      // Columns
+      const colMat = frameMat;
+      const colGeo = { width: 0.4, depth: 0.4, height: pergolaH };
+      [-pergolaW / 2, pergolaW / 2].forEach((px) => {
+        [-pergolaL / 2, pergolaL / 2].forEach((pz) => {
+          const col = MeshBuilder.CreateBox("pergolaCol", colGeo, scene);
+          col.position = new Vector3(pergX + px, plinthHeight + pergolaH / 2, pergZ + pz);
+          col.material = colMat;
+          col.parent = houseRoot;
+          if (shadowGen) shadowGen.addShadowCaster(col);
+        });
+      });
+
+      // Pergola Slats
+      for (let s = -pergolaL / 2; s <= pergolaL / 2; s += 2.0) {
+        const slat = MeshBuilder.CreateBox("pergolaSlat", { width: pergolaW + 1.0, depth: 0.2, height: 0.4 }, scene);
+        slat.position = new Vector3(pergX, plinthHeight + pergolaH, pergZ + s);
+        slat.material = colMat;
+        slat.parent = houseRoot;
+        if (shadowGen) shadowGen.addShadowCaster(slat);
       }
     }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(4, 4);
-    return tex;
-  }, []);
 
-  const tileTexture = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.fillStyle = "#EAE6DE";
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "#D2CCC2";
-    ctx.lineWidth = 2;
-    for (let i = 0; i <= 512; i += 64) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, 512);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(512, i);
-      ctx.stroke();
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(3, 3);
-    return tex;
-  }, []);
+    // 3. MULTI-FLOOR & ROOMS GEOMETRY CONSTRUCTION
+    const numFloors = Math.max(1, layout.floors?.length || layout.num_floors || 1);
 
-  const grassTexture = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.fillStyle = "#437329";
-    ctx.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 3500; i++) {
-      const gx = Math.random() * 512;
-      const gy = Math.random() * 512;
-      ctx.fillStyle = Math.random() > 0.5 ? "#386121" : "#528734";
-      ctx.fillRect(gx, gy, 2, 4);
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(Math.max(4, Math.round(pw / 6)), Math.max(4, Math.round(pl / 6)));
-    return tex;
-  }, [pw, pl]);
+    (layout.floors || [layout]).forEach((fl, fIdx) => {
+      const floorPlan: FloorPlan =
+        layout.floors && layout.floors[fIdx]
+          ? layout.floors[fIdx]
+          : {
+              floor_number: fIdx + 1,
+              floor_name: `Level ${fIdx + 1}`,
+              rooms: layout.rooms || [],
+              exterior_walls: layout.exterior_walls || [],
+              interior_walls: layout.interior_walls || [],
+              doors: layout.doors || [],
+              windows: layout.windows || [],
+            };
 
-  const paverTexture = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.fillStyle = "#CFCAC2";
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "#A49F96";
-    ctx.lineWidth = 2.5;
-    for (let y = 0; y < 512; y += 64) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(512, y);
-      ctx.stroke();
-      const offset = (y / 64) % 2 === 0 ? 0 : 32;
-      for (let x = offset; x <= 512; x += 64) {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y + 64);
-        ctx.stroke();
-      }
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(3, 4);
-    return tex;
-  }, []);
+      const floorBaseY = plinthHeight + fIdx * floorHeight;
 
-  // PBR Materials System (Calibrated for crisp architectural visualization without blowouts)
-  const materials = useMemo(() => {
-    return {
-      // Exterior Stucco / Plaster: Warm off-white (NOT pure white!)
-      extPlaster: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#33353A" : "#ECE8E1",
-        roughness: 0.88,
-        metalness: 0.02,
-      }),
-      // Accent Architectural Stone: Rich dark charcoal slate
-      accentStone: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#1C2028" : "#2E3440",
-        roughness: 0.65,
-        metalness: 0.05,
-      }),
-      // Interior Plaster Partition: Clean warm gallery white
-      intPlaster: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#27292D" : "#F2EFE9",
-        roughness: 0.90,
-        metalness: 0.01,
-      }),
-      // Concrete Plinth Foundation
-      plinthMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#26282E" : "#B8BAC0",
-        roughness: 0.75,
-        metalness: 0.04,
-      }),
-      // Concrete Intermediate Slabs & Roof
-      slabMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2D3036" : "#D6D4CF",
-        roughness: 0.72,
-        metalness: 0.03,
-      }),
-      terraceMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2D3036" : "#D6D4CF",
-        roughness: 0.72,
-        metalness: 0.03,
-      }),
-      // Hardwood Oak Floor: Rich warm brown tone
-      woodFloor: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#3A291C" : "#A87948",
-        roughness: 0.38,
-        metalness: 0.04,
-        map: woodTexture || undefined,
-      }),
-      // Marble Tile Floor: Honed light stone
-      marbleFloor: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#22252A" : "#E8E6E1",
-        roughness: 0.22,
-        metalness: 0.05,
-        map: tileTexture || undefined,
-      }),
-      // Architectural Transparent Glass
-      glassMat: new THREE.MeshStandardMaterial({
-        color: "#9AC4E8",
-        transparent: true,
-        opacity: 0.28,
-        roughness: 0.04,
-        metalness: 0.12,
-      }),
-      // Dark Aluminum Frame
-      frameMat: new THREE.MeshStandardMaterial({
-        color: "#1E2229",
-        roughness: 0.42,
-        metalness: 0.85,
-      }),
-      // Wooden Door Leaf
-      doorLeafMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#362215" : "#633B1E",
-        roughness: 0.45,
-        metalness: 0.05,
-      }),
-      // Polished Chrome Hardware
-      chromeMat: new THREE.MeshStandardMaterial({
-        color: "#CBD5E1",
-        roughness: 0.18,
-        metalness: 0.95,
-      }),
-      // Coping Cap
-      copingMat: new THREE.MeshStandardMaterial({
-        color: "#374151",
-        roughness: 0.6,
-      }),
-      // Entrance Canopy
-      canopyMat: new THREE.MeshStandardMaterial({
-        color: "#1F2937",
-        roughness: 0.35,
-        metalness: 0.85,
-      }),
-      // Site Landscaping Materials (Prevents default pure-white fallback meshes)
-      grassMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#1B2A15" : "#4A7C32",
-        map: grassTexture || undefined,
-        roughness: 0.85,
-        metalness: 0.01,
-      }),
-      roadMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#181A1F" : "#2A2D34",
-        roughness: 0.88,
-        metalness: 0.05,
-      }),
-      paverMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2A2825" : "#CFCAC2",
-        map: paverTexture || undefined,
-        roughness: 0.75,
-        metalness: 0.02,
-      }),
-      curbMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2B2D33" : "#525660",
-        roughness: 0.70,
-        metalness: 0.10,
-      }),
-      boundaryMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2C2E34" : "#E2DFD8",
-        roughness: 0.85,
-        metalness: 0.02,
-      }),
-      gateMat: new THREE.MeshStandardMaterial({
-        color: "#1F232B",
-        roughness: 0.45,
-        metalness: 0.80,
-      }),
-      carportMat: new THREE.MeshStandardMaterial({
-        color: "#272A30",
-        roughness: 0.40,
-        metalness: 0.75,
-      }),
-      soilMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#1C1510" : "#33251A",
-        roughness: 0.95,
-        metalness: 0.0,
-      }),
-      // Fallback Furniture Materials
-      furnitureWood: new THREE.MeshStandardMaterial({ color: "#7A5C3D", roughness: 0.55 }),
-      furnitureFabric: new THREE.MeshStandardMaterial({ color: "#B8B0A2", roughness: 0.85 }),
-    };
-  }, [isDarkMode, woodTexture, tileTexture, grassTexture, paverTexture]);
-
-  // Floor Material Mapper
-  const getRoomFloorMaterial = useCallback(
-    (room: Room): THREE.MeshStandardMaterial => {
-      const type = (room.type || "").toLowerCase();
-      const name = (room.name || "").toLowerCase();
-      if (type.includes("bed") || name.includes("bed") || type.includes("living") || name.includes("living")) {
-        return materials.woodFloor;
-      }
-      return materials.marbleFloor;
-    },
-    [materials]
-  );
-
-  // Helper to place GLTF or fallback procedural furniture
-  const placeFurniturePiece = useCallback(
-    (item: FurnitureItem, hostGroup: THREE.Group, floorBaseY: number) => {
-      const type = (item.type || "").toLowerCase();
-      const fw = Math.max(1.0, Number(item.width) || 3.0);
-      const fl = Math.max(1.0, Number(item.length) || 3.0);
-      const fx = item.x !== undefined ? item.x : 0;
-      const fz = item.y !== undefined ? item.y : 0;
-      const rotY = -THREE.MathUtils.degToRad(item.rotation || 0);
-
-      // Match item to GLB model
-      let modelKey = "sofa";
-      if (type.includes("bed")) modelKey = "bed";
-      else if (type.includes("nightstand") || type.includes("side_table")) modelKey = "nightstand";
-      else if (type.includes("wardrobe") || type.includes("closet")) modelKey = "wardrobe";
-      else if (type.includes("coffee")) modelKey = "coffee_table";
-      else if (type.includes("tv")) modelKey = "tv_unit";
-      else if (type.includes("dining_table")) modelKey = "dining_table";
-      else if (type.includes("chair")) modelKey = "dining_chair";
-      else if (type.includes("counter") || type.includes("kitchen")) modelKey = "kitchen_counter";
-      else if (type.includes("fridge") || type.includes("refrigerator")) modelKey = "refrigerator";
-      else if (type.includes("toilet") || type.includes("wc")) modelKey = "toilet";
-      else if (type.includes("basin") || type.includes("vanity")) modelKey = "basin";
-      else if (type.includes("shower")) modelKey = "shower";
-      else if (type.includes("outdoor") && type.includes("chair")) modelKey = "outdoor_chair";
-      else if (type.includes("outdoor") && type.includes("table")) modelKey = "outdoor_table";
-      else if (type.includes("plant") || type.includes("planter")) modelKey = "planter";
-
-      const cachedModel = loadedFurnitureRef.current[modelKey];
-      if (cachedModel) {
-        const cloned = cachedModel.clone(true);
-        cloned.position.set(fx, floorBaseY + 0.02, fz);
-        cloned.rotation.y = rotY;
-        cloned.userData = { furnitureId: item.id, type: "furniture" };
-        hostGroup.add(cloned);
-      } else {
-        // Fallback procedural box
-        const boxGeo = new THREE.BoxGeometry(fw, 1.2, fl);
-        const boxMesh = new THREE.Mesh(boxGeo, materials.furnitureFabric);
-        boxMesh.position.set(fx, floorBaseY + 0.6, fz);
-        boxMesh.rotation.y = rotY;
-        boxMesh.castShadow = true;
-        boxMesh.receiveShadow = true;
-        boxMesh.userData = { furnitureId: item.id, type: "furniture" };
-        hostGroup.add(boxMesh);
-      }
-    },
-    [materials]
-  );
-
-  // Build Staircase connecting floorBaseY to floorBaseY + floorHeight
-  const buildArchitecturalStaircase = useCallback(
-    (rect: Rect, baseElevation: number): THREE.Group => {
-      const group = new THREE.Group();
-      const sw = Math.max(3.0, rect.width || 6.0);
-      const sl = Math.max(6.0, rect.length || 10.0);
-      const sx = rect.x + sw / 2;
-      const sz = rect.y + sl / 2;
-      const numSteps = 16;
-      const stepH = floorHeight / numSteps;
-      const stepD = sl / (numSteps / 2); // Dog-legged flight run
-      const flightW = sw / 2 - 0.2;
-
-      // Flight 1 (Rising to mid landing)
-      for (let i = 0; i < numSteps / 2; i++) {
-        const stepGeo = new THREE.BoxGeometry(flightW, stepH, stepD);
-        const stepMesh = new THREE.Mesh(stepGeo, materials.woodFloor);
-        stepMesh.position.set(
-          sx - flightW / 2 - 0.1,
-          baseElevation + (i + 0.5) * stepH,
-          sz - sl / 2 + (i + 0.5) * stepD
-        );
-        stepMesh.castShadow = true;
-        stepMesh.receiveShadow = true;
-        group.add(stepMesh);
+      // Intermediate RCC Slab between floors
+      if (fIdx > 0) {
+        const slabMesh = MeshBuilder.CreateBox(`slab_level_${fIdx}`, {
+          width: plinthW,
+          depth: plinthL,
+          height: slabThickness,
+        }, scene);
+        slabMesh.position = new Vector3(plinthX, floorBaseY - slabThickness / 2, plinthZ);
+        slabMesh.material = slabMat;
+        slabMesh.parent = houseRoot;
+        slabMesh.receiveShadows = true;
+        if (shadowGen) shadowGen.addShadowCaster(slabMesh);
       }
 
-      // Mid-landing slab
-      const landingH = (numSteps / 2) * stepH;
-      const landingGeo = new THREE.BoxGeometry(sw, 0.4, sl * 0.35);
-      const landingMesh = new THREE.Mesh(landingGeo, materials.slabMat);
-      landingMesh.position.set(sx, baseElevation + landingH - 0.2, sz + sl / 2 - (sl * 0.35) / 2);
-      landingMesh.castShadow = true;
-      group.add(landingMesh);
-
-      // Flight 2 (Rising to top floor)
-      for (let i = numSteps / 2; i < numSteps; i++) {
-        const stepIdx = i - numSteps / 2;
-        const stepGeo = new THREE.BoxGeometry(flightW, stepH, stepD);
-        const stepMesh = new THREE.Mesh(stepGeo, materials.woodFloor);
-        stepMesh.position.set(
-          sx + flightW / 2 + 0.1,
-          baseElevation + (i + 0.5) * stepH,
-          sz + sl / 2 - sl * 0.35 - (stepIdx + 0.5) * stepD
-        );
-        stepMesh.castShadow = true;
-        stepMesh.receiveShadow = true;
-        group.add(stepMesh);
-      }
-
-      // Handrail
-      const railGeo = new THREE.CylinderGeometry(0.04, 0.04, sl * 0.85, 8);
-      const railMesh = new THREE.Mesh(railGeo, materials.frameMat);
-      railMesh.rotation.x = Math.PI / 4.2;
-      railMesh.position.set(sx - flightW, baseElevation + landingH / 2 + 2.5, sz - 0.5);
-      group.add(railMesh);
-
-      return group;
-    },
-    [floorHeight, materials]
-  );
-
-  // Build Single Floor Architectural Geometry
-  const buildFloorGeometry = useCallback(
-    (
-      floor: FloorPlan,
-      floorIndex: number,
-      floorBaseY: number,
-      isCutaway: boolean,
-      interiorLights: THREE.Group,
-      houseCenter: { x: number; z: number }
-    ): THREE.Group => {
-      const floorGroup = new THREE.Group();
-
-      // 1. Room Finished Floor Slabs
-      (floor.rooms || []).forEach((room) => {
-        if (!room || !room.rect) return;
-        const rw = Math.max(1.0, room.rect.width);
-        const rl = Math.max(1.0, room.rect.length);
+      // 3A. ROOM FLOORS & INTERIOR DETAILS
+      (floorPlan.rooms || []).forEach((room, rIdx) => {
+        if (!room.rect) return;
+        const rw = room.rect.width;
+        const rl = room.rect.length;
         const rx = room.rect.x + rw / 2;
         const rz = room.rect.y + rl / 2;
 
-        const floorMat = getRoomFloorMaterial(room);
-        const floorGeo = new THREE.PlaneGeometry(rw - 0.04, rl - 0.04);
-        const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-        floorMesh.rotation.x = -Math.PI / 2;
-        floorMesh.position.set(rx, floorBaseY + 0.02, rz);
-        floorMesh.receiveShadow = true;
-        floorMesh.userData = { roomId: room.id, type: "room_floor" };
-        floorGroup.add(floorMesh);
+        const rtype = (room.type || "").toLowerCase();
+        const isWetArea = rtype.includes("bath") || rtype.includes("toilet") || rtype.includes("kitchen") || rtype.includes("wash");
 
-        // Highlight selected room
-        if (selectedRoomId === room.id) {
-          const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(rw, 0.1, rl));
-          const lineMat = new THREE.LineBasicMaterial({ color: 0xc48446, linewidth: 3 });
-          const wireframe = new THREE.LineSegments(edges, lineMat);
-          wireframe.position.set(rx, floorBaseY + 0.06, rz);
-          floorGroup.add(wireframe);
+        // Architectural Floor Slab (Wood vs Tile)
+        const roomFloorMesh = MeshBuilder.CreateBox(`floor_${fIdx}_room_${rIdx}`, {
+          width: rw - 0.15,
+          depth: rl - 0.15,
+          height: 0.08,
+        }, scene);
+        roomFloorMesh.position = new Vector3(rx, floorBaseY + 0.04, rz);
+        roomFloorMesh.material = isWetArea ? marbleFloor : woodFloor;
+        roomFloorMesh.parent = houseRoot;
+        roomFloorMesh.receiveShadows = true;
+        roomFloorMesh.metadata = { roomId: room.id };
+
+        // Warm Interior Ceiling Downlight (For Sunset & Night, up to 2 key areas)
+        if (interiorLightsRef.current.length < 2 && (rtype.includes("living") || rtype.includes("bed") || rIdx === 0)) {
+          const roomLight = new PointLight(`downlight_${fIdx}_${rIdx}`, new Vector3(rx, floorBaseY + 7.8, rz), scene);
+          roomLight.diffuse = Color3.FromHexString("#FFEED1");
+          roomLight.range = 28.0;
+          roomLight.intensity = effectiveLightingPreset === "day" ? 0.0 : (effectiveLightingPreset === "night" ? 0.85 : 0.45);
+          interiorLightsRef.current.push(roomLight);
         }
 
-        // Warm Interior Ceiling Light (Subtle architectural downlights in sunset & night)
-        if (effectiveLightingPreset === "sunset" || effectiveLightingPreset === "night") {
-          const light = new THREE.PointLight(
-            0xffeed1,
-            effectiveLightingPreset === "night" ? 0.75 : 0.35,
-            18
-          );
-          light.position.set(rx, floorBaseY + 8.2, rz);
-          interiorLights.add(light);
-        }
+        // 3B. GLB FURNITURE PLACEMENT
+        if (showFurnitureState && room.furniture) {
+          room.furniture.forEach((fItem) => {
+            const fType = (fItem.type || "").toLowerCase();
+            let modelKey = "sofa";
+            if (fType.includes("bed")) modelKey = "bed";
+            else if (fType.includes("dining") && fType.includes("table")) modelKey = "dining_table";
+            else if (fType.includes("dining") && fType.includes("chair")) modelKey = "dining_chair";
+            else if (fType.includes("counter")) modelKey = "kitchen_counter";
+            else if (fType.includes("coffee")) modelKey = "coffee_table";
+            else if (fType.includes("night") || fType.includes("stand")) modelKey = "nightstand";
+            else if (fType.includes("tv")) modelKey = "tv_unit";
+            else if (fType.includes("wardrobe")) modelKey = "wardrobe";
+            else if (fType.includes("toilet") || fType.includes("wc")) modelKey = "toilet";
+            else if (fType.includes("basin") || fType.includes("sink")) modelKey = "basin";
+            else if (fType.includes("shower")) modelKey = "shower";
+            else if (fType.includes("table")) modelKey = "outdoor_table";
+            else if (fType.includes("chair")) modelKey = "outdoor_chair";
+            else if (fType.includes("planter") || fType.includes("pot")) modelKey = "planter";
 
-        // Interior Furniture
-        if (showFurnitureState) {
-          (room.furniture || []).forEach((item) => {
-            placeFurniturePiece(item, floorGroup, floorBaseY);
+            const container = loadedModelsRef.current[modelKey];
+            if (container) {
+              const entries = container.instantiateModelsToScene(
+                (name: string) => `furn_${fItem.id}_${name}`,
+                false
+              );
+              if (entries.rootNodes[0]) {
+                const fNode = entries.rootNodes[0] as TransformNode;
+                fNode.position = new Vector3(fItem.x, floorBaseY + 0.08, fItem.y);
+                fNode.rotation.y = ((fItem.rotation || 0) * Math.PI) / 180;
+                fNode.parent = houseRoot;
+
+                // Shadows for instantiated furniture meshes
+                entries.rootNodes.forEach((node: any) => {
+                  node.getChildMeshes?.().forEach((m: AbstractMesh) => {
+                    m.receiveShadows = true;
+                    if (shadowGen) shadowGen.addShadowCaster(m);
+                  });
+                });
+              }
+            } else {
+              // Procedural proxy if GLB is loading or unavailable
+              const pW = fItem.width || 3.0;
+              const pL = fItem.length || 3.0;
+              const pH = 2.0;
+              const proxyBox = MeshBuilder.CreateBox(`proxy_${fItem.id}`, { width: pW, depth: pL, height: pH }, scene);
+              proxyBox.position = new Vector3(fItem.x, floorBaseY + pH / 2, fItem.y);
+              proxyBox.material = accentStone;
+              proxyBox.parent = houseRoot;
+              proxyBox.receiveShadows = true;
+              if (shadowGen) shadowGen.addShadowCaster(proxyBox);
+            }
           });
         }
       });
 
-      // 2. Staircase
-      const stairRooms = (floor.rooms || []).filter(
-        (r) => r.type === "staircase" || r.name.toLowerCase().includes("stair")
-      );
-      stairRooms.forEach((sr) => {
-        if (sr.rect) {
-          const stairMesh = buildArchitecturalStaircase(sr.rect, floorBaseY);
-          floorGroup.add(stairMesh);
-        }
-      });
-
-      // 3. Canonical Wall Network with Door/Window Cutouts
-      const allWalls: Wall[] = [
-        ...(floor.exterior_walls || []).map((w) => ({ ...w, is_exterior: true })),
-        ...(floor.interior_walls || []).map((w) => ({ ...w, is_exterior: false })),
+      // 3C. ARCHITECTURAL WALLS (DOLLHOUSE CUTAWAY VS COMPLETE EXTERIOR)
+      const extWalls = floorPlan.exterior_walls || [];
+      const intWalls = floorPlan.interior_walls || [];
+      const allWalls: { wall: Wall; isExterior: boolean }[] = [
+        ...extWalls.map((w) => ({ wall: w, isExterior: true })),
+        ...intWalls.map((w) => ({ wall: w, isExterior: false })),
       ];
 
-      allWalls.forEach((wall, wallIdx) => {
-        const dx = wall.x2 - wall.x1;
-        const dz = wall.y2 - wall.y1;
-        const wallLen = Math.hypot(dx, dz);
-        if (wallLen < 0.25) return;
+      allWalls.forEach((item, wIdx) => {
+        const { wall, isExterior } = item;
+        if (!wall.start || !wall.end) return;
+        const sx = wall.start.x;
+        const sz = wall.start.y;
+        const ex = wall.end.x;
+        const ez = wall.end.y;
+
+        const dx = ex - sx;
+        const dz = ez - sz;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.2) return;
 
         const angle = Math.atan2(dz, dx);
-        const ux = dx / wallLen;
-        const uz = dz / wallLen;
-        const isExt = wall.is_exterior;
-        const thickness = wall.thickness || (isExt ? 0.75 : 0.38);
+        const mx = (sx + ex) / 2;
+        const mz = (sz + ez) / 2;
 
-        // Architectural Cutaway Determination:
-        // Front-facing exterior walls are cut to cutawayWallHeight (3.2 ft) in cutaway mode
+        const thick = wall.thickness || (isExterior ? 0.75 : 0.45);
+
+        // Reference Cutaway Logic:
+        // Top floor exterior walls are lowered to 3.5 ft to reveal rooms/furniture
+        // Interior partitions remain clear at 7.5 ft
         let curWallH = fullWallHeight;
-        if (isCutaway && isExt) {
-          const midX = (wall.x1 + wall.x2) / 2;
-          const midZ = (wall.y1 + wall.y2) / 2;
-          let isFrontFacing = false;
-
-          if (resolvedFacing === "south" && midZ >= houseCenter.z) isFrontFacing = true;
-          else if (resolvedFacing === "north" && midZ <= houseCenter.z) isFrontFacing = true;
-          else if (resolvedFacing === "east" && midX >= houseCenter.x) isFrontFacing = true;
-          else if (resolvedFacing === "west" && midX <= houseCenter.x) isFrontFacing = true;
-
-          if (isFrontFacing) {
-            curWallH = cutawayWallHeight;
-          }
+        if (isCutawayMode && fIdx === numFloors - 1) {
+          curWallH = isExterior ? cutawayWallHeight : 7.2;
         }
 
-        const wallMat = isExt
-          ? wallIdx % 3 === 0
-            ? materials.accentStone
-            : materials.extPlaster
-          : materials.intPlaster;
-
-        // Collect openings on this wall
-        interface Opening {
-          type: "door" | "window";
-          id: string;
-          start: number;
-          end: number;
-          width: number;
-          midX: number;
-          midZ: number;
-        }
-        const openings: Opening[] = [];
-
-        (floor.doors || []).forEach((d) => {
-          const dmx = (d.x1 + d.x2) / 2;
-          const dmz = (d.y1 + d.y2) / 2;
-          const distToStart = Math.hypot(dmx - wall.x1, dmz - wall.y1);
-          const distToEnd = Math.hypot(dmx - wall.x2, dmz - wall.y2);
-          if (Math.abs(distToStart + distToEnd - wallLen) < 0.6) {
-            const sMid = (dmx - wall.x1) * ux + (dmz - wall.y1) * uz;
-            const w = Math.max(1.8, d.width || 3.0);
-            openings.push({
-              type: "door",
-              id: d.id,
-              start: Math.max(0, sMid - w / 2),
-              end: Math.min(wallLen, sMid + w / 2),
-              width: w,
-              midX: dmx,
-              midZ: dmz,
-            });
-          }
-        });
-
-        (floor.windows || []).forEach((win) => {
-          const wmx = (win.x1 + win.x2) / 2;
-          const wmz = (win.y1 + win.y2) / 2;
-          const distToStart = Math.hypot(wmx - wall.x1, wmz - wall.y1);
-          const distToEnd = Math.hypot(wmx - wall.x2, wmz - wall.y2);
-          if (Math.abs(distToStart + distToEnd - wallLen) < 0.6) {
-            const sMid = (wmx - wall.x1) * ux + (wmz - wall.y1) * uz;
-            const winW = Math.max(2.0, win.width || 4.0);
-            openings.push({
-              type: "window",
-              id: win.id,
-              start: Math.max(0, sMid - winW / 2),
-              end: Math.min(wallLen, sMid + winW / 2),
-              width: winW,
-              midX: wmx,
-              midZ: wmz,
-            });
-          }
-        });
-
-        // Render wall segments
-        if (openings.length === 0) {
-          const geo = new THREE.BoxGeometry(wallLen, curWallH, thickness);
-          const mesh = new THREE.Mesh(geo, wallMat);
-          mesh.position.set(
-            (wall.x1 + wall.x2) / 2,
-            floorBaseY + curWallH / 2,
-            (wall.y1 + wall.y2) / 2
-          );
-          mesh.rotation.y = -angle;
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          floorGroup.add(mesh);
-        } else {
-          openings.sort((a, b) => a.start - b.start);
-          let currentS = 0;
-
-          openings.forEach((op) => {
-            const segLen = op.start - currentS;
-            if (segLen > 0.25) {
-              const segMidS = currentS + segLen / 2;
-              const mx = wall.x1 + ux * segMidS;
-              const mz = wall.y1 + uz * segMidS;
-              const geo = new THREE.BoxGeometry(segLen, curWallH, thickness);
-              const mesh = new THREE.Mesh(geo, wallMat);
-              mesh.position.set(mx, floorBaseY + curWallH / 2, mz);
-              mesh.rotation.y = -angle;
-              mesh.castShadow = true;
-              mesh.receiveShadow = true;
-              floorGroup.add(mesh);
-            }
-
-            // Window Joinery
-            if (op.type === "window") {
-              const sillH = 2.8;
-              const headH = 7.0;
-              const winH = headH - sillH;
-
-              // Sill wall below window
-              if (curWallH >= sillH) {
-                const sH = Math.min(sillH, curWallH);
-                const sMesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, sH, thickness), wallMat);
-                sMesh.position.set(op.midX, floorBaseY + sH / 2, op.midZ);
-                sMesh.rotation.y = -angle;
-                sMesh.castShadow = true;
-                sMesh.receiveShadow = true;
-                floorGroup.add(sMesh);
-              }
-
-              // Lintel wall above window (in full height walls)
-              if (curWallH >= fullWallHeight) {
-                const lH = fullWallHeight - headH;
-                const lMesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, lH, thickness), wallMat);
-                lMesh.position.set(op.midX, floorBaseY + headH + lH / 2, op.midZ);
-                lMesh.rotation.y = -angle;
-                lMesh.castShadow = true;
-                floorGroup.add(lMesh);
-              }
-
-              // Glass and aluminum frame
-              if (curWallH >= sillH + 0.5) {
-                const renderWinH = Math.min(winH, curWallH - sillH);
-                const gMesh = new THREE.Mesh(
-                  new THREE.BoxGeometry(op.width - 0.2, renderWinH - 0.2, 0.08),
-                  materials.glassMat
-                );
-                gMesh.position.set(op.midX, floorBaseY + sillH + renderWinH / 2, op.midZ);
-                gMesh.rotation.y = -angle;
-                floorGroup.add(gMesh);
-
-                const fMesh = new THREE.Mesh(
-                  new THREE.BoxGeometry(op.width, renderWinH, thickness + 0.05),
-                  materials.frameMat
-                );
-                fMesh.position.set(op.midX, floorBaseY + sillH + renderWinH / 2, op.midZ);
-                fMesh.rotation.y = -angle;
-                floorGroup.add(fMesh);
-              }
-            }
-
-            // Door Joinery
-            if (op.type === "door") {
-              const doorHeadH = 7.0;
-              if (curWallH >= fullWallHeight) {
-                const lH = fullWallHeight - doorHeadH;
-                const lMesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, lH, thickness), wallMat);
-                lMesh.position.set(op.midX, floorBaseY + doorHeadH + lH / 2, op.midZ);
-                lMesh.rotation.y = -angle;
-                floorGroup.add(lMesh);
-              }
-
-              const renderDoorH = Math.min(doorHeadH, curWallH);
-              // Door frame
-              const frameMesh = new THREE.Mesh(
-                new THREE.BoxGeometry(op.width, renderDoorH, thickness + 0.04),
-                materials.frameMat
-              );
-              frameMesh.position.set(op.midX, floorBaseY + renderDoorH / 2, op.midZ);
-              frameMesh.rotation.y = -angle;
-              floorGroup.add(frameMesh);
-
-              // Recessed leaf
-              const leafMesh = new THREE.Mesh(
-                new THREE.BoxGeometry(op.width - 0.2, renderDoorH - 0.1, 0.12),
-                materials.doorLeafMat
-              );
-              leafMesh.position.set(op.midX, floorBaseY + renderDoorH / 2, op.midZ);
-              leafMesh.rotation.y = -angle;
-              floorGroup.add(leafMesh);
-            }
-
-            currentS = op.end;
-          });
-
-          // Final wall segment
-          if (wallLen - currentS > 0.25) {
-            const segLen = wallLen - currentS;
-            const segMidS = currentS + segLen / 2;
-            const mx = wall.x1 + ux * segMidS;
-            const mz = wall.y1 + uz * segMidS;
-            const geo = new THREE.BoxGeometry(segLen, curWallH, thickness);
-            const mesh = new THREE.Mesh(geo, wallMat);
-            mesh.position.set(mx, floorBaseY + curWallH / 2, mz);
-            mesh.rotation.y = -angle;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            floorGroup.add(mesh);
-          }
-        }
+        const wallMesh = MeshBuilder.CreateBox(`wall_${fIdx}_${wIdx}`, {
+          width: len,
+          depth: thick,
+          height: curWallH,
+        }, scene);
+        wallMesh.position = new Vector3(mx, floorBaseY + curWallH / 2, mz);
+        wallMesh.rotation.y = -angle;
+        wallMesh.material = isExterior ? extPlaster : intPlaster;
+        wallMesh.parent = houseRoot;
+        wallMesh.receiveShadows = true;
+        if (shadowGen) shadowGen.addShadowCaster(wallMesh);
       });
 
-      return floorGroup;
-    },
-    [
-      getRoomFloorMaterial,
-      materials,
-      effectiveLightingPreset,
-      showFurnitureState,
-      placeFurniturePiece,
-      buildArchitecturalStaircase,
-      fullWallHeight,
-      cutawayWallHeight,
-      resolvedFacing,
-      selectedRoomId,
-    ]
-  );
+      // 3D. ARCHITECTURAL STAIRCASE
+      const stairRooms = (floorPlan.rooms || []).filter(
+        (r) => r.type === "staircase" || r.name.toLowerCase().includes("stair")
+      );
+      stairRooms.forEach((sr, sIdx) => {
+        if (!sr.rect) return;
+        const sw = sr.rect.width;
+        const sl = sr.rect.length;
+        const sx = sr.rect.x;
+        const sz = sr.rect.y;
 
-  // Complete 3D Scene Rebuild
-  const rebuildScene = useCallback(() => {
-    const scene = sceneRef.current;
-    if (!scene) return;
+        const numSteps = 16;
+        const stepH = floorHeight / numSteps;
+        const stepL = sl / (numSteps / 2);
 
-    if (houseRootRef.current) {
-      scene.remove(houseRootRef.current);
-    }
-    const rootGroup = new THREE.Group();
-    scene.add(rootGroup);
-    houseRootRef.current = rootGroup;
-
-    const interiorLights = new THREE.Group();
-    rootGroup.add(interiorLights);
-    interiorLightsGroupRef.current = interiorLights;
-
-    // Calculate Canonical Bounding Footprint
-    let minBx = Infinity, maxBx = -Infinity, minBz = Infinity, maxBz = -Infinity;
-    (layout.rooms || []).forEach((r) => {
-      if (r.rect) {
-        minBx = Math.min(minBx, r.rect.x);
-        maxBx = Math.max(maxBx, r.rect.x + r.rect.width);
-        minBz = Math.min(minBz, r.rect.y);
-        maxBz = Math.max(maxBz, r.rect.y + r.rect.length);
-      }
+        for (let i = 0; i < numSteps / 2; i++) {
+          const stepMesh = MeshBuilder.CreateBox(`stair_${fIdx}_${sIdx}_${i}`, {
+            width: sw / 2 - 0.2,
+            depth: stepL,
+            height: stepH * (i + 1),
+          }, scene);
+          stepMesh.position = new Vector3(
+            sx + sw / 4,
+            floorBaseY + (stepH * (i + 1)) / 2,
+            sz + i * stepL + stepL / 2
+          );
+          stepMesh.material = woodFloor;
+          stepMesh.parent = houseRoot;
+          stepMesh.receiveShadows = true;
+          if (shadowGen) shadowGen.addShadowCaster(stepMesh);
+        }
+      });
     });
 
-    const hasRooms = isFinite(minBx) && minBx < maxBx;
-    const plinthW = hasRooms ? maxBx - minBx + 1.2 : pw * 0.7;
-    const plinthL = hasRooms ? maxBz - minBz + 1.2 : pl * 0.7;
-    const plinthX = hasRooms ? (minBx + maxBx) / 2 : cx;
-    const plinthZ = hasRooms ? (minBz + maxBz) / 2 : cz;
-
-    // 1. Plinth Foundation (Elevation 0 to plinthHeight)
-    const plinthGeo = new THREE.BoxGeometry(plinthW, plinthHeight, plinthL);
-    const plinthMesh = new THREE.Mesh(plinthGeo, materials.plinthMat);
-    plinthMesh.position.set(plinthX, plinthHeight / 2, plinthZ);
-    plinthMesh.receiveShadow = true;
-    rootGroup.add(plinthMesh);
-
-    // 2. Site Landscaping
-    if (effectiveShowLandscape) {
-      const landscapeModel = generateArchitecturalLandscape(layout);
-      const landscapeScene = buildArchitecturalLandscapeScene(
-        landscapeModel,
-        materials as any,
-        loadedNatureRef.current as any,
-        {
-          filterCategory: showVegetationState ? "all" : "paths",
-          lightingPreset: effectiveLightingPreset,
-          isDarkMode,
-        }
-      );
-      rootGroup.add(landscapeScene);
-    }
-
-    // 3. Multi-Floor / Single Floor Construction
-    const numFloors = Math.max(1, layout.floors?.length || layout.num_floors || 1);
-
-    if (multiFloorStacked) {
-      (layout.floors || [layout]).forEach((fl, fIdx) => {
-        const floorPlan: FloorPlan =
-          layout.floors && layout.floors[fIdx]
-            ? layout.floors[fIdx]
-            : {
-                floor_number: fIdx + 1,
-                floor_name: `Level ${fIdx + 1}`,
-                rooms: layout.rooms || [],
-                exterior_walls: layout.exterior_walls || [],
-                interior_walls: layout.interior_walls || [],
-                doors: layout.doors || [],
-                windows: layout.windows || [],
-              };
-
-        const floorBaseY = plinthHeight + fIdx * floorHeight;
-
-        // Intermediate RCC Slab between floors
-        if (fIdx > 0) {
-          const slabGeo = new THREE.BoxGeometry(plinthW, slabThickness, plinthL);
-          const slabMesh = new THREE.Mesh(slabGeo, materials.slabMat);
-          slabMesh.position.set(plinthX, floorBaseY - slabThickness / 2, plinthZ);
-          slabMesh.castShadow = true;
-          slabMesh.receiveShadow = true;
-          rootGroup.add(slabMesh);
-        }
-
-        const flGroup = buildFloorGeometry(
-          floorPlan,
-          fIdx,
-          floorBaseY,
-          isCutawayMode,
-          interiorLights,
-          { x: plinthX, z: plinthZ }
-        );
-        rootGroup.add(flGroup);
-      });
-    }
-
-    // 4. RCC Roof Slab & Parapet Wall
+    // 4. RCC ROOF SLAB & PARAPET WALLS (When Complete Exterior Mode is active)
     const topFloorBaseY = plinthHeight + (numFloors - 1) * floorHeight;
     const roofBaseY = topFloorBaseY + fullWallHeight;
     const roofW = plinthW + 1.2;
     const roofL = plinthL + 1.2;
 
-    if (effectiveShowRoof) {
-      if (!isCutawayMode) {
-        // Complete roof slab
-        const roofGeo = new THREE.BoxGeometry(roofW, slabThickness, roofL);
-        const roofMesh = new THREE.Mesh(roofGeo, materials.slabMat);
-        roofMesh.position.set(plinthX, roofBaseY + slabThickness / 2, plinthZ);
-        roofMesh.castShadow = true;
-        roofMesh.receiveShadow = true;
-        rootGroup.add(roofMesh);
+    if (effectiveShowRoof && !isCutawayMode) {
+      const roofMesh = MeshBuilder.CreateBox("roofSlab", {
+        width: roofW,
+        depth: roofL,
+        height: slabThickness,
+      }, scene);
+      roofMesh.position = new Vector3(plinthX, roofBaseY + slabThickness / 2, plinthZ);
+      roofMesh.material = slabMat;
+      roofMesh.parent = houseRoot;
+      roofMesh.receiveShadows = true;
+      if (shadowGen) shadowGen.addShadowCaster(roofMesh);
 
-        // Parapet Walls
-        const parapetH = 2.5;
-        const parapetThick = 0.5;
-        const pFront = new THREE.Mesh(new THREE.BoxGeometry(roofW, parapetH, parapetThick), materials.extPlaster);
-        pFront.position.set(plinthX, roofBaseY + slabThickness + parapetH / 2, plinthZ + roofL / 2 - parapetThick / 2);
-        const pRear = pFront.clone();
-        pRear.position.z = plinthZ - roofL / 2 + parapetThick / 2;
+      // Parapet Walls
+      const parapetH = 2.4;
+      const parapetThick = 0.5;
+      const pFront = MeshBuilder.CreateBox("parapetFront", { width: roofW, depth: parapetThick, height: parapetH }, scene);
+      pFront.position = new Vector3(plinthX, roofBaseY + slabThickness + parapetH / 2, plinthZ + roofL / 2 - parapetThick / 2);
+      pFront.material = extPlaster;
+      pFront.parent = houseRoot;
 
-        const pLeft = new THREE.Mesh(new THREE.BoxGeometry(parapetThick, parapetH, roofL), materials.extPlaster);
-        pLeft.position.set(plinthX - roofW / 2 + parapetThick / 2, roofBaseY + slabThickness + parapetH / 2, plinthZ);
-        const pRight = pLeft.clone();
-        pRight.position.x = plinthX + roofW / 2 - parapetThick / 2;
-
-        rootGroup.add(pFront, pRear, pLeft, pRight);
-
-        // Stair Mumty Tower
-        const mumtyGeo = new THREE.BoxGeometry(10.0, 7.5, 12.0);
-        const mumtyMesh = new THREE.Mesh(mumtyGeo, materials.accentStone);
-        mumtyMesh.position.set(plinthX - plinthW * 0.15, roofBaseY + slabThickness + 3.75, plinthZ - plinthL * 0.15);
-        mumtyMesh.castShadow = true;
-        rootGroup.add(mumtyMesh);
-      } else {
-        // Cutaway Roof: Retain rear half to reveal interior while maintaining architectural massing
-        const cutawayL = roofL * 0.45;
-        const roofGeo = new THREE.BoxGeometry(roofW, slabThickness, cutawayL);
-        const roofMesh = new THREE.Mesh(roofGeo, materials.slabMat);
-        roofMesh.position.set(plinthX, roofBaseY + slabThickness / 2, plinthZ - roofL / 2 + cutawayL / 2);
-        rootGroup.add(roofMesh);
-
-        const pRear = new THREE.Mesh(new THREE.BoxGeometry(roofW, 2.5, 0.5), materials.extPlaster);
-        pRear.position.set(plinthX, roofBaseY + slabThickness + 1.25, plinthZ - roofL / 2 + 0.25);
-        rootGroup.add(pRear);
-      }
-    }
-
-    // 5. Entrance Porch Canopy & Stone Steps
-    const groundDoors = layout.floors?.[0]?.doors || layout.doors || [];
-    const mainDoor =
-      groundDoors.find((d) => d.door_type === "entrance" || d.door_type === "entry") ||
-      groundDoors[0];
-
-    if (mainDoor) {
-      const mdx = (mainDoor.x1 + mainDoor.x2) / 2;
-      const mdz = (mainDoor.y1 + mainDoor.y2) / 2;
-      const stepW = (mainDoor.width || 3.2) + 2.0;
-
-      // 3 Architectural Plinth Steps
-      for (let s = 0; s < 3; s++) {
-        const stepGeo = new THREE.BoxGeometry(stepW + s * 0.4, 0.18, 1.0);
-        const stepMesh = new THREE.Mesh(stepGeo, materials.slabMat);
-        let offZ = (s + 1) * 1.0;
-        if (resolvedFacing === "north") offZ = -offZ;
-        stepMesh.position.set(mdx, plinthHeight - (s + 1) * 0.18 + 0.09, mdz + offZ);
-        stepMesh.castShadow = true;
-        stepMesh.receiveShadow = true;
-        rootGroup.add(stepMesh);
-      }
-
-      // Porch Canopy
-      const canopyGeo = new THREE.BoxGeometry(stepW + 2.0, 0.35, 4.5);
-      const canopyMesh = new THREE.Mesh(canopyGeo, materials.canopyMat);
-      canopyMesh.position.set(mdx, plinthHeight + 8.5, mdz + (resolvedFacing === "north" ? -2.25 : 2.25));
-      canopyMesh.castShadow = true;
-      rootGroup.add(canopyMesh);
+      const pBack = MeshBuilder.CreateBox("parapetBack", { width: roofW, depth: parapetThick, height: parapetH }, scene);
+      pBack.position = new Vector3(plinthX, roofBaseY + slabThickness + parapetH / 2, plinthZ - roofL / 2 + parapetThick / 2);
+      pBack.material = extPlaster;
+      pBack.parent = houseRoot;
     }
   }, [
     layout,
+    isCutawayMode,
+    effectiveShowRoof,
+    effectiveShowLandscape,
+    showFurnitureState,
+    effectiveLightingPreset,
+    isDarkMode,
+    resolvedFacing,
+    plinthHeight,
+    floorHeight,
+    fullWallHeight,
+    cutawayWallHeight,
+    slabThickness,
     pw,
     pl,
     cx,
     cz,
-    plinthHeight,
-    floorHeight,
-    fullWallHeight,
-    slabThickness,
-    materials,
-    multiFloorStacked,
-    isCutawayMode,
-    effectiveShowRoof,
-    effectiveShowLandscape,
-    showVegetationState,
-    effectiveLightingPreset,
-    isDarkMode,
-    resolvedFacing,
-    buildFloorGeometry,
+    getOrCreatePBRMaterial,
   ]);
-
-  // Three.js Mount, HDRI Environment, Postprocessing & Animation Loop
-  useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount) return;
-
-    const width = mount.clientWidth || 800;
-    const height = mount.clientHeight || 600;
-
-    // 1. Scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDarkMode ? "#0E1015" : "#E8ECEF");
-    sceneRef.current = scene;
-
-    // 2. Camera: Elevated 3/4 Dollhouse Perspective framing the building
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.5, 600);
-    cameraRef.current = camera;
-
-    // 3. Renderer with calibrated ACES Filmic Tone Mapping and Shadows
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.82;
-    mount.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    // 4. Post-processing Composer
-    const composer = new EffectComposer(renderer);
-    const renderPass = new RenderPass(scene, camera);
-    composer.addPass(renderPass);
-
-    // Controlled bloom: high threshold ensures white walls never bloom
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(width, height),
-      0.03, // subtle architectural warmth
-      0.25,
-      1.12  // threshold > 1.0 ensures diffuse surfaces never bloom
-    );
-    composer.addPass(bloomPass);
-    bloomPassRef.current = bloomPass;
-
-    // Single authoritative output pass for tone mapping and sRGB color space
-    const outputPass = new OutputPass();
-    composer.addPass(outputPass);
-    composerRef.current = composer;
-
-    // 5. OrbitControls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.maxPolarAngle = Math.PI / 2 - 0.02; // Don't dip below horizon
-    controls.minDistance = 15;
-    controls.maxDistance = 220;
-    controls.target.set(cx, plinthHeight + 4.0, cz);
-    controlsRef.current = controls;
-
-    // 6. HDRI Environment via RGBELoader + PMREMGenerator (Controlled ambient contribution)
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    pmremGenerator.compileEquirectangularShader();
-    scene.environmentIntensity = 0.28;
-
-    const rgbeLoader = new RGBELoader();
-    rgbeLoader.load(
-      "/environments/sky_architectural.hdr",
-      (texture) => {
-        const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-        scene.environment = envMap;
-        scene.environmentIntensity = 0.28;
-        texture.dispose();
-        pmremGenerator.dispose();
-      },
-      undefined,
-      (err) => {
-        console.warn("[Notice] Fallback ambient environment will be used:", err);
-      }
-    );
-
-    // 7. Architectural Sunlight and Sky Fill (Balanced, non-overexposing intensities)
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 0.95);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 300;
-    const d = Math.max(pw, pl) * 0.9;
-    sunLight.shadow.camera.left = -d;
-    sunLight.shadow.camera.right = d;
-    sunLight.shadow.camera.top = d;
-    sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.0003;
-    scene.add(sunLight);
-    sunLightRef.current = sunLight;
-
-    const skyLight = new THREE.HemisphereLight(0xe2eaf4, 0x475569, 0.22);
-    scene.add(skyLight);
-    skyLightRef.current = skyLight;
-
-    // Set Default 3/4 Dollhouse Camera Position
-    const diag = Math.hypot(pw, pl);
-    let camX = cx + diag * 0.85;
-    let camZ = cz + diag * 0.95;
-    if (resolvedFacing === "west") {
-      camX = cx - diag * 0.95;
-      camZ = cz + diag * 0.65;
-    } else if (resolvedFacing === "east") {
-      camX = cx + diag * 0.95;
-      camZ = cz - diag * 0.65;
-    } else if (resolvedFacing === "north") {
-      camX = cx + diag * 0.65;
-      camZ = cz - diag * 0.95;
-    }
-    camera.position.set(camX, diag * 0.75, camZ);
-    controls.update();
-
-    // 8. Animation & Render Loop
-    let animId: number;
-    const animate = () => {
-      animId = requestAnimationFrame(animate);
-
-      // Smooth camera transition
-      if (isTransitioningCamera.current) {
-        camera.position.lerp(targetCamPos.current, 0.08);
-        controls.target.lerp(targetControlsTarget.current, 0.08);
-        if (
-          camera.position.distanceTo(targetCamPos.current) < 0.2 &&
-          controls.target.distanceTo(targetControlsTarget.current) < 0.2
-        ) {
-          isTransitioningCamera.current = false;
-        }
-      }
-
-      controls.update();
-      if (composerRef.current) {
-        composerRef.current.render();
-      } else {
-        renderer.render(scene, camera);
-      }
-    };
-    animate();
-
-    // 9. Resize Handling
-    const handleResize = () => {
-      if (!mount) return;
-      const w = mount.clientWidth;
-      const h = mount.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-      composer.setSize(w, h);
-    };
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener("resize", handleResize);
-      renderer.dispose();
-      pmremGenerator.dispose();
-      if (mount && renderer.domElement) {
-        mount.removeChild(renderer.domElement);
-      }
-    };
-  }, [cx, cz, pw, pl, isDarkMode, resolvedFacing, plinthHeight]);
-
-  // Lighting Mode Updates (Controlled architectural illumination per preset)
-  useEffect(() => {
-    if (!sunLightRef.current || !skyLightRef.current) return;
-    const sun = sunLightRef.current;
-    const sky = skyLightRef.current;
-    const scene = sceneRef.current;
-    const renderer = rendererRef.current;
-    const bloom = bloomPassRef.current;
-
-    const diag = Math.hypot(pw, pl);
-
-    if (effectiveLightingPreset === "day") {
-      sun.color.setHex(0xfffaed);
-      sun.intensity = 0.95;
-      sun.position.set(cx + diag * 0.6, diag * 0.9, cz + diag * 0.6);
-      sky.color.setHex(0xe2eaf4);
-      sky.groundColor.setHex(0x475569);
-      sky.intensity = 0.22;
-      if (scene) {
-        scene.environmentIntensity = 0.28;
-        scene.background = new THREE.Color(isDarkMode ? "#0E1015" : "#E8ECEF");
-      }
-      if (renderer) renderer.toneMappingExposure = 0.82;
-      if (bloom) {
-        bloom.strength = 0.02;
-        bloom.threshold = 1.15;
-      }
-    } else if (effectiveLightingPreset === "sunset") {
-      sun.color.setHex(0xf59e0b);
-      sun.intensity = 0.75;
-      sun.position.set(cx - diag * 0.8, diag * 0.35, cz + diag * 0.4);
-      sky.color.setHex(0xfb923c);
-      sky.groundColor.setHex(0x1e1b4b);
-      sky.intensity = 0.25;
-      if (scene) {
-        scene.environmentIntensity = 0.22;
-        scene.background = new THREE.Color(isDarkMode ? "#0C0D12" : "#D4D9E2");
-      }
-      if (renderer) renderer.toneMappingExposure = 0.85;
-      if (bloom) {
-        bloom.strength = 0.06;
-        bloom.threshold = 1.05;
-      }
-    } else if (effectiveLightingPreset === "night") {
-      sun.color.setHex(0x93c5fd);
-      sun.intensity = 0.20;
-      sun.position.set(cx + diag * 0.5, diag * 0.8, cz - diag * 0.5);
-      sky.color.setHex(0x1e293b);
-      sky.groundColor.setHex(0x090a0f);
-      sky.intensity = 0.12;
-      if (scene) {
-        scene.environmentIntensity = 0.12;
-        scene.background = new THREE.Color("#080A0F");
-      }
-      if (renderer) renderer.toneMappingExposure = 0.90;
-      if (bloom) {
-        bloom.strength = 0.08;
-        bloom.threshold = 0.95;
-      }
-    }
-  }, [effectiveLightingPreset, cx, cz, pw, pl, isDarkMode]);
 
   // Trigger rebuild when layout, mode, or assets change
   useEffect(() => {
     rebuildScene();
   }, [rebuildScene, assetsReady]);
 
-  // Camera Presets
+  // --------------------------------------------------------------------------
+  // 5. CAMERA PRESETS CONTROLS
+  // --------------------------------------------------------------------------
   const handleCameraPreset = (preset: CameraPresetType) => {
     setCameraView(preset);
     setIsCameraMenuOpen(false);
-    if (!cameraRef.current || !controlsRef.current) return;
-    isTransitioningCamera.current = true;
+    const camera = cameraRef.current;
+    if (!camera) return;
 
     const diag = Math.hypot(pw, pl);
+    const centerTarget = new Vector3(cx, plinthHeight + 3.8, cz);
 
     if (preset === "cutaway") {
       setIsCutawayMode(true);
-      targetCamPos.current.set(cx + diag * 0.85, diag * 0.7, cz + diag * 0.95);
-      targetControlsTarget.current.set(cx, plinthHeight + 4.0, cz);
+      animateCamera(camera, Math.PI * 0.25, Math.PI * 0.32, diag * 1.65, centerTarget);
     } else if (preset === "exterior") {
       setIsCutawayMode(false);
-      targetCamPos.current.set(cx + diag * 0.95, diag * 0.65, cz + diag * 1.05);
-      targetControlsTarget.current.set(cx, plinthHeight + 4.5, cz);
+      animateCamera(camera, Math.PI * 0.25, Math.PI * 0.36, diag * 1.85, centerTarget);
     } else if (preset === "iso") {
-      targetCamPos.current.set(cx + diag * 0.9, diag * 0.9, cz + diag * 0.9);
-      targetControlsTarget.current.set(cx, plinthHeight + 3.0, cz);
+      animateCamera(camera, Math.PI * 0.25, Math.PI * 0.35, diag * 1.7, centerTarget);
     } else if (preset === "top") {
-      targetCamPos.current.set(cx, diag * 1.8, cz + 0.01);
-      targetControlsTarget.current.set(cx, 0, cz);
+      animateCamera(camera, 0, 0.01, diag * 1.9, centerTarget);
     } else if (preset === "front") {
-      let fz = cz + diag * 1.2;
-      let fx = cx;
-      if (resolvedFacing === "north") fz = cz - diag * 1.2;
-      else if (resolvedFacing === "east") { fx = cx + diag * 1.2; fz = cz; }
-      else if (resolvedFacing === "west") { fx = cx - diag * 1.2; fz = cz; }
-      targetCamPos.current.set(fx, diag * 0.45, fz);
-      targetControlsTarget.current.set(cx, plinthHeight + 4.0, cz);
+      let fAlpha = Math.PI * 0.5;
+      if (resolvedFacing === "north") fAlpha = Math.PI * 1.5;
+      else if (resolvedFacing === "east") fAlpha = 0;
+      else if (resolvedFacing === "west") fAlpha = Math.PI;
+      animateCamera(camera, fAlpha, Math.PI * 0.42, diag * 1.75, centerTarget);
     } else if (preset === "entrance") {
-      targetCamPos.current.set(cx, plinthHeight + 5.5, cz + diag * 0.55);
-      targetControlsTarget.current.set(cx, plinthHeight + 3.5, cz);
+      animateCamera(camera, Math.PI * 0.5, Math.PI * 0.45, diag * 1.1, new Vector3(cx, plinthHeight + 3.0, cz + pl / 2));
     } else if (preset === "living" || preset === "kitchen" || preset === "bedroom") {
       const matchRoom = (layout.rooms || []).find((r) =>
         (r.type || "").toLowerCase().includes(preset) || (r.name || "").toLowerCase().includes(preset)
@@ -1403,78 +873,62 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       if (matchRoom && matchRoom.rect) {
         const rx = matchRoom.rect.x + matchRoom.rect.width / 2;
         const rz = matchRoom.rect.y + matchRoom.rect.length / 2;
-        targetCamPos.current.set(rx - 8, plinthHeight + 10, rz + 10);
-        targetControlsTarget.current.set(rx, plinthHeight + 2.0, rz);
         setIsCutawayMode(true);
+        animateCamera(camera, Math.PI * 0.3, Math.PI * 0.35, 28, new Vector3(rx, plinthHeight + 3.5, rz));
       }
     } else if (preset === "garden") {
-      targetCamPos.current.set(cx + pw * 0.6, plinthHeight + 8, cz + pl * 0.7);
-      targetControlsTarget.current.set(cx, plinthHeight + 1.5, cz + pl * 0.3);
+      animateCamera(camera, Math.PI * 0.8, Math.PI * 0.42, diag * 1.6, new Vector3(cx, plinthHeight + 1.0, cz));
     }
   };
 
-  // 3D Dimension Editing (Width / Depth increments without room dragging)
-  const handleAdjustRoomDimension = async (axis: "width" | "length", delta: number) => {
-    if (!selectedRoomId) return;
-    const room = (layout.rooms || []).find((r) => r.id === selectedRoomId);
-    if (!room || !room.rect) return;
-
-    setIsEditingRoom(true);
-    const newW = Math.max(6, Math.min(40, room.rect.width + (axis === "width" ? delta : 0)));
-    const newL = Math.max(6, Math.min(40, room.rect.length + (axis === "length" ? delta : 0)));
-
-    const proposedRect: Rect = {
-      x: room.rect.x,
-      y: room.rect.y,
-      width: newW,
-      length: newL,
-    };
-
-    try {
-      const res = await editRoomLayoutFull(layout, selectedRoomId, proposedRect, true);
-      if (res && res.layout) {
-        if (onUpdateLayout) {
-          onUpdateLayout(res.layout);
-        }
-      }
-    } catch (err) {
-      console.error("[3D EDIT ERROR] Could not adjust room dimension:", err);
-    } finally {
-      setIsEditingRoom(false);
-    }
+  const animateCamera = (
+    camera: ArcRotateCamera,
+    targetAlpha: number,
+    targetBeta: number,
+    targetRadius: number,
+    targetTarget: Vector3
+  ) => {
+    Animation.CreateAndStartAnimation("camAlpha", camera, "alpha", 30, 15, camera.alpha, targetAlpha, 0);
+    Animation.CreateAndStartAnimation("camBeta", camera, "beta", 30, 15, camera.beta, targetBeta, 0);
+    Animation.CreateAndStartAnimation("camRadius", camera, "radius", 30, 15, camera.radius, targetRadius, 0);
+    Animation.CreateAndStartAnimation("camTarget", camera, "target", 30, 15, camera.target, targetTarget, 0);
   };
 
-  // Pointer Click / Tap selection
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const mount = mountRef.current;
-    if (!mount || !cameraRef.current || !sceneRef.current) return;
-    const rect = mount.getBoundingClientRect();
-    pointer.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.current.setFromCamera(pointer.current, cameraRef.current);
-    const intersects = raycaster.current.intersectObjects(sceneRef.current.children, true);
-
-    for (const hit of intersects) {
-      const uData = hit.object.userData;
-      if (uData && uData.roomId) {
-        onSelectRoom(uData.roomId);
-        return;
-      }
-    }
-  };
-
+  // --------------------------------------------------------------------------
+  // 6. 3D ROOM DIMENSION EDITING (Updates HouseLayout Single Source of Truth)
+  // --------------------------------------------------------------------------
   const selectedRoom = useMemo(() => {
     if (!selectedRoomId) return null;
     return (layout.rooms || []).find((r) => r.id === selectedRoomId);
   }, [layout.rooms, selectedRoomId]);
 
+  const handleAdjustRoomDimension = async (dimension: "width" | "length", delta: number) => {
+    if (!selectedRoom || !onUpdateLayout || isEditingRoom) return;
+    setIsEditingRoom(true);
+    try {
+      const currentVal = dimension === "width" ? selectedRoom.rect.width : selectedRoom.rect.length;
+      const newVal = Math.max(6, currentVal + delta);
+      const res = await editRoomLayoutFull(layout, selectedRoom.id, {
+        x: selectedRoom.rect.x,
+        y: selectedRoom.rect.y,
+        width: dimension === "width" ? newVal : selectedRoom.rect.width,
+        length: dimension === "length" ? newVal : selectedRoom.rect.length,
+      });
+      if (res && res.layout) {
+        onUpdateLayout(res.layout);
+      }
+    } catch (err) {
+      console.error("[3D EDIT ERROR] Failed to adjust room dimension:", err);
+    } finally {
+      setIsEditingRoom(false);
+    }
+  };
+
   return (
-    <div
-      ref={mountRef}
-      onPointerDown={handlePointerDown}
-      className="relative w-full h-full select-none overflow-hidden bg-[#0E1015]"
-    >
+    <div className="relative w-full h-full select-none overflow-hidden bg-[#0E1015]">
+      {/* BABYLON WEBGPU / WEBGL CANVAS */}
+      <canvas ref={canvasRef} className="w-full h-full block outline-none touch-none" />
+
       {/* FLOATING TOP BAR CONTROLS */}
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         {/* Left: Presentation Mode & Camera Presets */}
@@ -1506,36 +960,36 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                 : "hover:text-white"
             }`}
           >
-            <Building className="w-3.5 h-3.5" />
+            <Home className="w-3.5 h-3.5" />
             FULL EXTERIOR
           </button>
 
-          <div className="w-[1px] h-4 bg-white/10 mx-1" />
+          <div className="h-4 w-[1px] bg-white/10 mx-1" />
 
-          {/* Camera Preset Dropdown */}
+          {/* Camera Presets Dropdown */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => setIsCameraMenuOpen(!isCameraMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-white transition-all"
+              onClick={() => setIsCameraMenuOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:text-white transition-colors"
             >
               <Camera className="w-3.5 h-3.5 text-[#C48446]" />
               <span className="capitalize">{cameraView} View</span>
-              <ChevronDown className="w-3 h-3 text-[#9E9C98]" />
+              <ChevronDown className="w-3 h-3 opacity-60" />
             </button>
 
             {isCameraMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 w-44 rounded-xl bg-[#161922] border border-white/10 shadow-2xl overflow-hidden py-1 z-30">
+              <div className="absolute top-full left-0 mt-2 w-40 bg-[#12141A] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-30">
                 {[
                   { id: "cutaway", label: "Dollhouse 3/4" },
-                  { id: "exterior", label: "Exterior Perspective" },
-                  { id: "iso", label: "Isometric 45°" },
-                  { id: "top", label: "Top (Plan)" },
+                  { id: "exterior", label: "Full Exterior" },
+                  { id: "iso", label: "Isometric" },
+                  { id: "top", label: "Top-Down Plan" },
                   { id: "front", label: "Front Facade" },
                   { id: "entrance", label: "Main Entrance" },
                   { id: "living", label: "Living Room" },
-                  { id: "kitchen", label: "Kitchen" },
-                  { id: "bedroom", label: "Master Bedroom" },
+                  { id: "kitchen", label: "Kitchen Area" },
+                  { id: "bedroom", label: "Master Suite" },
                   { id: "garden", label: "Site & Garden" },
                 ].map((item) => (
                   <button
@@ -1642,51 +1096,41 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               disabled={isEditingRoom}
               onClick={() => handleAdjustRoomDimension("width", -1)}
               className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
-              title="Decrease width by 1 ft"
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
+            <span className="font-mono text-xs w-6 text-center">{Math.round(selectedRoom.rect.width)}&apos;</span>
             <button
               type="button"
               disabled={isEditingRoom}
               onClick={() => handleAdjustRoomDimension("width", 1)}
               className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
-              title="Increase width by 1 ft"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Length / Depth adjustment */}
-          <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
+          {/* Length/Depth adjustment */}
+          <div className="flex items-center gap-1.5 ml-2 border-l border-white/10 pl-3">
             <span className="text-[11px] font-mono text-[#9E9C98]">Depth:</span>
             <button
               type="button"
               disabled={isEditingRoom}
               onClick={() => handleAdjustRoomDimension("length", -1)}
               className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
-              title="Decrease depth by 1 ft"
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
+            <span className="font-mono text-xs w-6 text-center">{Math.round(selectedRoom.rect.length)}&apos;</span>
             <button
               type="button"
               disabled={isEditingRoom}
               onClick={() => handleAdjustRoomDimension("length", 1)}
               className="p-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 transition-colors"
-              title="Increase depth by 1 ft"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => onSelectRoom(null)}
-            className="text-[11px] text-[#9E9C98] hover:text-white ml-2 underline"
-          >
-            Deselect
-          </button>
         </div>
       )}
 

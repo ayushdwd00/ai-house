@@ -1013,7 +1013,6 @@ async def render_realistic_endpoint(request: Dict[str, Any]):
     samples = int(request.get("samples", 64))
     lighting = str(request.get("lighting", "day"))
     
-    # If layout_data is a Pydantic model instance
     if hasattr(layout_data, "model_dump"):
         layout_dict = layout_data.model_dump()
     elif hasattr(layout_data, "dict"):
@@ -1029,4 +1028,3 @@ async def render_realistic_endpoint(request: Dict[str, Any]):
         lighting=lighting
     )
     return result
-

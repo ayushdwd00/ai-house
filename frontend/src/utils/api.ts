@@ -1,7 +1,7 @@
 import { HouseLayout, IntakeRequest, Room, Rect } from "@/types/house";
 
 export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+  process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || "http://localhost:8000"
 ).replace(/\/+$/, "");
 
 /**
@@ -370,5 +370,3 @@ export async function renderRealisticPhoto(options: {
     };
   }
 }
-
-

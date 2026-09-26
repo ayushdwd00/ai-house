@@ -55,7 +55,6 @@ def find_blender_executable() -> Optional[str]:
         ]
         for base_dir in search_dirs:
             if os.path.exists(base_dir):
-                # Check root of folder or nested version folders (e.g. Blender 4.5, Blender 4.4, etc.)
                 direct_exe = os.path.join(base_dir, "blender.exe")
                 if os.path.isfile(direct_exe):
                     return direct_exe
@@ -206,7 +205,6 @@ def render_layout_realistic(
             "message": f"Unexpected error during render execution: {str(e)}"
         }
     finally:
-        # Clean up temporary files
         try:
             shutil.rmtree(temp_dir, ignore_errors=True)
         except Exception:

@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Sparkles, Download, RefreshCw, AlertCircle, CheckCircle2, Sliders, Sun, Moon, Info } from "lucide-react";
 import { HouseLayout } from "@/types/house";
+import { X, Sparkles, Download, RefreshCw, Sun, Moon, Info, Eye } from "lucide-react";
 import { renderRealisticPhoto, checkBlenderStatus } from "@/utils/api";
 
 interface RealisticRenderModalProps {
   isOpen: boolean;
   onClose: () => void;
   layout: HouseLayout;
-  currentLighting?: "day" | "sunset" | "night";
+  currentLighting?: string;
   isCutawayMode?: boolean;
 }
 
@@ -20,8 +20,8 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
   currentLighting = "day",
   isCutawayMode = true,
 }) => {
-  const [renderState, setRenderState] = useState<"idle" | "generating" | "complete" | "error" | "unsupported">("idle");
   const [cutaway, setCutaway] = useState<boolean>(isCutawayMode);
+  const [renderState, setRenderState] = useState<"idle" | "generating" | "complete" | "error" | "unsupported">("idle");
   const [lighting, setLighting] = useState<string>(currentLighting);
   const [resolution, setResolution] = useState<string>("1920x1080");
   const [renderedImage, setRenderedImage] = useState<string | null>(null);
@@ -34,9 +34,6 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
     if (isOpen) {
       checkBlenderStatus().then((info) => {
         setBlenderInfo(info);
-        if (!info.available && renderState === "idle") {
-          // Keep idle so user can review info or test render
-        }
       });
     }
   }, [isOpen]);
@@ -63,7 +60,6 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
         resolution,
         samples: 64,
         lighting,
-        projectId: layout.id || layout.project_id,
       });
 
       clearTimeout(progressTimer);
@@ -78,7 +74,7 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
         setBlenderInfo({
           available: false,
           message: res.message || "Blender was not detected on this system.",
-          instructions: res.instructions,
+          instructions: res.instructions
         });
       } else {
         setRenderState("error");
@@ -96,19 +92,19 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
     if (!renderedImage) return;
     const a = document.createElement("a");
     a.href = renderedImage;
-    a.download = `AI_House_Realistic_${layout.title?.replace(/\s+/g, "_") || "Design"}_${cutaway ? "Cutaway" : "Exterior"}.png`;
+    a.download = `Architectural_Render_${cutaway ? "Cutaway" : "Exterior"}_${lighting}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-all">
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-[#12141A] border border-white/10 rounded-2xl shadow-2xl overflow-hidden text-[#F5F3EF]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl bg-[#12141A] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#161922]">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-[#C48446]/20 border border-[#C48446]/30 text-[#C48446]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/[0.02]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#C48446]/20 border border-[#C48446]/40 text-[#C48446]">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
@@ -121,8 +117,9 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-full text-[#9E9C98] hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-lg text-[#9E9C98] hover:text-white hover:bg-white/5 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -130,7 +127,6 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* STATE 1: IDLE / CONFIGURATION */}
           {renderState === "idle" && (
             <div className="space-y-6">
               {blenderInfo && !blenderInfo.available && (
@@ -163,7 +159,7 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
                       }`}
                     >
                       <span className="text-xs font-bold block mb-1">Dollhouse Cutaway</span>
-                      <span className="text-[11px] text-[#9E9C98] block">
+                      <span className="text-[11px] opacity-70 block">
                         Reveals multi-story interior rooms, slabs & staircase
                       </span>
                     </button>
@@ -177,7 +173,7 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
                       }`}
                     >
                       <span className="text-xs font-bold block mb-1">Complete Exterior</span>
-                      <span className="text-[11px] text-[#9E9C98] block">
+                      <span className="text-[11px] opacity-70 block">
                         Full facade massing, roof parapet & entrance steps
                       </span>
                     </button>
@@ -190,58 +186,76 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
                     Lighting & Atmosphere
                   </label>
                   <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: "day", label: "Daylight", icon: Sun },
-                      { id: "sunset", label: "Golden Dusk", icon: Sparkles },
-                      { id: "night", label: "Night Glow", icon: Moon },
-                    ].map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setLighting(item.id)}
-                          className={`p-2.5 rounded-lg border flex flex-col items-center gap-1.5 transition-all ${
-                            lighting === item.id
-                              ? "bg-[#C48446]/20 border-[#C48446] text-white"
-                              : "border-white/10 text-[#9E9C98] hover:border-white/20"
-                          }`}
-                        >
-                          <Icon className="w-4 h-4 text-[#C48446]" />
-                          <span className="text-xs font-medium">{item.label}</span>
-                        </button>
-                      );
-                    })}
+                    <button
+                      type="button"
+                      onClick={() => setLighting("day")}
+                      className={`p-3 rounded-lg border flex flex-col items-center justify-center gap-1.5 transition-all ${
+                        lighting === "day"
+                          ? "bg-[#C48446]/20 border-[#C48446] text-white"
+                          : "border-white/10 text-[#9E9C98] hover:border-white/20"
+                      }`}
+                    >
+                      <Sun className="w-4 h-4 text-amber-300" />
+                      <span className="text-xs font-medium">Daylight</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLighting("sunset")}
+                      className={`p-3 rounded-lg border flex flex-col items-center justify-center gap-1.5 transition-all ${
+                        lighting === "sunset"
+                          ? "bg-[#C48446]/20 border-[#C48446] text-white"
+                          : "border-white/10 text-[#9E9C98] hover:border-white/20"
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4 text-orange-400" />
+                      <span className="text-xs font-medium">Golden Dusk</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLighting("night")}
+                      className={`p-3 rounded-lg border flex flex-col items-center justify-center gap-1.5 transition-all ${
+                        lighting === "night"
+                          ? "bg-[#C48446]/20 border-[#C48446] text-white"
+                          : "border-white/10 text-[#9E9C98] hover:border-white/20"
+                      }`}
+                    >
+                      <Moon className="w-4 h-4 text-indigo-300" />
+                      <span className="text-xs font-medium">Night Glow</span>
+                    </button>
                   </div>
                 </div>
               </div>
 
               {/* Technical Specifications */}
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-[#9E9C98]">
-                <div className="flex justify-between py-1 border-b border-white/5">
+              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-white/5 text-[#9E9C98]">
                   <span>Target Layout</span>
-                  <span className="text-white font-medium">{layout.title || "Current Residence"}</span>
+                  <span className="font-semibold text-white">
+                    {(layout as any).name || `${(layout as any).bhk || 3} BHK Residence`}
+                  </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
+                <div className="flex justify-between py-1 border-b border-white/5 text-[#9E9C98]">
                   <span>Floors & Program</span>
-                  <span className="text-white font-medium">{layout.floors?.length || layout.num_floors || 1} Levels, {layout.rooms?.length || 0} Rooms</span>
+                  <span className="text-white">
+                    {layout.floors?.length || layout.num_floors || 1} Levels, {layout.rooms?.length || 0} Rooms
+                  </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
+                <div className="flex justify-between py-1 border-b border-white/5 text-[#9E9C98]">
                   <span>Render Engine</span>
-                  <span className="text-[#C48446] font-medium">Cycles PBR Path Tracing (Denoised)</span>
+                  <span className="text-[#C48446] font-mono">Cycles PBR Path Tracing (Denoised)</span>
                 </div>
-                <div className="flex justify-between py-1">
+                <div className="flex justify-between items-center py-1 text-[#9E9C98]">
                   <span>Resolution</span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     {["1280x720", "1920x1080", "2560x1440"].map((res) => (
                       <button
                         key={res}
                         type="button"
                         onClick={() => setResolution(res)}
-                        className={`px-2 py-0.5 rounded text-[11px] ${
+                        className={`px-2 py-0.5 rounded text-[11px] font-mono ${
                           resolution === res
-                            ? "bg-[#C48446] text-black font-semibold"
-                            : "bg-white/10 text-[#9E9C98] hover:text-white"
+                            ? "bg-[#C48446] text-[#0A0B0E] font-bold"
+                            : "bg-white/5 hover:bg-white/10 text-[#9E9C98]"
                         }`}
                       >
                         {res.split("x")[1]}p
@@ -253,7 +267,6 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
             </div>
           )}
 
-          {/* STATE 2: GENERATING */}
           {renderState === "generating" && (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
               <div className="relative">
@@ -262,45 +275,37 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
               </div>
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold text-white">Rendering Realistic Architectural Photo</h3>
-                <p className="text-xs text-[#9E9C98] max-w-md mx-auto">{progressMsg}</p>
-              </div>
-              <div className="text-[11px] font-mono text-[#C48446]/80 bg-[#C48446]/10 px-3 py-1 rounded-full border border-[#C48446]/20">
-                Mode: {cutaway ? "Cutaway Dollhouse" : "Full Exterior"} • {resolution}
+                <p className="text-xs text-[#9E9C98] font-mono animate-pulse">{progressMsg}</p>
               </div>
             </div>
           )}
 
-          {/* STATE 3: COMPLETE (IMAGE PREVIEW) */}
           {renderState === "complete" && renderedImage && (
             <div className="space-y-4">
-              <div className="relative rounded-xl overflow-hidden border border-white/15 bg-black/40 flex items-center justify-center group shadow-2xl">
+              <div className="relative rounded-xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center max-h-[500px]">
                 <img
                   src={renderedImage}
                   alt="Blender Realistic Architectural Render"
-                  className="w-full max-h-[58vh] object-contain rounded-xl"
+                  className="w-full h-auto max-h-[500px] object-contain"
                 />
-                <div className="absolute top-3 left-3 bg-[#12141A]/90 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[11px] font-mono text-[#9E9C98]">
-                  Cycles Raytraced • {resolution}
-                </div>
               </div>
             </div>
           )}
 
-          {/* STATE 4: BLENDER NOT INSTALLED OR ERROR */}
           {(renderState === "error" || renderState === "unsupported") && (
-            <div className="p-6 rounded-xl bg-red-500/10 border border-red-500/20 text-center space-y-4">
-              <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center mx-auto text-red-400">
-                <AlertCircle className="w-6 h-6" />
+            <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
+              <div className="p-3 rounded-full bg-rose-500/20 text-rose-400">
+                <Info className="w-8 h-8" />
               </div>
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold text-white">
                   {renderState === "unsupported" ? "Blender Not Installed" : "Rendering Notice"}
                 </h3>
-                <p className="text-xs text-red-200/80 max-w-lg mx-auto">
+                <p className="text-xs text-[#9E9C98]">
                   {errorMessage || "The backend was unable to execute the Blender rendering command."}
                 </p>
                 {blenderInfo?.instructions && (
-                  <p className="text-xs text-[#9E9C98] max-w-lg mx-auto mt-2 p-3 bg-white/5 rounded-lg border border-white/5 text-left">
+                  <p className="mt-2 text-xs text-amber-200/80 bg-white/5 p-3 rounded-lg text-left">
                     {blenderInfo.instructions}
                   </p>
                 )}
@@ -308,7 +313,7 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
               <button
                 type="button"
                 onClick={() => setRenderState("idle")}
-                className="px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors"
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors"
               >
                 Back to Settings
               </button>
@@ -316,18 +321,18 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#161922]">
-          <div className="text-xs text-[#9E9C98]">
-            {renderState === "complete" ? "Render complete" : "Realtime Three.js viewer remains active in background"}
-          </div>
-          <div className="flex items-center gap-3">
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-white/[0.02]">
+          <span className="text-[11px] text-[#9E9C98]">
+            {renderState === "complete" ? "Render complete" : "Realtime viewer remains active in background"}
+          </span>
+          <div className="flex items-center gap-2">
             {renderState === "complete" && (
               <>
                 <button
                   type="button"
                   onClick={() => setRenderState("idle")}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium transition-colors"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Render Again
@@ -335,21 +340,20 @@ export const RealisticRenderModal: React.FC<RealisticRenderModalProps> = ({
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[#C48446] hover:bg-[#B37438] text-xs font-semibold text-[#0A0B0E] transition-all shadow-lg"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#C48446] hover:bg-[#B37438] text-[#0A0B0E] text-xs font-semibold shadow-lg transition-colors"
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="w-3.5 h-3.5" />
                   Download Render
                 </button>
               </>
             )}
-
             {renderState === "idle" && (
               <button
                 type="button"
                 onClick={handleStartRender}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#C48446] hover:bg-[#B37438] text-xs font-semibold text-[#0A0B0E] transition-all shadow-lg hover:shadow-orange-500/20"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#C48446] hover:bg-[#B37438] text-[#0A0B0E] font-semibold text-xs shadow-lg transition-all"
               >
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-4 h-4 fill-current" />
                 Generate Realistic Photo
               </button>
             )}
