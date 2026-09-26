@@ -506,6 +506,8 @@ export interface HouseLayout {
   id: string;
   project_id?: string;
   version_number?: number;
+  revision_id?: string;
+  parent_revision_id?: string;
   title: string;
   designer_rationale: string;
   plot_width: number;
@@ -529,6 +531,21 @@ export interface HouseLayout {
   quantities?: Record<string, unknown>;
   cost_estimate?: Record<string, unknown>;
   materials?: MaterialDefinition[];
+  generated_visuals?: {
+    plan_images: Array<{
+      id: string;
+      revision_id?: string;
+      style: string;
+      view: string;
+      url?: string;
+      mime_type?: string;
+      created_at?: string;
+      is_cover?: boolean;
+    }>;
+    architectural_visualization?: string;
+    active_stale?: boolean;
+    cover_visual_id?: string;
+  };
   rooms: Room[];
   walls?: Wall[];
   exterior_walls: Wall[];

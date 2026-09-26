@@ -154,14 +154,24 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                       <ArrowRight className="w-4 h-4" />
                     </button>
 
+                    {/* Delete button:
+                        - Desktop (hover device): subtle by default, fully visible on group-hover
+                        - Touch/mobile: always fully visible (pointer: coarse) */}
                     <button
                       type="button"
                       aria-label={`Delete ${p.title}`}
                       onClick={(e) => {
                         e.stopPropagation();
+                        e.preventDefault();
                         setProjectToDelete(p);
                       }}
-                      className="w-7 h-7 rounded-lg text-[#6E6C68] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors opacity-70 group-hover:opacity-100"
+                      className={`
+                        w-7 h-7 rounded-lg flex items-center justify-center transition-all
+                        text-[#6E6C68] hover:text-red-400 hover:bg-red-500/10
+                        opacity-0 group-hover:opacity-100
+                        [@media(pointer:coarse)]:opacity-100
+                        focus-visible:opacity-100
+                      `}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>

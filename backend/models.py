@@ -1055,10 +1055,57 @@ class LandscapePreferences(BaseModel):
     outdoor_seating: bool = True
     notes: Optional[str] = None
 
+class GeneratedVisual(BaseModel):
+    id: str
+    revision_id: Optional[str] = None
+    style: str = "architectural"
+    view: str = "top_down"
+    url: Optional[str] = None
+    mime_type: str = "image/png"
+    created_at: str = ""
+    is_cover: bool = False
+
+
+class GeneratedVisuals(BaseModel):
+    """Presentation images derived FROM HouseLayout. Never authoritative geometry."""
+    plan_images: List[GeneratedVisual] = Field(default_factory=list)
+    architectural_visualization: Optional[str] = None
+    active_stale: bool = False
+    cover_visual_id: Optional[str] = None
+
+
+class EditIntent(BaseModel):
+    """Structured architectural modification. Geometry is applied by the engine, not Groq."""
+    operation: Literal[
+        "resize_room",
+        "move_room",
+        "add_room",
+        "remove_room",
+        "add_attached_bathroom",
+        "move_staircase",
+        "add_balcony",
+        "change_parking",
+        "change_entrance",
+        "change_plot_dimensions",
+        "general_adjust",
+    ] = "general_adjust"
+    target_room_id: Optional[str] = None
+    target_room_type: Optional[str] = None
+    constraints: Dict[str, Any] = Field(default_factory=dict)
+    relationship_constraints: List[str] = Field(default_factory=list)
+    delta_width: float = 0.0
+    delta_length: float = 0.0
+    target_value: Optional[float] = None
+    architectural_rationale: str = ""
+    llm_source: Optional[str] = "deterministic_fallback"
+
+
 class HouseLayout(BaseModel):
     id: str
     project_id: Optional[str] = None
     version_number: int = 1
+    revision_id: Optional[str] = None
+    parent_revision_id: Optional[str] = None
     title: str
     designer_rationale: str
     plot_width: float
@@ -1082,6 +1129,7 @@ class HouseLayout(BaseModel):
     materials: List[MaterialDefinition] = Field(default_factory=list)
     facing: Optional[str] = "south"
     orientation: Optional[str] = "south"
+    generated_visuals: Optional[GeneratedVisuals] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     # Backwards compatibility flat properties for single-floor or legacy consumer code
@@ -1135,6 +1183,24 @@ class HouseLayout(BaseModel):
         elif "exterior_walls" in data and "interior_walls" in data and "walls" not in data:
             data["walls"] = list(data["exterior_walls"]) + list(data["interior_walls"])
         super().__init__(**data)
+
+
+class VisualizeRequest(BaseModel):
+    layout: Optional[HouseLayout] = None
+    style: str = "architectural"
+    view: str = "top_down"
+    plan_image_base64: Optional[str] = None
+    set_as_cover: bool = False
+
+
+class ProjectEditRequest(BaseModel):
+    edit_instruction: str
+    current_layout: Optional[HouseLayout] = None
+    target_room_id: Optional[str] = None
+    regenerate_visualization: bool = False
+    style: str = "architectural"
+    view: str = "top_down"
+    plan_image_base64: Optional[str] = None
 
 class RoomAllocationItem(BaseModel):
     id: Optional[str] = None
