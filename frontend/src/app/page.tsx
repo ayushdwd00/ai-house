@@ -110,11 +110,12 @@ export default function HomePage() {
       }
 
       // Close consultation modals now that generation is successful
+      setIsGenerating(false);
       setIsConsultationOpen(false);
       setIsCreateChoiceOpen(false);
       setIsDreamHomeOpen(false);
       const newProjectId = createProject(sanitized);
-      // Navigate directly to plan without unmounting loading overlay beforehand
+      // Navigate directly to plan
       router.push(`/project/${newProjectId}/plan`);
     } catch (err) {
       console.error("[GENERATION ERROR]", err);

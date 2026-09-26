@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation";
 import { HouseLayout, FloorPlan, Room, FurnitureItem, Door, Window, Wall } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
-import { generateArchitecturalLandscape, ArchitecturalLandscapeModel } from "@/utils/residentialLandscapeGenerator";
+import { generateArchitecturalLandscape, ArchitecturalLandscapeModel } from "@/utils/residentialLandscapeData";
 import {
   computeCutWalls,
   computeDoorGeometry,

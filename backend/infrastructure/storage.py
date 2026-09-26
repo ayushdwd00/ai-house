@@ -41,3 +41,8 @@ def restore_project_version(project_id: str, version_number: int) -> Optional[Ho
 def undo_project_version(project_id: str) -> Optional[HouseLayout]:
     """Reverts to the preceding version snapshot."""
     return _default_repo.undo(project_id)
+
+
+def delete_project(project_id: str) -> bool:
+    """Permanently deletes a saved project and its version history."""
+    return _default_repo.delete(project_id)

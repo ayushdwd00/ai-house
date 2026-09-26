@@ -99,9 +99,24 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     isHydrated,
   } = useProject();
 
-  const [currentTab, setCurrentTab] = useState<"plan" | "model" | "structure" | "estimate">(initialTab);
-  const [layout, setLayout] = useState<HouseLayout | null>(activeProject);
-  const [isLoadingProject, setIsLoadingProject] = useState(!activeProject || activeProject.id !== projectId);
+  // Synchronously initialize layout from activeProject or localStorage cache for 0ms transition
+  const [layout, setLayout] = useState<HouseLayout | null>(() => {
+    if (activeProject && activeProject.id === projectId) return activeProject;
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("atelier_archai_proj_" + projectId);
+        if (cached) return JSON.parse(cached);
+        const saved = localStorage.getItem("atelier_archai_saved_layout");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.id === projectId || parsed.project_id === projectId)) return parsed;
+        }
+      } catch (_) {}
+    }
+    return null;
+  });
+
+  const [isLoadingProject, setIsLoadingProject] = useState(!layout);
 
   // Active Floor & Selection (Synchronized across 2D & 3D)
   const [activeFloorIndex, setActiveFloorIndex] = useState(0);
@@ -127,7 +142,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   // Keep layout synchronized with activeProject
   useEffect(() => {
-    if (activeProject && activeProject.id === projectId) {
+    if (activeProject && (activeProject.id === projectId || activeProject.project_id === projectId)) {
       setLayout(activeProject);
       setIsLoadingProject(false);
     }
@@ -139,8 +154,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
     let mounted = true;
     const fetchLayout = async () => {
-      if (activeProject && activeProject.id === projectId) {
-        setLayout(activeProject);
+      // If matching layout is already loaded, ensure loading is cleared
+      if (layout && (layout.id === projectId || layout.project_id === projectId)) {
         setIsLoadingProject(false);
         return;
       }
@@ -152,7 +167,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           setLayout(loaded);
           setIsLoadingProject(false);
         } else {
-          // Direct Route Protection: redirect to Home if invalid project
+          // Direct Route Protection: redirect to Home only if project cannot be found anywhere
           router.replace("/");
         }
       }
@@ -162,7 +177,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     return () => {
       mounted = false;
     };
-  }, [isHydrated, projectId, activeProject, loadProject, router]);
+  }, [isHydrated, projectId, loadProject, router]);
 
   // Sync tab with URL
   const handleNavigate = (view: NavView) => {

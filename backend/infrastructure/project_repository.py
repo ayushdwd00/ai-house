@@ -43,6 +43,11 @@ class ProjectRepository(ABC):
         """Reverts to preceding version snapshot."""
         pass
 
+    @abstractmethod
+    def delete(self, project_id: str) -> bool:
+        """Deletes project and its version history from repository."""
+        pass
+
 
 class JsonFileProjectRepository(ProjectRepository):
     """Local filesystem JSON implementation storing projects under projects/{project_id}/"""
@@ -137,3 +142,15 @@ class JsonFileProjectRepository(ProjectRepository):
             return None
         prev_ver = versions[-2]["version"]
         return self.restore_version(project_id, prev_ver)
+
+    def delete(self, project_id: str) -> bool:
+        import shutil
+        p_dir = self.base_dir / project_id
+        if p_dir.exists():
+            try:
+                shutil.rmtree(p_dir)
+                return True
+            except Exception as e:
+                print(f"[STORAGE ERROR] Could not delete project {project_id}: {e}")
+                return False
+        return False

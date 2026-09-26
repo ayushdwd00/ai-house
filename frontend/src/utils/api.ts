@@ -115,6 +115,40 @@ export async function fetchProjectById(projectId: string): Promise<HouseLayout |
 }
 
 /**
+ * Persist a project layout to the backend server.
+ */
+export async function saveProjectToServer(layout: HouseLayout): Promise<HouseLayout | null> {
+  const url = `${API_BASE_URL}/api/projects`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(layout),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn(`[API NOTICE] Could not save project ${layout.id} to server:`, err);
+    return null;
+  }
+}
+
+/**
+ * Permanently delete a project from backend server storage.
+ */
+export async function deleteProjectApi(projectId: string): Promise<boolean> {
+  const url = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`;
+  try {
+    const res = await fetch(url, { method: "DELETE" });
+    return res.ok;
+  } catch (err) {
+    console.warn(`[API NOTICE] Could not delete project ${projectId} on server:`, err);
+    return false;
+  }
+}
+
+
+/**
  * Apply AI natural language instruction to refine an existing design.
  */
 export async function refineHouseLayout(

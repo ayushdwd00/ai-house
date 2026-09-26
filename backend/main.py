@@ -33,7 +33,7 @@ from estimation.cost_estimator import estimate_construction_cost
 from architecture.floorplan_reconstruction import reconstruct_floorplan_vector, validate_floorplan_upload
 from architecture.geometry_normalizer import calibrate_scale
 from shapely.geometry import box
-from infrastructure.storage import save_project, get_project, list_project_versions, restore_project_version, undo_project_version
+from infrastructure.storage import save_project, get_project, list_project_versions, restore_project_version, undo_project_version, delete_project
 from ai.groq_service import (
     parse_intake_with_groq_or_fallback,
     interpret_dream_home_prompt,
@@ -604,6 +604,18 @@ def undo_version_endpoint(project_id: str):
     if not undone:
         raise HTTPException(status_code=404, detail="Cannot undo")
     return undone
+
+@app.delete("/api/projects/{project_id}")
+def delete_project_endpoint(project_id: str):
+    success = delete_project(project_id)
+    if not success:
+        # Check if project exists
+        proj = get_project(project_id)
+        if not proj:
+            return {"status": "ok", "deleted": True, "message": "Project already deleted or not found"}
+        raise HTTPException(status_code=500, detail="Could not delete project from storage")
+    return {"status": "ok", "deleted": True, "project_id": project_id}
+
 
 @app.post("/api/edit-room", response_model=EditRoomResponse)
 async def edit_room_endpoint(req: EditRoomRequest):

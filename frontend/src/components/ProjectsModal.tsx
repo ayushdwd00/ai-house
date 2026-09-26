@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FolderGit2, ArrowRight, X, Sparkles, Home, Clock, Layers } from "lucide-react";
-import { useProject } from "@/context/ProjectContext";
+import { FolderGit2, ArrowRight, X, Sparkles, Home, Trash2, AlertTriangle } from "lucide-react";
+import { useProject, ProjectSummary } from "@/context/ProjectContext";
 
 interface ProjectsModalProps {
   isOpen: boolean;
@@ -18,9 +18,34 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   onSelectProject,
   onStartNew,
 }) => {
-  const { recentProjects, activeProject } = useProject();
+  const { recentProjects, activeProject, deleteProject } = useProject();
+  const [projectToDelete, setProjectToDelete] = useState<ProjectSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const isCurrentActive = activeProject?.id === projectToDelete.id;
+      const { remainingCount, nextActiveId } = await deleteProject(projectToDelete.id);
+
+      setProjectToDelete(null);
+      setIsDeleting(false);
+
+      if (isCurrentActive && nextActiveId) {
+        onSelectProject(nextActiveId);
+      }
+    } catch (err) {
+      console.error("Deletion error:", err);
+      setIsDeleting(false);
+      setDeleteError("Could not delete project. Please try again.");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md">
@@ -34,7 +59,11 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
         >
           {/* Close button */}
           <button
-            onClick={onClose}
+            onClick={() => {
+              setProjectToDelete(null);
+              onClose();
+            }}
+            aria-label="Close archive"
             className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-[#9E9C98] hover:text-white flex items-center justify-center transition-colors"
           >
             <X className="w-4 h-4" />
@@ -86,7 +115,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                     onSelectProject(p.id);
                     onClose();
                   }}
-                  className={`cursor-pointer p-4 rounded-xl border transition-all duration-200 flex items-center justify-between ${
+                  className={`group cursor-pointer p-4 rounded-xl border transition-all duration-200 flex items-center justify-between ${
                     isActive
                       ? "bg-[#C48446]/10 border-[#C48446]/40 text-[#F5F3EF]"
                       : "bg-[#171A22]/70 hover:bg-[#1C202B] border-white/5 hover:border-white/20 text-[#DCD8D0]"
@@ -110,7 +139,33 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                     </div>
                   </div>
 
-                  <ArrowRight className="w-4 h-4 text-[#9E9C98] shrink-0" />
+                  {/* Actions: Open Arrow + Subtle Delete Button */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      aria-label={`Open ${p.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectProject(p.id);
+                        onClose();
+                      }}
+                      className="w-7 h-7 rounded-lg hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] flex items-center justify-center transition-colors"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label={`Delete ${p.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProjectToDelete(p);
+                      }}
+                      className="w-7 h-7 rounded-lg text-[#6E6C68] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors opacity-70 group-hover:opacity-100"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -132,8 +187,65 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
               <span>CREATE NEW</span>
             </button>
           </div>
+
+          {/* DELETE CONFIRMATION MODAL OVERLAY */}
+          {projectToDelete && (
+            <div
+              className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-[#151720] border border-white/15 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-left space-y-4">
+                <div className="flex items-center gap-2.5 text-amber-500/90 text-xs font-mono uppercase tracking-wider">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Delete this project?</span>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-serif text-[#F5F3EF] leading-snug">
+                    &ldquo;{projectToDelete.title}&rdquo;
+                  </h3>
+                  {activeProject?.id === projectToDelete.id && (
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-[#C48446]/20 border border-[#C48446]/40 text-[#C48446]">
+                      Current Active Project
+                    </span>
+                  )}
+                  <p className="text-xs text-[#9E9C98] font-light mt-2 leading-relaxed">
+                    This saved design will be permanently removed.
+                  </p>
+                </div>
+
+                {deleteError && (
+                  <p className="text-xs text-red-400 font-mono">{deleteError}</p>
+                )}
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => {
+                      setProjectToDelete(null);
+                      setDeleteError(null);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-mono text-[#DCD8D0] hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={handleConfirmDelete}
+                    className="px-4 py-2 rounded-xl text-xs font-mono text-red-300 hover:text-red-200 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{isDeleting ? "Deleting..." : "Delete"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
     </div>
   );
 };
+
