@@ -1,0 +1,17 @@
+frontend
+node_modules
+.next
+chrome_temp
+.git
+.gitignore
+.github
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+tests
+scripts
+*.md
+*.png

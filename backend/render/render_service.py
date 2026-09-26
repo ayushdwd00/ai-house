@@ -19,12 +19,12 @@ def find_blender_executable() -> Optional[str]:
     """
     # 1. Environment variable override from .env or os.environ
     env_path = os.getenv("BLENDER_PATH", "").strip().strip('"').strip("'")
-    if env_path and os.path.isfile(env_path):
+    if env_path and (os.path.isfile(env_path) or (os.path.exists(env_path) and os.access(env_path, os.X_OK))):
         return env_path
         
     # 2. System PATH
     in_path = shutil.which("blender")
-    if in_path and os.path.isfile(in_path):
+    if in_path and (os.path.isfile(in_path) or os.path.exists(in_path)):
         return in_path
         
     # 3. Windows Common Installation Paths & Registry
@@ -83,7 +83,7 @@ def find_blender_executable() -> Optional[str]:
             "/snap/bin/blender"
         ]
         for p in linux_paths:
-            if os.path.isfile(p):
+            if os.path.isfile(p) or (os.path.exists(p) and os.access(p, os.X_OK)):
                 return p
                 
     return None

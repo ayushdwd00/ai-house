@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ai-house-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: standard
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: BLENDER_PATH
+        value: /usr/local/bin/blender
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

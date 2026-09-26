@@ -161,6 +161,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const composerRef = useRef<EffectComposer | null>(null);
+  const bloomPassRef = useRef<UnrealBloomPass | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const houseRootRef = useRef<THREE.Group | null>(null);
@@ -281,9 +282,9 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     canvas.height = 512;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.fillStyle = "#F5F6F8";
+    ctx.fillStyle = "#EAE6DE";
     ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "#E2E4E8";
+    ctx.strokeStyle = "#D2CCC2";
     ctx.lineWidth = 2;
     for (let i = 0; i <= 512; i += 64) {
       ctx.beginPath();
@@ -302,77 +303,135 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     return tex;
   }, []);
 
-  // PBR Materials System
+  const grassTexture = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#437329";
+    ctx.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 3500; i++) {
+      const gx = Math.random() * 512;
+      const gy = Math.random() * 512;
+      ctx.fillStyle = Math.random() > 0.5 ? "#386121" : "#528734";
+      ctx.fillRect(gx, gy, 2, 4);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(Math.max(4, Math.round(pw / 6)), Math.max(4, Math.round(pl / 6)));
+    return tex;
+  }, [pw, pl]);
+
+  const paverTexture = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#CFCAC2";
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = "#A49F96";
+    ctx.lineWidth = 2.5;
+    for (let y = 0; y < 512; y += 64) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(512, y);
+      ctx.stroke();
+      const offset = (y / 64) % 2 === 0 ? 0 : 32;
+      for (let x = offset; x <= 512; x += 64) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y + 64);
+        ctx.stroke();
+      }
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(3, 4);
+    return tex;
+  }, []);
+
+  // PBR Materials System (Calibrated for crisp architectural visualization without blowouts)
   const materials = useMemo(() => {
     return {
-      // Exterior Stucco / Plaster
+      // Exterior Stucco / Plaster: Warm off-white (NOT pure white!)
       extPlaster: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#33353A" : "#F3EFEA",
-        roughness: 0.85,
+        color: isDarkMode ? "#33353A" : "#ECE8E1",
+        roughness: 0.88,
         metalness: 0.02,
       }),
-      // Accent Architectural Stone / Siding
+      // Accent Architectural Stone: Rich dark charcoal slate
       accentStone: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#1F232B" : "#2B303A",
-        roughness: 0.62,
+        color: isDarkMode ? "#1C2028" : "#2E3440",
+        roughness: 0.65,
         metalness: 0.05,
       }),
-      // Interior Plaster Partition
+      // Interior Plaster Partition: Clean warm gallery white
       intPlaster: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#27292D" : "#FAF8F5",
-        roughness: 0.88,
+        color: isDarkMode ? "#27292D" : "#F2EFE9",
+        roughness: 0.90,
         metalness: 0.01,
       }),
       // Concrete Plinth Foundation
       plinthMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#26282E" : "#D1D5DB",
-        roughness: 0.72,
+        color: isDarkMode ? "#26282E" : "#B8BAC0",
+        roughness: 0.75,
         metalness: 0.04,
       }),
       // Concrete Intermediate Slabs & Roof
       slabMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#2D3036" : "#E5E7EB",
-        roughness: 0.68,
+        color: isDarkMode ? "#2D3036" : "#D6D4CF",
+        roughness: 0.72,
         metalness: 0.03,
       }),
-      // Hardwood Oak Floor
+      terraceMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#2D3036" : "#D6D4CF",
+        roughness: 0.72,
+        metalness: 0.03,
+      }),
+      // Hardwood Oak Floor: Rich warm brown tone
       woodFloor: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#3A291C" : "#C49A6C",
+        color: isDarkMode ? "#3A291C" : "#A87948",
         roughness: 0.38,
         metalness: 0.04,
         map: woodTexture || undefined,
       }),
-      // Marble Tile Floor
+      // Marble Tile Floor: Honed light stone
       marbleFloor: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#22252A" : "#F8F9FA",
-        roughness: 0.16,
-        metalness: 0.06,
+        color: isDarkMode ? "#22252A" : "#E8E6E1",
+        roughness: 0.22,
+        metalness: 0.05,
         map: tileTexture || undefined,
       }),
       // Architectural Transparent Glass
       glassMat: new THREE.MeshStandardMaterial({
-        color: "#D0E7F9",
+        color: "#9AC4E8",
         transparent: true,
-        opacity: 0.38,
-        roughness: 0.05,
-        metalness: 0.15,
+        opacity: 0.28,
+        roughness: 0.04,
+        metalness: 0.12,
       }),
       // Dark Aluminum Frame
       frameMat: new THREE.MeshStandardMaterial({
         color: "#1E2229",
-        roughness: 0.4,
-        metalness: 0.82,
+        roughness: 0.42,
+        metalness: 0.85,
       }),
       // Wooden Door Leaf
       doorLeafMat: new THREE.MeshStandardMaterial({
-        color: isDarkMode ? "#362215" : "#6E4527",
+        color: isDarkMode ? "#362215" : "#633B1E",
         roughness: 0.45,
         metalness: 0.05,
       }),
       // Polished Chrome Hardware
       chromeMat: new THREE.MeshStandardMaterial({
-        color: "#E2E8F0",
-        roughness: 0.15,
+        color: "#CBD5E1",
+        roughness: 0.18,
         metalness: 0.95,
       }),
       // Coping Cap
@@ -383,14 +442,57 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       // Entrance Canopy
       canopyMat: new THREE.MeshStandardMaterial({
         color: "#1F2937",
-        roughness: 0.3,
+        roughness: 0.35,
         metalness: 0.85,
       }),
+      // Site Landscaping Materials (Prevents default pure-white fallback meshes)
+      grassMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#1B2A15" : "#4A7C32",
+        map: grassTexture || undefined,
+        roughness: 0.85,
+        metalness: 0.01,
+      }),
+      roadMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#181A1F" : "#2A2D34",
+        roughness: 0.88,
+        metalness: 0.05,
+      }),
+      paverMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#2A2825" : "#CFCAC2",
+        map: paverTexture || undefined,
+        roughness: 0.75,
+        metalness: 0.02,
+      }),
+      curbMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#2B2D33" : "#525660",
+        roughness: 0.70,
+        metalness: 0.10,
+      }),
+      boundaryMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#2C2E34" : "#E2DFD8",
+        roughness: 0.85,
+        metalness: 0.02,
+      }),
+      gateMat: new THREE.MeshStandardMaterial({
+        color: "#1F232B",
+        roughness: 0.45,
+        metalness: 0.80,
+      }),
+      carportMat: new THREE.MeshStandardMaterial({
+        color: "#272A30",
+        roughness: 0.40,
+        metalness: 0.75,
+      }),
+      soilMat: new THREE.MeshStandardMaterial({
+        color: isDarkMode ? "#1C1510" : "#33251A",
+        roughness: 0.95,
+        metalness: 0.0,
+      }),
       // Fallback Furniture Materials
-      furnitureWood: new THREE.MeshStandardMaterial({ color: "#8A6D4B", roughness: 0.55 }),
-      furnitureFabric: new THREE.MeshStandardMaterial({ color: "#D4CCC0", roughness: 0.85 }),
+      furnitureWood: new THREE.MeshStandardMaterial({ color: "#7A5C3D", roughness: 0.55 }),
+      furnitureFabric: new THREE.MeshStandardMaterial({ color: "#B8B0A2", roughness: 0.85 }),
     };
-  }, [isDarkMode, woodTexture, tileTexture]);
+  }, [isDarkMode, woodTexture, tileTexture, grassTexture, paverTexture]);
 
   // Floor Material Mapper
   const getRoomFloorMaterial = useCallback(
@@ -555,12 +657,12 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           floorGroup.add(wireframe);
         }
 
-        // Warm Interior Ceiling Light
+        // Warm Interior Ceiling Light (Subtle architectural downlights in sunset & night)
         if (effectiveLightingPreset === "sunset" || effectiveLightingPreset === "night") {
           const light = new THREE.PointLight(
             0xffeed1,
-            effectiveLightingPreset === "night" ? 1.4 : 0.65,
-            24
+            effectiveLightingPreset === "night" ? 0.75 : 0.35,
+            18
           );
           light.position.set(rx, floorBaseY + 8.2, rz);
           interiorLights.add(light);
@@ -1037,21 +1139,22 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
     // 1. Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDarkMode ? "#0E1015" : "#F3F4F6");
+    scene.background = new THREE.Color(isDarkMode ? "#0E1015" : "#E8ECEF");
     sceneRef.current = scene;
 
     // 2. Camera: Elevated 3/4 Dollhouse Perspective framing the building
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.5, 600);
     cameraRef.current = camera;
 
-    // 3. Renderer with ACES Filmic Tone Mapping and Shadows
+    // 3. Renderer with calibrated ACES Filmic Tone Mapping and Shadows
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 0.82;
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -1060,14 +1163,17 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
 
+    // Controlled bloom: high threshold ensures white walls never bloom
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(width, height),
-      0.18, // subtle architectural bloom
-      0.4,
-      0.85
+      0.03, // subtle architectural warmth
+      0.25,
+      1.12  // threshold > 1.0 ensures diffuse surfaces never bloom
     );
     composer.addPass(bloomPass);
+    bloomPassRef.current = bloomPass;
 
+    // Single authoritative output pass for tone mapping and sRGB color space
     const outputPass = new OutputPass();
     composer.addPass(outputPass);
     composerRef.current = composer;
@@ -1082,9 +1188,10 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     controls.target.set(cx, plinthHeight + 4.0, cz);
     controlsRef.current = controls;
 
-    // 6. HDRI Environment via RGBELoader + PMREMGenerator
+    // 6. HDRI Environment via RGBELoader + PMREMGenerator (Controlled ambient contribution)
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
+    scene.environmentIntensity = 0.28;
 
     const rgbeLoader = new RGBELoader();
     rgbeLoader.load(
@@ -1092,6 +1199,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       (texture) => {
         const envMap = pmremGenerator.fromEquirectangular(texture).texture;
         scene.environment = envMap;
+        scene.environmentIntensity = 0.28;
         texture.dispose();
         pmremGenerator.dispose();
       },
@@ -1101,8 +1209,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       }
     );
 
-    // 7. Architectural Sunlight and Sky Fill
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.8);
+    // 7. Architectural Sunlight and Sky Fill (Balanced, non-overexposing intensities)
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 0.95);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
@@ -1117,7 +1225,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     scene.add(sunLight);
     sunLightRef.current = sunLight;
 
-    const skyLight = new THREE.HemisphereLight(0xe0f2fe, 0x475569, 0.75);
+    const skyLight = new THREE.HemisphereLight(0xe2eaf4, 0x475569, 0.22);
     scene.add(skyLight);
     skyLightRef.current = skyLight;
 
@@ -1187,37 +1295,67 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     };
   }, [cx, cz, pw, pl, isDarkMode, resolvedFacing, plinthHeight]);
 
-  // Lighting Mode Updates
+  // Lighting Mode Updates (Controlled architectural illumination per preset)
   useEffect(() => {
     if (!sunLightRef.current || !skyLightRef.current) return;
     const sun = sunLightRef.current;
     const sky = skyLightRef.current;
+    const scene = sceneRef.current;
+    const renderer = rendererRef.current;
+    const bloom = bloomPassRef.current;
 
     const diag = Math.hypot(pw, pl);
 
     if (effectiveLightingPreset === "day") {
       sun.color.setHex(0xfffaed);
-      sun.intensity = 1.8;
+      sun.intensity = 0.95;
       sun.position.set(cx + diag * 0.6, diag * 0.9, cz + diag * 0.6);
-      sky.color.setHex(0xe0f2fe);
+      sky.color.setHex(0xe2eaf4);
       sky.groundColor.setHex(0x475569);
-      sky.intensity = 0.75;
+      sky.intensity = 0.22;
+      if (scene) {
+        scene.environmentIntensity = 0.28;
+        scene.background = new THREE.Color(isDarkMode ? "#0E1015" : "#E8ECEF");
+      }
+      if (renderer) renderer.toneMappingExposure = 0.82;
+      if (bloom) {
+        bloom.strength = 0.02;
+        bloom.threshold = 1.15;
+      }
     } else if (effectiveLightingPreset === "sunset") {
       sun.color.setHex(0xf59e0b);
-      sun.intensity = 1.3;
+      sun.intensity = 0.75;
       sun.position.set(cx - diag * 0.8, diag * 0.35, cz + diag * 0.4);
       sky.color.setHex(0xfb923c);
       sky.groundColor.setHex(0x1e1b4b);
-      sky.intensity = 0.55;
+      sky.intensity = 0.25;
+      if (scene) {
+        scene.environmentIntensity = 0.22;
+        scene.background = new THREE.Color(isDarkMode ? "#0C0D12" : "#D4D9E2");
+      }
+      if (renderer) renderer.toneMappingExposure = 0.85;
+      if (bloom) {
+        bloom.strength = 0.06;
+        bloom.threshold = 1.05;
+      }
     } else if (effectiveLightingPreset === "night") {
       sun.color.setHex(0x93c5fd);
-      sun.intensity = 0.35;
+      sun.intensity = 0.20;
       sun.position.set(cx + diag * 0.5, diag * 0.8, cz - diag * 0.5);
       sky.color.setHex(0x1e293b);
       sky.groundColor.setHex(0x090a0f);
-      sky.intensity = 0.25;
+      sky.intensity = 0.12;
+      if (scene) {
+        scene.environmentIntensity = 0.12;
+        scene.background = new THREE.Color("#080A0F");
+      }
+      if (renderer) renderer.toneMappingExposure = 0.90;
+      if (bloom) {
+        bloom.strength = 0.08;
+        bloom.threshold = 0.95;
+      }
     }
-  }, [effectiveLightingPreset, cx, cz, pw, pl]);
+  }, [effectiveLightingPreset, cx, cz, pw, pl, isDarkMode]);
 
   // Trigger rebuild when layout, mode, or assets change
   useEffect(() => {
