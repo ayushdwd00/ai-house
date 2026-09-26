@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { HouseLayout, IntakeRequest, Room } from "@/types/house";
+import { HouseLayout, IntakeRequest } from "@/types/house";
 import { FloatingNav, NavView } from "@/components/FloatingNav";
 import { FloatingAICommandBar } from "@/components/FloatingAICommandBar";
 import { GenerationProgressModal } from "@/components/GenerationProgressModal";
@@ -14,7 +14,6 @@ import { VastuAuditModal } from "@/components/VastuAuditModal";
 import { CreateChoiceModal } from "@/components/CreateChoiceModal";
 import { ProjectsModal } from "@/components/ProjectsModal";
 import { EditProgressPanel } from "@/components/EditProgressPanel";
-import { ImageVisualizationPanel } from "@/components/ImageVisualizationPanel";
 import { useProject } from "@/context/ProjectContext";
 import { validateAndSanitizeHouseLayout, validateAndSanitizeHouseLayoutDetailed } from "@/utils/layoutValidator";
 import { generateHouseLayout, refineHouseLayout, editRoomLayout, applyProjectEdit, EditStage } from "@/utils/api";
@@ -121,7 +120,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [lightingPreset, setLightingPreset] = useState<"day" | "sunset" | "night" | "studio">("day");
   const [cameraPreset, setCameraPreset] = useState<"isometric" | "perspective" | "interior" | "top" | "front">("isometric");
   const [wallHeightMode, setWallHeightMode] = useState<"cutaway" | "full">("cutaway");
-  const [showRoof, setShowRoof] = useState(false);
+  const [showRoof, setShowRoof] = useState(true);
 
   // ── Modal states ──
   const [isCreateChoiceOpen, setIsCreateChoiceOpen] = useState(false);
@@ -132,7 +131,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isVastuAuditOpen, setIsVastuAuditOpen] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [isImagePanelOpen, setIsImagePanelOpen] = useState(false);
+  const [planEditMode, setPlanEditMode] = useState<"view" | "edit">("view");
 
   // ── Edit progress state ──
   const [isRefining, setIsRefining] = useState(false);
@@ -187,8 +186,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         setIsCreateChoiceOpen(true);
       } else if (view === "projects") {
         setIsProjectsOpen(true);
-      } else if (view === "image") {
-        setIsImagePanelOpen(true);
       } else if (
         view === "plan" ||
         view === "model" ||
@@ -210,6 +207,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       setSelectedRoomId(null);
       setSelectedFurnitureId(null);
       updateProject(sanitized);
+      // 3D model will automatically refresh when MODEL tab is opened due to layout prop change
     },
     [updateProject]
   );
@@ -257,7 +255,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   };
 
   // ── Drag/resize rooms → edit-room API ──
-  const handleRegenerateFromEdit = async (updatedRooms: Room[]) => {
+  const handleRegenerateFromEdit = async (updatedRooms: any[]) => {
     if (!layout) return;
     setIsRefining(true);
     try {
@@ -303,9 +301,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           edit_instruction: instruction,
           current_layout: layout,
           target_room_id: selectedRoomId || undefined,
-          regenerate_visualization: true,
-          style: "architectural",
-          view: "top_down",
         });
 
         setEditStages(result.stages || []);
@@ -367,6 +362,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           hasProject
           onOpenVastuAudit={() => setIsVastuAuditOpen(true)}
           hasVastuResult={Boolean(layout?.scores?.vastu_result)}
+          isPlanEditMode={planEditMode === "edit"}
+          onTogglePlanEditMode={() =>
+            setPlanEditMode((mode) => (mode === "view" ? "edit" : "view"))
+          }
         />
       )}
 
@@ -412,6 +411,9 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   onRegenerateLayout={handleRegenerateFromEdit}
                   isRegenerating={isRefining}
                   isDarkMode
+                  mode={planEditMode}
+                  onUpdateLayout={handleUpdateLayout}
+                  onSave={handleUpdateLayout}
                 />
               </ErrorBoundary>
             </motion.div>
@@ -522,14 +524,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           setEditStages([]);
           setEditRejectionReason(null);
         }}
-      />
-
-      {/* ── Gemini Image Visualization Panel ── */}
-      <ImageVisualizationPanel
-        isOpen={isImagePanelOpen}
-        onClose={() => setIsImagePanelOpen(false)}
-        projectId={projectId}
-        layout={layout}
       />
 
       {/* ── Modals ── */}

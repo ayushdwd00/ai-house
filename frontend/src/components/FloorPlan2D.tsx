@@ -19,6 +19,9 @@ export interface FloorPlan2DProps {
   onRegenerateLayout?: (updatedRooms: Room[]) => Promise<void> | void;
   isRegenerating?: boolean;
   isDarkMode?: boolean;
+  mode?: "view" | "edit";
+  onUpdateLayout?: (newLayout: HouseLayout) => void;
+  onSave?: (savedLayout: HouseLayout) => Promise<void> | void;
 }
 
 export { feetToArchitectural, getRoomBackgroundFill };
@@ -39,11 +42,14 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
   onSelectFurniture,
   onRegenerateLayout,
   isRegenerating,
+  mode = "view",
+  onUpdateLayout,
+  onSave,
 }) => {
   return (
     <ArchitecturalPlanRenderer
       layout={layout}
-      mode="view"
+      mode={mode}
       activeFloorIndex={activeFloorIndex}
       onSelectFloor={onSelectFloor}
       selectedRoomId={selectedRoomId}
@@ -52,6 +58,8 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
       onSelectFurniture={onSelectFurniture}
       onRegenerateLayout={onRegenerateLayout}
       isRegenerating={isRegenerating}
+      onUpdateLayout={onUpdateLayout}
+      onSave={onSave}
     />
   );
 };

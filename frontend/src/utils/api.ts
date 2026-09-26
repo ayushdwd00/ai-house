@@ -338,80 +338,6 @@ export async function reviewLayoutWithGemini(
 
 
 // ============================================================
-// GEMINI VISUALIZATION API
-// ============================================================
-
-export interface GeneratedVisual {
-  id: string;
-  revision_id?: string;
-  style: string;
-  view: string;
-  url?: string;
-  mime_type?: string;
-  created_at?: string;
-  is_cover?: boolean;
-}
-
-export interface GeneratedVisuals {
-  plan_images: GeneratedVisual[];
-  architectural_visualization?: string;
-  active_stale?: boolean;
-  cover_visual_id?: string;
-}
-
-export interface VisualizeRequest {
-  layout?: HouseLayout;
-  style?: string;
-  view?: string;
-  plan_image_base64?: string;
-  set_as_cover?: boolean;
-}
-
-export interface VisualizeResult {
-  status: "ok" | "visualization_failed";
-  project_id: string;
-  visual?: GeneratedVisual;
-  image_url?: string;
-  generated_visuals?: GeneratedVisuals;
-  message?: string;
-  layout?: HouseLayout;
-}
-
-/**
- * Generates a Gemini architectural presentation visualization for a saved project.
- * Never modifies canonical HouseLayout — presentation-only.
- */
-export async function generateProjectVisualization(
-  projectId: string,
-  req: VisualizeRequest
-): Promise<VisualizeResult> {
-  const url = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/visualize`;
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req),
-    });
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.detail || errData.message || `Visualization failed (HTTP ${res.status})`);
-    }
-    return await res.json();
-  } catch (err) {
-    throw new Error(formatApiError(err));
-  }
-}
-
-/**
- * Returns the full URL for a stored visualization image.
- */
-export function getVisualImageUrl(imageUrl: string): string {
-  if (!imageUrl) return "";
-  if (imageUrl.startsWith("http")) return imageUrl;
-  return `${API_BASE_URL}${imageUrl}`;
-}
-
-// ============================================================
 // PROJECT EDIT API — Full cascade with revision tracking
 // ============================================================
 
@@ -427,10 +353,6 @@ export interface ProjectEditRequest {
   edit_instruction: string;
   current_layout?: HouseLayout;
   target_room_id?: string;
-  regenerate_visualization?: boolean;
-  style?: string;
-  view?: string;
-  plan_image_base64?: string;
 }
 
 export interface ProjectEditResult {
@@ -439,7 +361,6 @@ export interface ProjectEditResult {
   layout?: HouseLayout;
   diff?: Record<string, unknown>;
   stages: EditStage[];
-  visualization?: GeneratedVisual;
   revision_id?: string;
   version_number?: number;
   reason?: string;

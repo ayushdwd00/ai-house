@@ -17,7 +17,6 @@ const STAGE_META: Record<
   validating_layout: { label: "Validating layout", shortLabel: "Validation", order: 2 },
   updating_2d_plan: { label: "Updating 2D plan", shortLabel: "2D Plan", order: 3 },
   updating_3d_model: { label: "Updating 3D model", shortLabel: "3D Model", order: 4 },
-  updating_visualization: { label: "Updating visualization", shortLabel: "Visualization", order: 5 },
 };
 
 const DEFAULT_STAGES = [
@@ -26,7 +25,6 @@ const DEFAULT_STAGES = [
   "validating_layout",
   "updating_2d_plan",
   "updating_3d_model",
-  "updating_visualization",
 ] as const;
 
 // ============================================================
@@ -222,18 +220,6 @@ export const EditProgressPanel: React.FC<EditProgressPanelProps> = ({
             })}
           </div>
 
-          {/* Visualization note on done */}
-          {isDone && (() => {
-            const visStage = resolvedStages?.find((s) => s.stage === "updating_visualization");
-            if (visStage?.status === "failed" && visStage.error) {
-              return (
-                <p className="mt-3 text-[10px] text-[#6E6C68] font-mono leading-relaxed border-t border-white/5 pt-2.5">
-                  {visStage.error}
-                </p>
-              );
-            }
-            return null;
-          })()}
         </div>
       </motion.div>
     </AnimatePresence>

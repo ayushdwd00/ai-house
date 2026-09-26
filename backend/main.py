@@ -19,7 +19,7 @@ from models import (
     HouseLayout, IntakeRequest, RefineRequest, EditRoomRequest, EditRoomResponse,
     Rect, ArchitecturalValidation, ArchitecturalScores, ConstructionSpecification,
     MaterialQuantities, CostEstimate, ReconstructionVerificationState, Point2D,
-    DreamHomeStructuredRequirements, LandscapePreferences
+    DreamHomeStructuredRequirements, LandscapePreferences, ProjectEditRequest
 )
 from architecture.architectural_engine import generate_architectural_house_layout
 from ai.refinement_engine import refine_current_house_layout
@@ -992,102 +992,9 @@ async def export_project_svg(project_id: str = FastPath(...)):
 
 
 # ============================================================
-# GEMINI ARCHITECTURAL VISUALIZATION
-# Presentation-only images derived from canonical HouseLayout.
-# Never overwrites geometry.
-# ============================================================
-
-from pathlib import Path as _Path
-from ai.visualization_engine import (
-    generate_gemini_visualization,
-    persist_visualization,
-    mark_visuals_stale,
-    compact_architectural_context,
-)
-from models import GeneratedVisuals, GeneratedVisual, EditIntent, VisualizeRequest, ProjectEditRequest
-
-BASE_PROJECTS_DIR = _Path("projects")
-
-
-@app.post("/api/projects/{project_id}/visualize")
-async def visualize_project_endpoint(project_id: str, req: VisualizeRequest):
-    """
-    Generates a Gemini architectural presentation image from canonical HouseLayout.
-    NEVER modifies HouseLayout geometry — presentation-only.
-    Stores generated image as binary file under projects/{id}/visuals/.
-    """
-    layout = get_project(project_id)
-    if not layout:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    # Use layout from request body if provided (contains latest 2D plan render from frontend)
-    active_layout = req.layout or layout
-
-    png_bytes, error = generate_gemini_visualization(
-        layout=active_layout,
-        style=req.style or "architectural",
-        view=req.view or "top_down",
-        plan_image_base64=req.plan_image_base64,
-    )
-
-    if not png_bytes:
-        # Architecture update still succeeded; visualization failure is non-blocking
-        return JSONResponse(
-            status_code=202,
-            content={
-                "status": "visualization_failed",
-                "message": f"Design is available. Visualization generation failed — you can retry. Error: {error}",
-                "project_id": project_id,
-                "layout": active_layout.model_dump(mode="json"),
-            }
-        )
-
-    updated_layout = persist_visualization(
-        layout=active_layout,
-        png_bytes=png_bytes,
-        style=req.style or "architectural",
-        view=req.view or "top_down",
-        projects_dir=BASE_PROJECTS_DIR,
-        set_as_cover=req.set_as_cover,
-    )
-
-    try:
-        save_project(updated_layout, project_id)
-    except Exception as e:
-        print(f"[STORAGE WARNING] Failed to persist visualization on project {project_id}: {e}")
-
-    # Return the generated image as PNG for immediate display
-    latest_visual = updated_layout.generated_visuals.plan_images[-1] if updated_layout.generated_visuals and updated_layout.generated_visuals.plan_images else None
-    return {
-        "status": "ok",
-        "project_id": project_id,
-        "visual": latest_visual.model_dump() if latest_visual else None,
-        "image_url": latest_visual.url if latest_visual else None,
-        "generated_visuals": updated_layout.generated_visuals.model_dump() if updated_layout.generated_visuals else None,
-    }
-
-
-@app.get("/api/projects/{project_id}/visuals/{visual_id}")
-async def get_visual_image_endpoint(project_id: str, visual_id: str):
-    """Serves the stored PNG for a generated architectural visualization."""
-    import pathlib
-    vis_file = BASE_PROJECTS_DIR / project_id / "visuals" / f"{visual_id}.png"
-    if not vis_file.exists():
-        raise HTTPException(status_code=404, detail="Visual not found")
-    return Response(
-        content=vis_file.read_bytes(),
-        media_type="image/png",
-        headers={
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "Content-Disposition": f'inline; filename="{visual_id}.png"',
-        }
-    )
-
-
-# ============================================================
 # PROJECT EDIT ENDPOINT — Full cascade:
 # EditIntent → Architectural Engine → Validation →
-# New HouseLayout Revision → 2D + 3D + Gemini stale
+# New HouseLayout Revision → 2D + 3D
 # ============================================================
 
 @app.post("/api/projects/{project_id}/edit")
@@ -1100,12 +1007,9 @@ async def project_edit_endpoint(project_id: str, req: ProjectEditRequest):
       3. Refinement engine → localized geometry update
       4. Validate updated HouseLayout
       5. Save as new revision (version_number++)
-      6. Mark visuals stale
-      7. Optionally trigger Gemini visualization regeneration
-      8. Return updated HouseLayout + progress stages
+      6. Return updated HouseLayout + progress stages
     
     On invalid edit: rollback, return old HouseLayout with reason.
-    On Gemini failure: return updated architecture without visualization (non-blocking).
     """
     layout = get_project(project_id)
     if not layout:
@@ -1163,9 +1067,6 @@ async def project_edit_endpoint(project_id: str, req: ProjectEditRequest):
     refined_layout.revision_id = f"rev_{_uuid.uuid4().hex[:8]}"
     refined_layout.version_number = (current_layout.version_number or 1) + 1
 
-    # Mark derived data stale (images, cache)
-    refined_layout = mark_visuals_stale(refined_layout, reason=f"edit: {instruction[:80]}")
-
     try:
         save_project(refined_layout, project_id)
     except Exception as e:
@@ -1174,47 +1075,12 @@ async def project_edit_endpoint(project_id: str, req: ProjectEditRequest):
     stages.append({"stage": "updating_2d_plan", "status": "ok", "label": "Updating 2D plan"})
     stages.append({"stage": "updating_3d_model", "status": "ok", "label": "Updating 3D model"})
 
-    # Attempt Gemini visualization regeneration (non-blocking)
-    visualization_result = None
-    if req.regenerate_visualization:
-        png_bytes, vis_error = generate_gemini_visualization(
-            layout=refined_layout,
-            style=req.style or "architectural",
-            view=req.view or "top_down",
-            plan_image_base64=req.plan_image_base64,
-        )
-        if png_bytes:
-            refined_layout = persist_visualization(
-                layout=refined_layout,
-                png_bytes=png_bytes,
-                style=req.style or "architectural",
-                view=req.view or "top_down",
-                projects_dir=BASE_PROJECTS_DIR,
-            )
-            try:
-                save_project(refined_layout, project_id)
-            except Exception:
-                pass
-            stages.append({"stage": "updating_visualization", "status": "ok", "label": "Updating visualization"})
-            latest = refined_layout.generated_visuals.plan_images[-1] if refined_layout.generated_visuals and refined_layout.generated_visuals.plan_images else None
-            visualization_result = latest.model_dump() if latest else None
-        else:
-            stages.append({
-                "stage": "updating_visualization",
-                "status": "failed",
-                "label": "Updating visualization",
-                "error": f"Design updated. Visualization generation failed — you can retry. {vis_error or ''}",
-            })
-    else:
-        stages.append({"stage": "updating_visualization", "status": "skipped", "label": "Updating visualization"})
-
     return {
         "status": "ok",
         "project_id": project_id,
         "layout": refined_layout.model_dump(mode="json"),
         "diff": diff if isinstance(diff, dict) else {},
         "stages": stages,
-        "visualization": visualization_result,
         "revision_id": refined_layout.revision_id,
         "version_number": refined_layout.version_number,
     }
@@ -1242,8 +1108,3 @@ def project_edit_intent_endpoint(project_id: str, req: ProjectEditRequest):
         "instruction": req.edit_instruction,
         "intent": cmd.model_dump(),
     }
-
-
-# BASE_PROJECTS_DIR is imported from infrastructure.storage
-from pathlib import Path as _Path
-BASE_PROJECTS_DIR = _Path("projects")

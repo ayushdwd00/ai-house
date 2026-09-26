@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from models import ConstructionSpecification, EditIntent, HouseLayout, Room
 from ai.groq_service import interpret_modification_with_groq, NaturalLanguageModificationCommand
 from ai.refinement_engine import refine_current_house_layout
-from ai.visualization_engine import mark_visuals_stale
 from architecture.architectural_validator import validate_design
 from architecture.furniture_validator import validate_and_place_furniture
 from architecture.wall_network import generate_wall_network_and_openings
@@ -150,7 +149,6 @@ def apply_canonical_edit(
         if blocking:
             return original, {"status": "rejected", "edit_intent": intent.model_dump(), "errors": blocking}, INVALID_EDIT_MESSAGE
 
-    updated = mark_visuals_stale(updated, instruction)
     updated.parent_revision_id = original.revision_id or f"rev_{original.version_number or 1}"
     updated.id = original.id
     updated.project_id = original.project_id or original.id

@@ -12,6 +12,8 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import {
   Camera,
   ChevronDown,
+  ChevronUp,
+  Bot,
   RotateCcw,
   Sun,
   Sunset,
@@ -83,6 +85,77 @@ export type CameraPresetType =
   | "bedroom"
   | "garden";
 
+function getExteriorFootprintLoops(walls: Wall[]): THREE.Vector2[][] {
+  const edges = walls
+    .filter((wall) => Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1) > 0.1)
+    .map((wall) => ({
+      start: new THREE.Vector2(wall.x1, wall.y1),
+      end: new THREE.Vector2(wall.x2, wall.y2),
+    }));
+  const pointKey = (point: THREE.Vector2) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+  const adjacency = new Map<string, number[]>();
+
+  edges.forEach((edge, index) => {
+    for (const key of [pointKey(edge.start), pointKey(edge.end)]) {
+      const connected = adjacency.get(key) || [];
+      connected.push(index);
+      adjacency.set(key, connected);
+    }
+  });
+
+  const used = new Set<number>();
+  const loops: THREE.Vector2[][] = [];
+  edges.forEach((edge, startIndex) => {
+    if (used.has(startIndex)) return;
+    const startKey = pointKey(edge.start);
+    let currentKey = startKey;
+    let currentEdgeIndex = startIndex;
+    const loop: THREE.Vector2[] = [];
+
+    for (let step = 0; step <= edges.length; step++) {
+      if (used.has(currentEdgeIndex)) break;
+      used.add(currentEdgeIndex);
+      const currentEdge = edges[currentEdgeIndex];
+      const forward = pointKey(currentEdge.start) === currentKey;
+      const nextPoint = forward ? currentEdge.end : currentEdge.start;
+      const nextKey = pointKey(nextPoint);
+      loop.push(forward ? currentEdge.start : currentEdge.end);
+      if (nextKey === startKey) {
+        if (loop.length >= 3) loops.push(loop);
+        break;
+      }
+
+      const nextEdgeIndex = (adjacency.get(nextKey) || []).find((index) => !used.has(index));
+      if (nextEdgeIndex === undefined) break;
+      currentKey = nextKey;
+      currentEdgeIndex = nextEdgeIndex;
+    }
+  });
+
+  return loops.sort((a, b) => Math.abs(THREE.ShapeUtils.area(b)) - Math.abs(THREE.ShapeUtils.area(a)));
+}
+
+function offsetFootprint(contour: THREE.Vector2[], distance: number): THREE.Vector2[] {
+  const isClockwise = THREE.ShapeUtils.isClockWise(contour);
+  return contour.map((point, index) => {
+    const previous = contour[(index - 1 + contour.length) % contour.length];
+    const next = contour[(index + 1) % contour.length];
+    const previousEdge = point.clone().sub(previous).normalize();
+    const nextEdge = next.clone().sub(point).normalize();
+    const normal = (edge: THREE.Vector2) => isClockwise
+      ? new THREE.Vector2(edge.y, -edge.x)
+      : new THREE.Vector2(-edge.y, edge.x);
+    const previousNormal = normal(previousEdge);
+    const nextNormal = normal(nextEdge);
+    const bisector = previousNormal.add(nextNormal).normalize();
+    const denominator = bisector.dot(nextNormal);
+    if (!Number.isFinite(denominator) || denominator <= 0.25) {
+      return point.clone().addScaledVector(nextNormal, distance);
+    }
+    return point.clone().addScaledVector(bisector, Math.min(distance / denominator, distance * 3));
+  });
+}
+
 export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   layout,
   activeFloorIndex,
@@ -137,6 +210,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   );
   const [cameraView, setCameraView] = useState<CameraPresetType>("cutaway");
   const [isCameraMenuOpen, setIsCameraMenuOpen] = useState(false);
+  const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(false);
   const [showFurnitureState, setShowFurnitureState] = useState(true);
   const [showVegetationState, setShowVegetationState] = useState(true);
   const [multiFloorStacked, setMultiFloorStacked] = useState(true);
@@ -391,6 +465,14 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         roughness: 0.72,
         metalness: 0.03,
       }),
+      roofMat: (() => {
+        const roofFinish = layout.materials?.find((material) => material.category === "roof");
+        return new THREE.MeshStandardMaterial({
+          color: roofFinish?.base_color || (isDarkMode ? "#343941" : "#77756F"),
+          roughness: roofFinish?.roughness ?? 0.78,
+          metalness: roofFinish?.metalness ?? 0.02,
+        });
+      })(),
       // Hardwood Oak Floor: Rich warm brown tone
       woodFloor: new THREE.MeshStandardMaterial({
         color: isDarkMode ? "#3A291C" : "#A87948",
@@ -489,7 +571,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       furnitureWood: new THREE.MeshStandardMaterial({ color: "#7A5C3D", roughness: 0.55 }),
       furnitureFabric: new THREE.MeshStandardMaterial({ color: "#B8B0A2", roughness: 0.85 }),
     };
-  }, [isDarkMode, woodTexture, tileTexture, grassTexture, paverTexture]);
+  }, [isDarkMode, layout.materials, woodTexture, tileTexture, grassTexture, paverTexture]);
 
   // Floor Material Mapper
   const getRoomFloorMaterial = useCallback(
@@ -931,7 +1013,24 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     if (!scene) return;
 
     if (houseRootRef.current) {
-      scene.remove(houseRootRef.current);
+      const previousRoot = houseRootRef.current;
+      scene.remove(previousRoot);
+      const cachedAssetGeometries = new Set<THREE.BufferGeometry>();
+      [loadedFurnitureRef.current, loadedNatureRef.current].forEach((assets) => {
+        Object.values(assets).forEach((asset) => {
+          asset.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              cachedAssetGeometries.add((child as THREE.Mesh).geometry);
+            }
+          });
+        });
+      });
+      previousRoot.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const geometry = (child as THREE.Mesh).geometry;
+          if (!cachedAssetGeometries.has(geometry)) geometry.dispose();
+        }
+      });
     }
     const rootGroup = new THREE.Group();
     scene.add(rootGroup);
@@ -943,7 +1042,9 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
     // Calculate Canonical Bounding Footprint
     let minBx = Infinity, maxBx = -Infinity, minBz = Infinity, maxBz = -Infinity;
-    (layout.rooms || []).forEach((r) => {
+    const floorRooms = layout.floors?.flatMap((floor) => floor.rooms || []) || [];
+    const canonicalRooms = floorRooms.length ? floorRooms : layout.rooms || [];
+    canonicalRooms.forEach((r) => {
       if (r.rect) {
         minBx = Math.min(minBx, r.rect.x);
         maxBx = Math.max(maxBx, r.rect.x + r.rect.width);
@@ -981,97 +1082,149 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       rootGroup.add(landscapeScene);
     }
 
-    // 3. Multi-Floor / Single Floor Construction
-    const numFloors = Math.max(1, layout.floors?.length || layout.num_floors || 1);
+    // 3. Multi-floor construction or isolation of the selected floor.
+    const floorPlans: FloorPlan[] = layout.floors?.length
+      ? layout.floors
+      : [{
+          floor_number: 1,
+          floor_name: "Ground Floor",
+          rooms: layout.rooms || [],
+          exterior_walls: layout.exterior_walls || [],
+          interior_walls: layout.interior_walls || [],
+          doors: layout.doors || [],
+          windows: layout.windows || [],
+        }];
+    const numFloors = floorPlans.length;
+    const isolatedFloorIndex = Math.min(Math.max(activeFloorIndex, 0), numFloors - 1);
+    const renderedFloorIndices = multiFloorStacked
+      ? floorPlans.map((_, index) => index)
+      : [isolatedFloorIndex];
 
-    if (multiFloorStacked) {
-      (layout.floors || [layout]).forEach((fl, fIdx) => {
-        const floorPlan: FloorPlan =
-          layout.floors && layout.floors[fIdx]
-            ? layout.floors[fIdx]
-            : {
-                floor_number: fIdx + 1,
-                floor_name: `Level ${fIdx + 1}`,
-                rooms: layout.rooms || [],
-                exterior_walls: layout.exterior_walls || [],
-                interior_walls: layout.interior_walls || [],
-                doors: layout.doors || [],
-                windows: layout.windows || [],
-              };
+    renderedFloorIndices.forEach((floorIndex, renderIndex) => {
+      const floorBaseY = plinthHeight + (multiFloorStacked ? renderIndex * floorHeight : 0);
+      if (multiFloorStacked && renderIndex > 0) {
+        const slabGeo = new THREE.BoxGeometry(plinthW, slabThickness, plinthL);
+        const slabMesh = new THREE.Mesh(slabGeo, materials.slabMat);
+        slabMesh.position.set(plinthX, floorBaseY - slabThickness / 2, plinthZ);
+        slabMesh.castShadow = true;
+        slabMesh.receiveShadow = true;
+        rootGroup.add(slabMesh);
+      }
 
-        const floorBaseY = plinthHeight + fIdx * floorHeight;
+      rootGroup.add(buildFloorGeometry(
+        floorPlans[floorIndex],
+        floorIndex,
+        floorBaseY,
+        isCutawayMode,
+        interiorLights,
+        { x: plinthX, z: plinthZ }
+      ));
+    });
 
-        // Intermediate RCC Slab between floors
-        if (fIdx > 0) {
-          const slabGeo = new THREE.BoxGeometry(plinthW, slabThickness, plinthL);
-          const slabMesh = new THREE.Mesh(slabGeo, materials.slabMat);
-          slabMesh.position.set(plinthX, floorBaseY - slabThickness / 2, plinthZ);
-          slabMesh.castShadow = true;
-          slabMesh.receiveShadow = true;
-          rootGroup.add(slabMesh);
-        }
-
-        const flGroup = buildFloorGeometry(
-          floorPlan,
-          fIdx,
-          floorBaseY,
-          isCutawayMode,
-          interiorLights,
-          { x: plinthX, z: plinthZ }
-        );
-        rootGroup.add(flGroup);
-      });
+    // 4. Architectural roof follows the visible top-floor exterior wall footprint.
+    const roofFloorIndex = multiFloorStacked ? numFloors - 1 : isolatedFloorIndex;
+    const roofFloor = floorPlans[roofFloorIndex];
+    const footprintWalls = roofFloor.exterior_walls?.length
+      ? roofFloor.exterior_walls
+      : layout.exterior_walls || [];
+    let roofContours = getExteriorFootprintLoops(footprintWalls);
+    if (!roofContours.length) {
+      const roofRooms = roofFloor.rooms || [];
+      const bounds = roofRooms.reduce(
+        (result, room) => {
+          if (!room.rect) return result;
+          result.minX = Math.min(result.minX, room.rect.x);
+          result.minY = Math.min(result.minY, room.rect.y);
+          result.maxX = Math.max(result.maxX, room.rect.x + room.rect.width);
+          result.maxY = Math.max(result.maxY, room.rect.y + room.rect.length);
+          return result;
+        },
+        { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+      );
+      if (Number.isFinite(bounds.minX) && bounds.maxX > bounds.minX && bounds.maxY > bounds.minY) {
+        roofContours = [[
+          new THREE.Vector2(bounds.minX, bounds.minY),
+          new THREE.Vector2(bounds.maxX, bounds.minY),
+          new THREE.Vector2(bounds.maxX, bounds.maxY),
+          new THREE.Vector2(bounds.minX, bounds.maxY),
+        ]];
+      }
+    }
+    if (!roofContours.length) {
+      roofContours = [[
+        new THREE.Vector2(plinthX - plinthW / 2, plinthZ - plinthL / 2),
+        new THREE.Vector2(plinthX + plinthW / 2, plinthZ - plinthL / 2),
+        new THREE.Vector2(plinthX + plinthW / 2, plinthZ + plinthL / 2),
+        new THREE.Vector2(plinthX - plinthW / 2, plinthZ + plinthL / 2),
+      ]];
     }
 
-    // 4. RCC Roof Slab & Parapet Wall
-    const topFloorBaseY = plinthHeight + (numFloors - 1) * floorHeight;
-    const roofBaseY = topFloorBaseY + fullWallHeight;
-    const roofW = plinthW + 1.2;
-    const roofL = plinthL + 1.2;
+    const roofBaseY = plinthHeight
+      + (multiFloorStacked ? numFloors - 1 : 0) * floorHeight
+      + fullWallHeight;
+    if (effectiveShowRoof && !isCutawayMode) {
+      const overhang = 0.8;
+      const parapetHeight = 2.0;
+      const parapetThickness = 0.45;
 
-    if (effectiveShowRoof) {
-      if (!isCutawayMode) {
-        // Complete roof slab
-        const roofGeo = new THREE.BoxGeometry(roofW, slabThickness, roofL);
-        const roofMesh = new THREE.Mesh(roofGeo, materials.slabMat);
-        roofMesh.position.set(plinthX, roofBaseY + slabThickness / 2, plinthZ);
+      roofContours.forEach((contour) => {
+        const expanded = offsetFootprint(contour, overhang);
+        const shape = new THREE.Shape();
+        expanded.forEach((point, index) => {
+          const x = point.x;
+          const z = -point.y;
+          if (index === 0) shape.moveTo(x, z);
+          else shape.lineTo(x, z);
+        });
+        shape.closePath();
+
+        const roofMesh = new THREE.Mesh(
+          new THREE.ExtrudeGeometry(shape, {
+            depth: slabThickness,
+            bevelEnabled: false,
+            curveSegments: 1,
+          }),
+          materials.roofMat
+        );
+        roofMesh.rotation.x = -Math.PI / 2;
+        roofMesh.position.y = roofBaseY;
         roofMesh.castShadow = true;
         roofMesh.receiveShadow = true;
         rootGroup.add(roofMesh);
 
-        // Parapet Walls
-        const parapetH = 2.5;
-        const parapetThick = 0.5;
-        const pFront = new THREE.Mesh(new THREE.BoxGeometry(roofW, parapetH, parapetThick), materials.extPlaster);
-        pFront.position.set(plinthX, roofBaseY + slabThickness + parapetH / 2, plinthZ + roofL / 2 - parapetThick / 2);
-        const pRear = pFront.clone();
-        pRear.position.z = plinthZ - roofL / 2 + parapetThick / 2;
+        contour.forEach((point, index) => {
+          const next = contour[(index + 1) % contour.length];
+          const dx = next.x - point.x;
+          const dz = next.y - point.y;
+          const wallLength = Math.hypot(dx, dz);
+          if (wallLength < 0.25) return;
+          const angle = Math.atan2(dz, dx);
+          const centerX = (point.x + next.x) / 2;
+          const centerZ = (point.y + next.y) / 2;
+          const parapet = new THREE.Mesh(
+            new THREE.BoxGeometry(wallLength, parapetHeight, parapetThickness),
+            materials.extPlaster
+          );
+          parapet.position.set(centerX, roofBaseY + slabThickness + parapetHeight / 2, centerZ);
+          parapet.rotation.y = -angle;
+          parapet.castShadow = true;
+          parapet.receiveShadow = true;
+          rootGroup.add(parapet);
 
-        const pLeft = new THREE.Mesh(new THREE.BoxGeometry(parapetThick, parapetH, roofL), materials.extPlaster);
-        pLeft.position.set(plinthX - roofW / 2 + parapetThick / 2, roofBaseY + slabThickness + parapetH / 2, plinthZ);
-        const pRight = pLeft.clone();
-        pRight.position.x = plinthX + roofW / 2 - parapetThick / 2;
-
-        rootGroup.add(pFront, pRear, pLeft, pRight);
-
-        // Stair Mumty Tower
-        const mumtyGeo = new THREE.BoxGeometry(10.0, 7.5, 12.0);
-        const mumtyMesh = new THREE.Mesh(mumtyGeo, materials.accentStone);
-        mumtyMesh.position.set(plinthX - plinthW * 0.15, roofBaseY + slabThickness + 3.75, plinthZ - plinthL * 0.15);
-        mumtyMesh.castShadow = true;
-        rootGroup.add(mumtyMesh);
-      } else {
-        // Cutaway Roof: Retain rear half to reveal interior while maintaining architectural massing
-        const cutawayL = roofL * 0.45;
-        const roofGeo = new THREE.BoxGeometry(roofW, slabThickness, cutawayL);
-        const roofMesh = new THREE.Mesh(roofGeo, materials.slabMat);
-        roofMesh.position.set(plinthX, roofBaseY + slabThickness / 2, plinthZ - roofL / 2 + cutawayL / 2);
-        rootGroup.add(roofMesh);
-
-        const pRear = new THREE.Mesh(new THREE.BoxGeometry(roofW, 2.5, 0.5), materials.extPlaster);
-        pRear.position.set(plinthX, roofBaseY + slabThickness + 1.25, plinthZ - roofL / 2 + 0.25);
-        rootGroup.add(pRear);
-      }
+          const coping = new THREE.Mesh(
+            new THREE.BoxGeometry(wallLength + 0.15, 0.18, parapetThickness + 0.2),
+            materials.copingMat
+          );
+          coping.position.set(
+            centerX,
+            roofBaseY + slabThickness + parapetHeight + 0.09,
+            centerZ
+          );
+          coping.rotation.y = -angle;
+          coping.castShadow = true;
+          rootGroup.add(coping);
+        });
+      });
     }
 
     // 5. Entrance Porch Canopy & Stone Steps
@@ -1116,6 +1269,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     slabThickness,
     materials,
     multiFloorStacked,
+    activeFloorIndex,
     isCutawayMode,
     effectiveShowRoof,
     effectiveShowLandscape,
@@ -1472,89 +1626,140 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       onPointerDown={handlePointerDown}
       className="relative w-full h-full select-none overflow-hidden bg-[#0E1015]"
     >
-      {/* FLOATING TOP BAR CONTROLS */}
-      <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Left: Presentation Mode & Camera Presets */}
-        <div className="flex items-center gap-1.5 p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl pointer-events-auto text-xs font-mono text-[#9E9C98]">
-          <button
-            type="button"
-            onClick={() => {
-              setIsCutawayMode(true);
-              setPresentationMode("cutaway");
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
-              isCutawayMode
-                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-md"
-                : "hover:text-white"
-            }`}
-          >
-            <Scissors className="w-3.5 h-3.5" />
-            DOLLHOUSE CUTAWAY
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsCutawayMode(false);
-              setPresentationMode("exterior");
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
-              !isCutawayMode
-                ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-md"
-                : "hover:text-white"
-            }`}
-          >
-            <Building className="w-3.5 h-3.5" />
-            FULL EXTERIOR
-          </button>
-
-          <div className="w-[1px] h-4 bg-white/10 mx-1" />
-
-          {/* Camera Preset Dropdown */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsCameraMenuOpen(!isCameraMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-white transition-all"
-            >
-              <Camera className="w-3.5 h-3.5 text-[#C48446]" />
-              <span className="capitalize">{cameraView} View</span>
-              <ChevronDown className="w-3 h-3 text-[#9E9C98]" />
-            </button>
-
-            {isCameraMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 w-44 rounded-xl bg-[#161922] border border-white/10 shadow-2xl overflow-hidden py-1 z-30">
-                {[
-                  { id: "cutaway", label: "Dollhouse 3/4" },
-                  { id: "exterior", label: "Exterior Perspective" },
-                  { id: "iso", label: "Isometric 45°" },
-                  { id: "top", label: "Top (Plan)" },
-                  { id: "front", label: "Front Facade" },
-                  { id: "entrance", label: "Main Entrance" },
-                  { id: "living", label: "Living Room" },
-                  { id: "kitchen", label: "Kitchen" },
-                  { id: "bedroom", label: "Master Bedroom" },
-                  { id: "garden", label: "Site & Garden" },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleCameraPreset(item.id as CameraPresetType)}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                      cameraView === item.id
-                        ? "bg-[#C48446]/20 text-[#C48446] font-semibold"
-                        : "text-[#9E9C98] hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+      {/* MODEL VIEW CONTROLS */}
+      <div className="absolute top-20 xl:top-4 left-3 right-3 xl:left-4 xl:right-4 z-20 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2 pointer-events-none">
+        <div
+          className={`pointer-events-auto justify-self-start rounded-2xl border border-white/10 bg-[#12141A]/95 text-[#9E9C98] shadow-2xl shadow-black/35 backdrop-blur-md ${
+            isControlPanelExpanded ? "w-60 max-w-[calc(100vw-1.5rem)] p-2.5" : "p-1.5"
+          }`}
+        >
+          <div className={`flex items-center ${isControlPanelExpanded ? "justify-between px-1 pb-2" : ""}`}>
+            {isControlPanelExpanded && (
+              <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-[#D6D2CA]">
+                <Bot className="h-4 w-4 text-[#C48446]" />
+                Model Controls
               </div>
             )}
+            <button
+              type="button"
+              aria-label={isControlPanelExpanded ? "Collapse model controls" : "Expand model controls"}
+              aria-expanded={isControlPanelExpanded}
+              title={isControlPanelExpanded ? "Collapse model controls" : "Expand model controls"}
+              onClick={() => setIsControlPanelExpanded((expanded) => !expanded)}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-[#C48446] transition-colors hover:bg-white/10 hover:text-[#F5F3EF] ${
+                isControlPanelExpanded ? "" : "mx-auto"
+              }`}
+            >
+              {isControlPanelExpanded
+                ? <ChevronUp className="h-4 w-4" />
+                : <Bot className="h-4 w-4" />}
+            </button>
           </div>
+
+          {isControlPanelExpanded && (
+            <div className="space-y-1.5 border-t border-white/8 pt-2 font-mono text-[10px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCutawayMode(true);
+                  setPresentationMode("cutaway");
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                  isCutawayMode
+                    ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
+                    : "bg-white/5 text-[#B8B4AC] hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Scissors className="h-4 w-4 shrink-0" />
+                <span>Dollhouse cutaway</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCutawayMode(false);
+                  setPresentationMode("exterior");
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                  !isCutawayMode
+                    ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
+                    : "bg-white/5 text-[#B8B4AC] hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Building className="h-4 w-4 shrink-0" />
+                <span>Full exterior</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMultiFloorStacked((stacked) => !stacked)}
+                title={multiFloorStacked ? "Isolate the selected floor" : "Show all floors"}
+                className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-2.5 py-2 text-left text-[#B8B4AC] transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <Layers className="h-4 w-4 shrink-0 text-[#C48446]" />
+                <span>{multiFloorStacked ? "All floors" : `Floor ${activeFloorIndex + 1}`}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onToggleRoof) onToggleRoof();
+                  else setInternalShowRoof((visible) => !visible);
+                }}
+                title={effectiveShowRoof ? "Hide roof in exterior view" : "Show roof in exterior view"}
+                className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                  effectiveShowRoof
+                    ? "bg-white/10 text-white"
+                    : "bg-white/5 text-[#9E9C98] hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Eye className="h-4 w-4 shrink-0 text-[#C48446]" />
+                <span>Roof visibility</span>
+                <span className={`ml-auto h-1.5 w-1.5 rounded-full ${effectiveShowRoof ? "bg-[#C48446]" : "bg-white/25"}`} />
+              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsCameraMenuOpen(!isCameraMenuOpen)}
+                  className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-2.5 py-2 text-left text-[#B8B4AC] transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <Camera className="h-4 w-4 shrink-0 text-[#C48446]" />
+                  <span className="capitalize">{cameraView} view</span>
+                  <ChevronDown className="ml-auto h-3 w-3 text-[#9E9C98]" />
+                </button>
+                {isCameraMenuOpen && (
+                  <div className="absolute left-0 top-full z-30 mt-1 max-h-64 w-44 overflow-y-auto rounded-xl border border-white/10 bg-[#161922] py-1 shadow-2xl sm:left-full sm:top-0 sm:ml-2 sm:mt-0">
+                    {[
+                      { id: "cutaway", label: "Dollhouse 3/4" },
+                      { id: "exterior", label: "Exterior Perspective" },
+                      { id: "iso", label: "Isometric 45°" },
+                      { id: "top", label: "Top (Plan)" },
+                      { id: "front", label: "Front Facade" },
+                      { id: "entrance", label: "Main Entrance" },
+                      { id: "living", label: "Living Room" },
+                      { id: "kitchen", label: "Kitchen" },
+                      { id: "bedroom", label: "Master Bedroom" },
+                      { id: "garden", label: "Site & Garden" },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleCameraPreset(item.id as CameraPresetType)}
+                        className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${
+                          cameraView === item.id
+                            ? "bg-[#C48446]/20 font-semibold text-[#C48446]"
+                            : "text-[#9E9C98] hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: Lighting Atmosphere */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="pointer-events-auto col-start-2 row-start-2 flex items-center justify-self-end gap-1 sm:row-start-1 sm:gap-2">
           {/* Lighting Mode */}
           <div className="flex items-center p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#9E9C98]">
             <button
