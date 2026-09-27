@@ -650,7 +650,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         </AnimatePresence>
       </main>
 
-      {(currentTab === "plan" || currentTab === "model") && !isConsultationOpen && (
+      {currentTab === "plan" && planEditMode === "view" && !isConsultationOpen && (
         <>
           <MEPLayerControls value={mepVisibility} onChange={handleMepVisibilityChange} />
           {mepError && (

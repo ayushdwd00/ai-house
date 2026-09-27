@@ -415,9 +415,9 @@ export const StructureView: React.FC<StructureViewProps> = ({
   return (
     <div className="relative w-full h-full flex flex-col md:flex-row overflow-hidden bg-[#F8FAFC] text-[#0F172A] select-none">
       {/* 1. TOP DRAFTING CONTROLS TOOLBAR */}
-      <div className="absolute top-4 left-4 right-4 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+      <div className="fixed top-16 sm:top-20 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain">
         {/* Left: View Mode Toggle & Floor Selector */}
-        <div className="pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg shadow-slate-900/5 text-xs font-mono">
+        <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg shadow-slate-900/5 text-xs font-mono">
           {/* 2D / 3D Switch */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-xl">
             <button
@@ -480,7 +480,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
         </div>
 
         {/* Right: Structural Visibility Controls (Rule 15) */}
-        <div className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg shadow-slate-900/5 text-[10.5px] font-mono">
+        <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg shadow-slate-900/5 text-[10.5px] font-mono">
           <button
             onClick={() => setShowArchitecture((v) => !v)}
             className={`px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 ${

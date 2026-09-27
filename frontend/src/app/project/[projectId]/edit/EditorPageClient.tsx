@@ -4,12 +4,11 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "@/context/ProjectContext";
 import { ArchitecturalPlanRenderer } from "@/components/ArchitecturalPlanRenderer";
-import { HouseLayout, MEPCategory } from "@/types/house";
+import { HouseLayout } from "@/types/house";
 import { Loader2 } from "lucide-react";
 import { NavView } from "@/components/FloatingNav";
 import { FloatingAICommandBar } from "@/components/FloatingAICommandBar";
-import { applyProjectEdit, generateMepPlan, previewProjectEditIntent, saveProjectToServer } from "@/utils/api";
-import { MEPLayerControls, MEPLayerVisibility } from "@/components/MEPLayerControls";
+import { applyProjectEdit, previewProjectEditIntent, saveProjectToServer } from "@/utils/api";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
 
 interface EditorPageClientProps {
@@ -27,37 +26,10 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [isApplyingAIEdit, setIsApplyingAIEdit] = useState(false);
   const [aiEditNotice, setAiEditNotice] = useState<string | null>(null);
-  const [mepVisibility, setMepVisibility] = useState<MEPLayerVisibility>({
-    electrical: false,
-    plumbing: false,
-    hvac: false,
-  });
-  const [mepError, setMepError] = useState<string | null>(null);
-
   const handleLayoutUpdate = (updated: HouseLayout) => {
     const canonicalLayout = validateAndSanitizeHouseLayout(updated) || updated;
     setLayout(canonicalLayout);
     updateProject(canonicalLayout);
-    if (!Object.values(mepVisibility).some(Boolean)) return;
-    void generateMepPlan(canonicalLayout).then((withMep) => {
-      setLayout(withMep);
-      updateProject(withMep);
-      setMepError(null);
-    }).catch((error: unknown) => {
-      setMepError(error instanceof Error ? error.message : "MEP layers could not be synchronized.");
-    });
-  };
-
-  const handleMepVisibilityChange = (category: MEPCategory, visible: boolean) => {
-    setMepVisibility((previous) => ({ ...previous, [category]: visible }));
-    if (!visible || !layout) return;
-    void generateMepPlan(layout).then((withMep) => {
-      setLayout(withMep);
-      updateProject(withMep);
-      setMepError(null);
-    }).catch((error: unknown) => {
-      setMepError(error instanceof Error ? error.message : "MEP layers could not be generated.");
-    });
   };
 
   const handleApplyAIInstruction = async (instruction: string) => {
@@ -195,7 +167,6 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
         activeFloorIndex={activeFloorIndex}
         onSelectFloor={setActiveFloorIndex}
         onSelectEntity={setSelectedEntityId}
-        mepVisibility={mepVisibility}
         onUpdateLayout={handleLayoutUpdate}
         onSave={(saved) => {
           handleLayoutUpdate(saved);
@@ -217,12 +188,6 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
         onApplyInstruction={handleApplyAIInstruction}
         isLoading={isApplyingAIEdit}
       />
-      <MEPLayerControls value={mepVisibility} onChange={handleMepVisibilityChange} />
-      {mepError && (
-        <div role="alert" className="fixed right-3 top-[13.5rem] z-40 max-w-56 rounded-lg border border-red-400/25 bg-[#171015]/95 px-3 py-2 text-[10px] text-red-200 shadow-lg">
-          {mepError}
-        </div>
-      )}
       {aiEditNotice && (
         <div
           role="status"
