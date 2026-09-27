@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { HouseLayout, FloorPlan, Room, FurnitureItem, Door, Window, Wall } from "@/types/house";
+import { HouseLayout, FloorPlan, Room, FurnitureItem, Door, Window, Wall, MEPCategory } from "@/types/house";
 import { generateFallbackLandscape } from "@/utils/landscapeFallback";
 import { generateArchitecturalLandscape, ArchitecturalLandscapeModel } from "@/utils/residentialLandscapeData";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/utils/blueprint2D";
 import { refineHouseLayout, editRoomLayoutFull, reviewLayoutWithGemini } from "@/utils/api";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
+import { FloatingNav, NavView } from "./FloatingNav";
 import {
   generateCanonicalWallNetwork,
   synchronizeOpeningsWithWalls,
@@ -147,9 +148,16 @@ export interface ArchitecturalPlanRendererProps {
   selectedFurnitureId?: string | null;
   onSelectRoom?: (roomId: string | null) => void;
   onSelectFurniture?: (furnitureId: string | null) => void;
+  onSelectEntity?: (entityId: string | null) => void;
   onBack?: () => void;
   onRegenerateLayout?: (arg?: any) => Promise<void> | void;
   isRegenerating?: boolean;
+  showAtelierNav?: boolean;
+  onStudioNavigate?: (view: NavView) => void;
+  onToggleEditMode?: () => void;
+  onOpenVastuAudit?: () => void;
+  hasVastuResult?: boolean;
+  mepVisibility?: Partial<Record<MEPCategory, boolean>>;
 }
 
 interface DraggingRoomState {
@@ -187,6 +195,7 @@ interface DraggingWallState {
   initialY2: number;
   affectedRoomIds: string[];
   initialRooms: Room[];
+  initialWalls: Wall[];
   initialDoors: Door[];
   initialWindows: Window[];
 }
@@ -204,6 +213,236 @@ interface ResizingWallEndpointState {
   initialRooms: Room[];
 }
 
+interface DrawingWallState {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
+
+interface DraggingOpeningState {
+  kind: "door" | "window";
+  id: string;
+  wallId: string;
+  initialOpening: Door | Window;
+}
+
+function syncPrimaryFloor(layout: HouseLayout): HouseLayout {
+  const sourceFloor = layout.floors?.[0];
+  if (!sourceFloor) return layout;
+  const openingIdsByWall = new Map<string, string[]>();
+  [...(sourceFloor.doors || []), ...(sourceFloor.windows || [])].forEach((opening) => {
+    const wallId = opening.host_wall_id || opening.wall_id;
+    if (wallId) openingIdsByWall.set(wallId, [...(openingIdsByWall.get(wallId) || []), opening.id]);
+  });
+  const exteriorWalls = (sourceFloor.exterior_walls || []).map((wall) => ({
+    ...wall,
+    openings: openingIdsByWall.get(wall.id) || [],
+  }));
+  const interiorWalls = (sourceFloor.interior_walls || []).map((wall) => ({
+    ...wall,
+    openings: openingIdsByWall.get(wall.id) || [],
+  }));
+  const primaryFloor: FloorPlan = {
+    ...sourceFloor,
+    exterior_walls: exteriorWalls,
+    interior_walls: interiorWalls,
+    walls: [...exteriorWalls, ...interiorWalls],
+  };
+  const floors = [...(layout.floors || [])];
+  floors[0] = primaryFloor;
+  const walls = [
+    ...exteriorWalls,
+    ...interiorWalls,
+  ];
+  const totalArea = primaryFloor.rooms.reduce(
+    (area, room) => area + (room.area_sqft || room.rect.width * room.rect.length),
+    0
+  );
+  return {
+    ...layout,
+    floors,
+    rooms: primaryFloor.rooms,
+    walls,
+    exterior_walls: exteriorWalls,
+    interior_walls: interiorWalls,
+    doors: primaryFloor.doors || [],
+    windows: primaryFloor.windows || [],
+    total_area_sqft: totalArea,
+    stats: { ...layout.stats, total_area_sqft: totalArea },
+  };
+}
+
+function projectOpeningToWall(
+  wall: Wall,
+  point: { x: number; y: number },
+  width: number
+): { x1: number; y1: number; x2: number; y2: number; width: number } | null {
+  const dx = wall.x2 - wall.x1;
+  const dy = wall.y2 - wall.y1;
+  const length = Math.hypot(dx, dy);
+  const fittedWidth = Math.min(width, length - 0.5);
+  if (length < 1 || fittedWidth < 1) return null;
+  const ux = dx / length;
+  const uy = dy / length;
+  const projection = Math.max(
+    fittedWidth / 2 + 0.25,
+    Math.min(
+      length - fittedWidth / 2 - 0.25,
+      ((point.x - wall.x1) * dx + (point.y - wall.y1) * dy) / length
+    )
+  );
+  const cx = wall.x1 + ux * projection;
+  const cy = wall.y1 + uy * projection;
+  return {
+    x1: cx - ux * fittedWidth / 2,
+    y1: cy - uy * fittedWidth / 2,
+    x2: cx + ux * fittedWidth / 2,
+    y2: cy + uy * fittedWidth / 2,
+    width: fittedWidth,
+  };
+}
+
+function hasValidWallGeometry(walls: Wall[], plotWidth: number, plotLength: number): boolean {
+  for (let i = 0; i < walls.length; i += 1) {
+    const wall = walls[i];
+    const length = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+    if (
+      length < 1 ||
+      wall.thickness <= 0 ||
+      Math.min(wall.x1, wall.x2) < 0 ||
+      Math.min(wall.y1, wall.y2) < 0 ||
+      Math.max(wall.x1, wall.x2) > plotWidth ||
+      Math.max(wall.y1, wall.y2) > plotLength
+    ) {
+      return false;
+    }
+    for (let j = 0; j < i; j += 1) {
+      const other = walls[j];
+      const parallelHorizontal =
+        Math.abs(wall.y1 - wall.y2) < 0.05 &&
+        Math.abs(other.y1 - other.y2) < 0.05 &&
+        Math.abs(wall.y1 - other.y1) < 0.05;
+      const parallelVertical =
+        Math.abs(wall.x1 - wall.x2) < 0.05 &&
+        Math.abs(other.x1 - other.x2) < 0.05 &&
+        Math.abs(wall.x1 - other.x1) < 0.05;
+      if (parallelHorizontal || parallelVertical) {
+        const wallMin = parallelHorizontal ? Math.min(wall.x1, wall.x2) : Math.min(wall.y1, wall.y2);
+        const wallMax = parallelHorizontal ? Math.max(wall.x1, wall.x2) : Math.max(wall.y1, wall.y2);
+        const otherMin = parallelHorizontal ? Math.min(other.x1, other.x2) : Math.min(other.y1, other.y2);
+        const otherMax = parallelHorizontal ? Math.max(other.x1, other.x2) : Math.max(other.y1, other.y2);
+        if (Math.min(wallMax, otherMax) - Math.max(wallMin, otherMin) > 0.05) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function openingOverlaps(
+  candidate: Door | Window,
+  openings: Array<Door | Window>,
+  wall: Wall
+): boolean {
+  const dx = wall.x2 - wall.x1;
+  const dy = wall.y2 - wall.y1;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return true;
+  const interval = (opening: Door | Window) => {
+    const start = (opening.x1 - wall.x1) * dx / length + (opening.y1 - wall.y1) * dy / length;
+    const end = (opening.x2 - wall.x1) * dx / length + (opening.y2 - wall.y1) * dy / length;
+    return { start: Math.min(start, end), end: Math.max(start, end) };
+  };
+  const candidateInterval = interval(candidate);
+  return openings.some((opening) => {
+    if (
+      opening.id === candidate.id ||
+      (opening.host_wall_id || opening.wall_id) !== wall.id
+    ) {
+      return false;
+    }
+    const other = interval(opening);
+    return Math.min(candidateInterval.end, other.end) - Math.max(candidateInterval.start, other.start) > 0.05;
+  });
+}
+
+function constrainFurnitureToRoom(room: Room): Room {
+  if (!room.rect) return room;
+  return {
+    ...room,
+    furniture: (room.furniture || []).map((item) => {
+      const halfWidth = Math.min(item.width / 2, room.rect.width / 2);
+      const halfLength = Math.min((item.depth || item.length) / 2, room.rect.length / 2);
+      return {
+        ...item,
+        x: Math.max(room.rect.x + halfWidth, Math.min(room.rect.x + room.rect.width - halfWidth, item.x)),
+        y: Math.max(room.rect.y + halfLength, Math.min(room.rect.y + room.rect.length - halfLength, item.y)),
+      };
+    }),
+  };
+}
+
+function findCanonicalWallMatch(walls: Wall[], reference: Wall): Wall | undefined {
+  const dx = reference.x2 - reference.x1;
+  const dy = reference.y2 - reference.y1;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return undefined;
+  const midpoint = { x: (reference.x1 + reference.x2) / 2, y: (reference.y1 + reference.y2) / 2 };
+  return walls.find((wall) => {
+    if (wall.is_exterior !== reference.is_exterior) return false;
+    const cross = Math.abs(dx * (wall.y1 - reference.y1) - dy * (wall.x1 - reference.x1)) / length;
+    const t = ((midpoint.x - wall.x1) * (wall.x2 - wall.x1) + (midpoint.y - wall.y1) * (wall.y2 - wall.y1)) /
+      (Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1) || 1);
+    return cross < 0.1 && t >= -0.05 && t <= Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1) + 0.05;
+  });
+}
+
+function architecturalFingerprint(layout: HouseLayout): string {
+  const rooms = (items: Room[]) => items.map((room) => ({
+    id: room.id,
+    name: room.name,
+    type: room.type,
+    rect: room.rect,
+    area_sqft: room.area_sqft,
+    furniture: room.furniture,
+  }));
+  const walls = (items: Wall[] = []) => items.map((wall) => ({
+    id: wall.id,
+    x1: wall.x1,
+    y1: wall.y1,
+    x2: wall.x2,
+    y2: wall.y2,
+    thickness: wall.thickness,
+    is_exterior: wall.is_exterior,
+    openings: wall.openings,
+  }));
+  const openings = (items: Array<Door | Window>) => items.map((item) => ({
+    id: item.id,
+    host_wall_id: item.host_wall_id || item.wall_id,
+    x1: item.x1,
+    y1: item.y1,
+    x2: item.x2,
+    y2: item.y2,
+    width: item.width,
+    height: item.height,
+    position_along_wall: item.position_along_wall,
+  }));
+  return JSON.stringify({
+    plot: [layout.plot_width, layout.plot_length, layout.num_floors],
+    rooms: rooms(layout.rooms || []),
+    walls: walls(layout.walls || []),
+    doors: openings(layout.doors || []),
+    windows: openings(layout.windows || []),
+    floors: (layout.floors || []).map((floor) => ({
+      id: floor.floor_id,
+      number: floor.floor_number,
+      rooms: rooms(floor.rooms || []),
+      walls: walls(floor.walls || []),
+      doors: openings(floor.doors || []),
+      windows: openings(floor.windows || []),
+      staircase: floor.staircase,
+    })),
+  });
+}
+
 export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps> = ({
   layout: initialLayout,
   mode = "view",
@@ -215,56 +454,104 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   selectedFurnitureId: externalSelectedFurnitureId,
   onSelectRoom: externalOnSelectRoom,
   onSelectFurniture: externalOnSelectFurniture,
+  onSelectEntity,
   onBack,
+  showAtelierNav = false,
+  onStudioNavigate,
+  onToggleEditMode,
+  onOpenVastuAudit,
+  hasVastuResult = false,
+  mepVisibility = {},
 }) => {
   const router = useRouter();
 
   // Internal working layout state (for live editing & undo/redo)
   const [layout, setLayout] = useState<HouseLayout>(initialLayout);
   const lastProjectRef = useRef<string>(initialLayout.id || "");
-  useEffect(() => {
-    // Only re-sync from initialLayout if the project ID actually changed (e.g. user loaded different layout)
-    if (initialLayout.id && initialLayout.id !== lastProjectRef.current) {
-      lastProjectRef.current = initialLayout.id;
-      setLayout(initialLayout);
-      setHistory([initialLayout]);
-      setHistoryIndex(0);
-    }
-  }, [initialLayout]);
+  const lastSyncedLayoutRef = useRef(architecturalFingerprint(initialLayout));
+  const lastRenderedLayoutRef = useRef(JSON.stringify(initialLayout));
 
   // Undo / Redo History Stack
   const [history, setHistory] = useState<HouseLayout[]>([initialLayout]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const historyStateRef = useRef({ history: [initialLayout], index: 0 });
+  useEffect(() => {
+    const incomingFingerprint = architecturalFingerprint(initialLayout);
+    const incomingSerialized = JSON.stringify(initialLayout);
+    if (initialLayout.id && initialLayout.id !== lastProjectRef.current) {
+      lastProjectRef.current = initialLayout.id;
+      lastSyncedLayoutRef.current = incomingFingerprint;
+      lastRenderedLayoutRef.current = incomingSerialized;
+      historyStateRef.current = { history: [initialLayout], index: 0 };
+      setLayout(initialLayout);
+      setHistory([initialLayout]);
+      setHistoryIndex(0);
+    } else if (incomingFingerprint !== lastSyncedLayoutRef.current) {
+      lastSyncedLayoutRef.current = incomingFingerprint;
+      const currentHistory = historyStateRef.current;
+      const nextHistory = [
+        ...currentHistory.history.slice(0, currentHistory.index + 1),
+        JSON.parse(JSON.stringify(initialLayout)) as HouseLayout,
+      ];
+      const nextIndex = currentHistory.index + 1;
+      historyStateRef.current = { history: nextHistory, index: nextIndex };
+      lastRenderedLayoutRef.current = incomingSerialized;
+      setLayout(initialLayout);
+      setHistory(nextHistory);
+      setHistoryIndex(nextIndex);
+    } else if (incomingSerialized !== lastRenderedLayoutRef.current) {
+      lastRenderedLayoutRef.current = incomingSerialized;
+      setLayout(initialLayout);
+    }
+  }, [initialLayout]);
 
   const pushSnapshot = useCallback((newLayout: HouseLayout) => {
-    setHistory((prev) => {
-      const next = prev.slice(0, historyIndex + 1);
-      return [...next, JSON.parse(JSON.stringify(newLayout))];
-    });
-    setHistoryIndex((prev) => prev + 1);
-    setLayout(newLayout);
-    onUpdateLayout?.(newLayout);
-  }, [historyIndex, onUpdateLayout]);
+    const syncedLayout = syncPrimaryFloor(newLayout);
+    const canonicalLayout = validateAndSanitizeHouseLayout(syncedLayout) || syncedLayout;
+    const serializedLayout = JSON.stringify(canonicalLayout);
+    const currentHistory = historyStateRef.current;
+    const currentSnapshot = currentHistory.history[currentHistory.index];
+    if (currentSnapshot && JSON.stringify(currentSnapshot) === serializedLayout) return;
+
+    lastSyncedLayoutRef.current = architecturalFingerprint(canonicalLayout);
+    lastRenderedLayoutRef.current = serializedLayout;
+    const nextHistory = [
+      ...currentHistory.history.slice(0, currentHistory.index + 1),
+      JSON.parse(JSON.stringify(canonicalLayout)),
+    ];
+    const nextIndex = currentHistory.index + 1;
+    historyStateRef.current = { history: nextHistory, index: nextIndex };
+    setHistory(nextHistory);
+    setHistoryIndex(nextIndex);
+    setLayout(canonicalLayout);
+    onUpdateLayout?.(canonicalLayout);
+  }, [onUpdateLayout]);
 
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const nextIdx = historyIndex - 1;
-      setHistoryIndex(nextIdx);
-      const prevLayout = history[nextIdx];
-      setLayout(prevLayout);
-      onUpdateLayout?.(prevLayout);
-    }
-  }, [historyIndex, history, onUpdateLayout]);
+    const currentHistory = historyStateRef.current;
+    if (currentHistory.index <= 0) return;
+    const nextIndex = currentHistory.index - 1;
+    const previousLayout = currentHistory.history[nextIndex];
+    historyStateRef.current = { ...currentHistory, index: nextIndex };
+    lastSyncedLayoutRef.current = architecturalFingerprint(previousLayout);
+    lastRenderedLayoutRef.current = JSON.stringify(previousLayout);
+    setHistoryIndex(nextIndex);
+    setLayout(previousLayout);
+    onUpdateLayout?.(previousLayout);
+  }, [onUpdateLayout]);
 
   const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const nextIdx = historyIndex + 1;
-      setHistoryIndex(nextIdx);
-      const nextLayout = history[nextIdx];
-      setLayout(nextLayout);
-      onUpdateLayout?.(nextLayout);
-    }
-  }, [historyIndex, history, onUpdateLayout]);
+    const currentHistory = historyStateRef.current;
+    if (currentHistory.index >= currentHistory.history.length - 1) return;
+    const nextIndex = currentHistory.index + 1;
+    const nextLayout = currentHistory.history[nextIndex];
+    historyStateRef.current = { ...currentHistory, index: nextIndex };
+    lastSyncedLayoutRef.current = architecturalFingerprint(nextLayout);
+    lastRenderedLayoutRef.current = JSON.stringify(nextLayout);
+    setHistoryIndex(nextIndex);
+    setLayout(nextLayout);
+    onUpdateLayout?.(nextLayout);
+  }, [onUpdateLayout]);
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
@@ -278,6 +565,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
   const selectedRoomId = externalSelectedRoomId !== undefined ? externalSelectedRoomId : internalSelectedRoomId;
   const selectedFurnitureId = externalSelectedFurnitureId !== undefined ? externalSelectedFurnitureId : internalSelectedFurnitureId;
+  useEffect(() => {
+    onSelectEntity?.(selectedWallId || selectedDoorId || selectedWindowId || selectedRoomId);
+  }, [onSelectEntity, selectedWallId, selectedDoorId, selectedWindowId, selectedRoomId]);
 
   const handleSelectRoom = (id: string | null) => {
     if (externalOnSelectRoom) {
@@ -378,6 +668,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [resizingRoom, setResizingRoom] = useState<ResizingRoomState | null>(null);
   const [draggingWall, setDraggingWall] = useState<DraggingWallState | null>(null);
   const [resizingWallEndpoint, setResizingWallEndpoint] = useState<ResizingWallEndpointState | null>(null);
+  const [drawingWall, setDrawingWall] = useState<DrawingWallState | null>(null);
+  const [draggingOpening, setDraggingOpening] = useState<DraggingOpeningState | null>(null);
   const [invalidMoveNotice, setInvalidMoveNotice] = useState<string | null>(null);
 
   // Contextual Exact Dimension Inputs & Notices
@@ -404,6 +696,21 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           windows: layout.windows || [],
         };
 
+  const commitFloorUpdate = (updates: Partial<FloorPlan>) => {
+    const floors = [...(layout.floors || [])];
+    const floor = floors[activeFloorIndex] || currentFloor;
+    const updatedFloor = { ...floor, ...updates };
+    floors[activeFloorIndex] = {
+      ...updatedFloor,
+      walls: [
+        ...(updatedFloor.exterior_walls || []),
+        ...(updatedFloor.interior_walls || []),
+      ],
+    };
+    const nextLayout = syncPrimaryFloor({ ...layout, floors });
+    pushSnapshot(nextLayout);
+  };
+
   // Selected Wall Entity
   const selectedWall = useMemo(() => {
     if (!selectedWallId) return null;
@@ -429,21 +736,10 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const handleToggleWallThickness = () => {
     if (!selectedWall) return;
     const newThickness = selectedWall.thickness > 0.5 ? 0.375 : 0.75;
-    setLayout((prev) => {
-      const nextFloors = prev.floors ? [...prev.floors] : [];
-      if (nextFloors[activeFloorIndex]) {
-        const floor = nextFloors[activeFloorIndex];
-        const updateWall = (w: Wall) => (w.id === selectedWall.id ? { ...w, thickness: newThickness } : w);
-        nextFloors[activeFloorIndex] = {
-          ...floor,
-          exterior_walls: (floor.exterior_walls || []).map(updateWall),
-          interior_walls: (floor.interior_walls || []).map(updateWall),
-        };
-        const updated = { ...prev, floors: nextFloors };
-        pushSnapshot(updated);
-        return updated;
-      }
-      return prev;
+    const updateWall = (wall: Wall) => (wall.id === selectedWall.id ? { ...wall, thickness: newThickness } : wall);
+    commitFloorUpdate({
+      exterior_walls: (currentFloor.exterior_walls || []).map(updateWall),
+      interior_walls: (currentFloor.interior_walls || []).map(updateWall),
     });
   };
 
@@ -454,21 +750,193 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       setTimeout(() => setInvalidMoveNotice(null), 3000);
       return;
     }
-    setLayout((prev) => {
-      const nextFloors = prev.floors ? [...prev.floors] : [];
-      if (nextFloors[activeFloorIndex]) {
-        const floor = nextFloors[activeFloorIndex];
-        nextFloors[activeFloorIndex] = {
-          ...floor,
-          interior_walls: (floor.interior_walls || []).filter((w) => w.id !== selectedWall.id),
-        };
-        const updated = { ...prev, floors: nextFloors };
-        pushSnapshot(updated);
-        return updated;
-      }
-      return prev;
+    const doors = (currentFloor.doors || []).filter(
+      (opening) => (opening.host_wall_id || opening.wall_id) !== selectedWall.id
+    );
+    const windows = (currentFloor.windows || []).filter(
+      (opening) => (opening.host_wall_id || opening.wall_id) !== selectedWall.id
+    );
+    commitFloorUpdate({
+      interior_walls: (currentFloor.interior_walls || []).filter((wall) => wall.id !== selectedWall.id),
+      doors,
+      windows,
     });
     setSelectedWallId(null);
+  };
+
+  const handleSetWallThickness = (thickness: number) => {
+    if (!selectedWall || !Number.isFinite(thickness) || thickness < 0.125 || thickness > 1.5) return;
+    commitFloorUpdate({
+      exterior_walls: (currentFloor.exterior_walls || []).map((wall) =>
+        wall.id === selectedWall.id ? { ...wall, thickness } : wall
+      ),
+      interior_walls: (currentFloor.interior_walls || []).map((wall) =>
+        wall.id === selectedWall.id ? { ...wall, thickness } : wall
+      ),
+    });
+  };
+
+  const handleSplitSelectedWall = () => {
+    if (!selectedWall) return;
+    const midpoint = { x: (selectedWall.x1 + selectedWall.x2) / 2, y: (selectedWall.y1 + selectedWall.y2) / 2 };
+    const hostedOpenings = [
+      ...(currentFloor.doors || []),
+      ...(currentFloor.windows || []),
+    ].filter((opening) => (opening.host_wall_id || opening.wall_id) === selectedWall.id);
+    const dx = selectedWall.x2 - selectedWall.x1;
+    const dy = selectedWall.y2 - selectedWall.y1;
+    if (hostedOpenings.some((opening) => {
+      const a = (opening.x1 - selectedWall.x1) * dx + (opening.y1 - selectedWall.y1) * dy;
+      const b = (opening.x2 - selectedWall.x1) * dx + (opening.y2 - selectedWall.y1) * dy;
+      return Math.min(a, b) < (dx * dx + dy * dy) / 2 && Math.max(a, b) > (dx * dx + dy * dy) / 2;
+    })) {
+      setInvalidMoveNotice("Move the opening away from the midpoint before splitting this wall.");
+      setTimeout(() => setInvalidMoveNotice(null), 3000);
+      return;
+    }
+    const firstId = `wall_${crypto.randomUUID()}`;
+    const secondId = `wall_${crypto.randomUUID()}`;
+    const first: Wall = {
+      ...selectedWall,
+      id: firstId,
+      wall_id: firstId,
+      x2: midpoint.x,
+      y2: midpoint.y,
+      end: midpoint,
+      openings: [],
+    };
+    const second: Wall = {
+      ...selectedWall,
+      id: secondId,
+      wall_id: secondId,
+      x1: midpoint.x,
+      y1: midpoint.y,
+      start: midpoint,
+      openings: [],
+    };
+    const exteriorWalls = (currentFloor.exterior_walls || []).filter((wall) => wall.id !== selectedWall.id);
+    const interiorWalls = (currentFloor.interior_walls || []).filter((wall) => wall.id !== selectedWall.id);
+    if (selectedWall.is_exterior) exteriorWalls.push(first, second);
+    else interiorWalls.push(first, second);
+    if (!hasValidWallGeometry([...exteriorWalls, ...interiorWalls], layout.plot_width, layout.plot_length)) {
+      setInvalidMoveNotice("The wall cannot be split at this location.");
+      setTimeout(() => setInvalidMoveNotice(null), 3000);
+      return;
+    }
+    const updateOpening = <T extends Door | Window,>(opening: T): T => {
+      if ((opening.host_wall_id || opening.wall_id) !== selectedWall.id) return opening;
+      const centerX = (opening.x1 + opening.x2) / 2;
+      const centerY = (opening.y1 + opening.y2) / 2;
+      const distance =
+        ((centerX - selectedWall.x1) * dx + (centerY - selectedWall.y1) * dy) /
+        (Math.hypot(dx, dy) || 1);
+      const id = distance <= Math.hypot(dx, dy) / 2 ? firstId : secondId;
+      return { ...opening, wall_id: id, host_wall_id: id };
+    };
+    commitFloorUpdate({
+      exterior_walls: exteriorWalls,
+      interior_walls: interiorWalls,
+      doors: (currentFloor.doors || []).map(updateOpening),
+      windows: (currentFloor.windows || []).map(updateOpening),
+    });
+    setSelectedWallId(firstId);
+  };
+
+  const handleJoinSelectedWall = () => {
+    if (!selectedWall) return;
+    const allWalls = [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])];
+    const points = [
+      { x: selectedWall.x1, y: selectedWall.y1 },
+      { x: selectedWall.x2, y: selectedWall.y2 },
+    ];
+    const other = allWalls.find((wall) => {
+      if (wall.id === selectedWall.id || wall.is_exterior !== selectedWall.is_exterior) return false;
+      const parallel =
+        Math.abs((selectedWall.x2 - selectedWall.x1) * (wall.y2 - wall.y1) -
+          (selectedWall.y2 - selectedWall.y1) * (wall.x2 - wall.x1)) < 0.05;
+      const lineDistance = Math.abs(
+        (wall.x1 - selectedWall.x1) * (selectedWall.y2 - selectedWall.y1) -
+        (wall.y1 - selectedWall.y1) * (selectedWall.x2 - selectedWall.x1)
+      ) / (Math.hypot(selectedWall.x2 - selectedWall.x1, selectedWall.y2 - selectedWall.y1) || 1);
+      const touches = points.some((point) =>
+        Math.hypot(point.x - wall.x1, point.y - wall.y1) < 0.05 ||
+        Math.hypot(point.x - wall.x2, point.y - wall.y2) < 0.05
+      );
+      return parallel && lineDistance < 0.05 && touches;
+    });
+    if (!other) {
+      setInvalidMoveNotice("Select a wall connected and parallel to this one to join it.");
+      setTimeout(() => setInvalidMoveNotice(null), 3000);
+      return;
+    }
+    const endpoints = [
+      { x: selectedWall.x1, y: selectedWall.y1 },
+      { x: selectedWall.x2, y: selectedWall.y2 },
+      { x: other.x1, y: other.y1 },
+      { x: other.x2, y: other.y2 },
+    ];
+    let start = endpoints[0];
+    let end = endpoints[1];
+    for (let i = 0; i < endpoints.length; i += 1) {
+      for (let j = i + 1; j < endpoints.length; j += 1) {
+        if (Math.hypot(endpoints[i].x - endpoints[j].x, endpoints[i].y - endpoints[j].y) >
+          Math.hypot(start.x - end.x, start.y - end.y)) {
+          start = endpoints[i];
+          end = endpoints[j];
+        }
+      }
+    }
+    const joinedId = `wall_${crypto.randomUUID()}`;
+    const joined: Wall = {
+      ...selectedWall,
+      id: joinedId,
+      wall_id: joinedId,
+      x1: start.x,
+      y1: start.y,
+      x2: end.x,
+      y2: end.y,
+      start,
+      end,
+      adjacent_room_ids: Array.from(new Set([
+        ...(selectedWall.adjacent_room_ids || []),
+        ...(other.adjacent_room_ids || []),
+      ])),
+      room_ids: Array.from(new Set([
+        ...(selectedWall.room_ids || []),
+        ...(other.room_ids || []),
+      ])),
+      connected_room_ids: Array.from(new Set([
+        ...(selectedWall.connected_room_ids || []),
+        ...(other.connected_room_ids || []),
+      ])),
+      openings: [],
+    };
+    const replaceWalls = (walls: Wall[]) => [
+      ...walls.filter((wall) => wall.id !== selectedWall.id && wall.id !== other.id),
+      joined,
+    ];
+    const replaceOpeningHost = <T extends Door | Window,>(opening: T): T =>
+      [selectedWall.id, other.id].includes(opening.host_wall_id || opening.wall_id || "")
+        ? { ...opening, wall_id: joinedId, host_wall_id: joinedId }
+        : opening;
+    const joinedExterior = selectedWall.is_exterior
+      ? replaceWalls(currentFloor.exterior_walls || [])
+      : currentFloor.exterior_walls || [];
+    const joinedInterior = selectedWall.is_exterior
+      ? currentFloor.interior_walls || []
+      : replaceWalls(currentFloor.interior_walls || []);
+    if (!hasValidWallGeometry([...joinedExterior, ...joinedInterior], layout.plot_width, layout.plot_length)) {
+      setInvalidMoveNotice("Joining these walls would create invalid geometry.");
+      setTimeout(() => setInvalidMoveNotice(null), 3000);
+      return;
+    }
+    commitFloorUpdate({
+      exterior_walls: joinedExterior,
+      interior_walls: joinedInterior,
+      doors: (currentFloor.doors || []).map(replaceOpeningHost),
+      windows: (currentFloor.windows || []).map(replaceOpeningHost),
+    });
+    setSelectedWallId(joinedId);
   };
 
   const svgWidth = (layout.plot_width || 50) * SCALE;
@@ -507,21 +975,220 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // Architectural Canonical Wall Network:
   // Guarantees every single room is 100% enclosed by connected walls with no missing partitions
   const canonicalWallNet = useMemo(() => {
+    const storedWalls = [
+      ...(currentFloor.exterior_walls || []),
+      ...(currentFloor.interior_walls || []),
+    ];
     const hasFullWalls =
       currentFloor.exterior_walls &&
       currentFloor.exterior_walls.length >= 4 &&
       currentFloor.interior_walls &&
       currentFloor.interior_walls.length > 0;
 
-    if (hasFullWalls && mode !== "edit") {
+    if (storedWalls.length > 0 && (mode === "edit" || hasFullWalls)) {
       return {
-        walls: [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])],
+        walls: storedWalls,
         exteriorWalls: currentFloor.exterior_walls || [],
         interiorWalls: currentFloor.interior_walls || [],
       };
     }
     return generateCanonicalWallNetwork(currentFloor.rooms || [], layout.site);
   }, [currentFloor.exterior_walls, currentFloor.interior_walls, currentFloor.rooms, layout.site, mode]);
+
+  const regenerateFloorGeometry = (
+    rooms: Room[],
+    doors: Door[],
+    windows: Window[]
+  ) => {
+    const generated = generateCanonicalWallNetwork(rooms, layout.site, 9.5);
+    const customWalls = canonicalWallNet.walls.filter(
+      (wall) => wall.id.startsWith("wall_") && !(wall.adjacent_room_ids?.length)
+    );
+    const interiorWalls = [...generated.interiorWalls, ...customWalls];
+    const synchronized = synchronizeOpeningsWithWalls(
+      doors,
+      windows,
+      [...generated.exteriorWalls, ...interiorWalls]
+    );
+    return {
+      exteriorWalls: generated.exteriorWalls,
+      interiorWalls,
+      doors: synchronized.doors,
+      windows: synchronized.windows,
+    };
+  };
+
+  const getModelPoint = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    const matrix = svg?.getScreenCTM();
+    if (!svg || !matrix) return null;
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    const transformed = point.matrixTransform(matrix.inverse());
+    return { x: transformed.x / SCALE, y: transformed.y / SCALE };
+  };
+
+  const snapWallPoint = (
+    point: { x: number; y: number },
+    excludedWallId?: string,
+    excludedEndpoint?: { x: number; y: number }
+  ) => {
+    const gridPoint = { x: Math.round(point.x * 2) / 2, y: Math.round(point.y * 2) / 2 };
+    const endpoints = canonicalWallNet.walls.filter((wall) => wall.id !== excludedWallId).flatMap((wall) => [
+      { x: wall.x1, y: wall.y1 },
+      { x: wall.x2, y: wall.y2 },
+    ]).filter((endpoint) =>
+      !excludedEndpoint || Math.hypot(endpoint.x - excludedEndpoint.x, endpoint.y - excludedEndpoint.y) > 0.05
+    );
+    return endpoints.find((endpoint) => Math.hypot(endpoint.x - point.x, endpoint.y - point.y) <= 0.6) || gridPoint;
+  };
+
+  const findWallAtPoint = (point: { x: number; y: number }) => {
+    let nearest: Wall | null = null;
+    let nearestDistance = Infinity;
+    for (const wall of canonicalWallNet.walls) {
+      const dx = wall.x2 - wall.x1;
+      const dy = wall.y2 - wall.y1;
+      const lengthSquared = dx * dx + dy * dy;
+      const t = lengthSquared === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - wall.x1) * dx + (point.y - wall.y1) * dy) / lengthSquared));
+      const distance = Math.hypot(point.x - (wall.x1 + t * dx), point.y - (wall.y1 + t * dy));
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = wall;
+      }
+    }
+    return nearestDistance <= 0.75 ? nearest : null;
+  };
+
+  const handleSvgMouseDownCapture = (event: React.MouseEvent<SVGSVGElement>) => {
+    if (mode !== "edit" || event.button !== 0) return;
+    const point = getModelPoint(event.clientX, event.clientY);
+    if (!point) return;
+    if (activeTool === "wall") {
+      event.preventDefault();
+      event.stopPropagation();
+      const snapped = snapWallPoint(point);
+      setDrawingWall({ start: snapped, end: snapped });
+      return;
+    }
+    if (activeTool !== "door" && activeTool !== "window") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const wall = findWallAtPoint(point);
+    if (!wall) {
+      setInvalidMoveNotice("Select a valid wall to place an opening.");
+      setTimeout(() => setInvalidMoveNotice(null), 2500);
+      return;
+    }
+    const kind = activeTool;
+    const width = kind === "door" ? 3 : 4;
+    const openingGeometry = projectOpeningToWall(wall, point, width);
+    if (!openingGeometry) return;
+    const id = `${kind === "door" ? "d" : "win"}_${crypto.randomUUID()}`;
+    const opening = kind === "door"
+      ? {
+          id,
+          wall_id: wall.id,
+          host_wall_id: wall.id,
+          floor_id: String(currentFloor.floor_number),
+          ...openingGeometry,
+          height: 7,
+          door_type: "interior" as const,
+          swing_direction: "inward" as const,
+          hinge_side: "left" as const,
+        }
+      : {
+          id,
+          wall_id: wall.id,
+          host_wall_id: wall.id,
+          floor_id: String(currentFloor.floor_number),
+          ...openingGeometry,
+          height: 4,
+          sill_height: 3,
+          window_type: "casement" as const,
+        };
+    if (
+      openingOverlaps(
+        opening,
+        [...(currentFloor.doors || []), ...(currentFloor.windows || [])],
+        wall
+      )
+    ) {
+      setInvalidMoveNotice("There is not enough clear wall space for another opening.");
+      setTimeout(() => setInvalidMoveNotice(null), 2500);
+      return;
+    }
+    if (kind === "door") {
+      commitFloorUpdate({ doors: [...(currentFloor.doors || []), opening] });
+      setSelectedDoorId(id);
+      setSelectedWindowId(null);
+    } else {
+      commitFloorUpdate({ windows: [...(currentFloor.windows || []), opening] });
+      setSelectedWindowId(id);
+      setSelectedDoorId(null);
+    }
+    setSelectedWallId(null);
+    handleSelectRoom(null);
+    handleSelectFurniture(null);
+  };
+
+  const handleSvgClickCapture = (event: React.MouseEvent<SVGSVGElement>) => {
+    if (
+      mode === "edit" &&
+      (activeTool === "wall" || activeTool === "door" || activeTool === "window")
+    ) {
+      event.stopPropagation();
+    }
+  };
+
+  const finishWallDrawing = () => {
+    if (!drawingWall) return;
+    const { start, end } = drawingWall;
+    setDrawingWall(null);
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const constrainedEnd = Math.abs(dx) >= Math.abs(dy)
+      ? { x: end.x, y: start.y }
+      : { x: start.x, y: end.y };
+    const wallId = `wall_${crypto.randomUUID()}`;
+    const wall: Wall = {
+      id: wallId,
+      wall_id: wallId,
+      start,
+      end: constrainedEnd,
+      x1: start.x,
+      y1: start.y,
+      x2: constrainedEnd.x,
+      y2: constrainedEnd.y,
+      thickness: 0.375,
+      height: 9.5,
+      wall_type: "partition",
+      is_exterior: false,
+      adjacent_room_ids: [],
+      room_ids: [],
+      connected_room_ids: [],
+      wall_direction: Math.abs(start.y - constrainedEnd.y) < 0.05 ? "horizontal" : "vertical",
+    };
+    const walls = [...canonicalWallNet.walls, wall];
+    if (Math.hypot(dx, dy) < 2 || !hasValidWallGeometry(walls, layout.plot_width, layout.plot_length)) {
+      setInvalidMoveNotice("Wall geometry is invalid or overlaps an existing wall.");
+      setTimeout(() => setInvalidMoveNotice(null), 3000);
+      return;
+    }
+    commitFloorUpdate({
+      exterior_walls: currentFloor.exterior_walls || [],
+      interior_walls: [...(currentFloor.interior_walls || []), wall],
+      walls,
+    });
+    setSelectedWallId(wallId);
+    setSelectedDoorId(null);
+    setSelectedWindowId(null);
+    handleSelectRoom(null);
+    handleSelectFurniture(null);
+  };
 
   // Synchronize doors and windows so they are physically embedded into host walls
   const synchedOpenings = useMemo(() => {
@@ -648,27 +1315,17 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
   // Helper: Update Room Property (live with undo/redo snapshot)
   const handleUpdateRoomProperty = (roomId: string, updates: Partial<Room>) => {
-    setLayout((prev) => {
-      const nextFloors = prev.floors ? [...prev.floors] : [];
-      if (nextFloors[activeFloorIndex]) {
-        const floor = nextFloors[activeFloorIndex];
-        const updatedRooms = (floor.rooms || []).map((r) => {
-          if (r.id === roomId) {
-            const updated = { ...r, ...updates };
-            if (updates.rect) {
-              updated.area_sqft = Math.round(updates.rect.width * updates.rect.length);
-            }
-            return updated;
-          }
-          return r;
-        });
-        nextFloors[activeFloorIndex] = { ...floor, rooms: updatedRooms };
-        const next = { ...prev, floors: nextFloors };
-        pushSnapshot(next);
-        return next;
+    const floor = layout.floors?.[activeFloorIndex];
+    if (!floor) return;
+    const updatedRooms = (floor.rooms || []).map((room) => {
+      if (room.id !== roomId) return room;
+      const updated = { ...room, ...updates };
+      if (updates.rect) {
+        updated.area_sqft = Math.round(updates.rect.width * updates.rect.length);
       }
-      return prev;
+      return updated;
     });
+    commitFloorUpdate({ rooms: updatedRooms });
   };
 
   // Helper: Quick Room Size Increment (+1ft / -1ft)
@@ -760,6 +1417,53 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
     if (mode !== "edit") return;
 
+    if (drawingWall) {
+      const point = getModelPoint(e.clientX, e.clientY);
+      if (!point) return;
+      const snapped = snapWallPoint(point);
+      const dx = snapped.x - drawingWall.start.x;
+      const dy = snapped.y - drawingWall.start.y;
+      setDrawingWall({
+        ...drawingWall,
+        end: Math.abs(dx) >= Math.abs(dy)
+          ? { x: snapped.x, y: drawingWall.start.y }
+          : { x: drawingWall.start.x, y: snapped.y },
+      });
+      return;
+    }
+
+    if (draggingOpening) {
+      const point = getModelPoint(e.clientX, e.clientY);
+      const wall = canonicalWallNet.walls.find((candidate) => candidate.id === draggingOpening.wallId);
+      if (!point || !wall) return;
+      const openingGeometry = projectOpeningToWall(wall, point, draggingOpening.initialOpening.width);
+      if (!openingGeometry) return;
+      setLayout((prev) => {
+        const floors = [...(prev.floors || [])];
+        const floor = floors[activeFloorIndex] || currentFloor;
+        const updatedFloor = draggingOpening.kind === "door"
+          ? {
+              ...floor,
+              doors: (floor.doors || []).map((opening) =>
+                opening.id === draggingOpening.id
+                  ? { ...opening, ...openingGeometry, wall_id: wall.id, host_wall_id: wall.id }
+                  : opening
+              ),
+            }
+          : {
+              ...floor,
+              windows: (floor.windows || []).map((opening) =>
+                opening.id === draggingOpening.id
+                  ? { ...opening, ...openingGeometry, wall_id: wall.id, host_wall_id: wall.id }
+                  : opening
+              ),
+            };
+        floors[activeFloorIndex] = updatedFloor;
+        return syncPrimaryFloor({ ...prev, floors });
+      });
+      return;
+    }
+
     // 1. Wall Dragging (Direct Manipulation with Relationship Updates)
     if (draggingWall) {
       const deltaXFeet = (e.clientX - draggingWall.startMouseX) / (SCALE * zoom);
@@ -778,12 +1482,18 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
           const updateWallCoords = (w: Wall) => {
             if (w.id === draggingWall.wallId) {
+              const x1 = draggingWall.initialX1 + snappedDeltaX;
+              const y1 = draggingWall.initialY1 + snappedDeltaY;
+              const x2 = draggingWall.initialX2 + snappedDeltaX;
+              const y2 = draggingWall.initialY2 + snappedDeltaY;
               return {
                 ...w,
-                x1: draggingWall.initialX1 + snappedDeltaX,
-                y1: draggingWall.initialY1 + snappedDeltaY,
-                x2: draggingWall.initialX2 + snappedDeltaX,
-                y2: draggingWall.initialY2 + snappedDeltaY,
+                x1,
+                y1,
+                x2,
+                y2,
+                start: { x: x1, y: y1 },
+                end: { x: x2, y: y2 },
               };
             }
             return w;
@@ -816,11 +1526,11 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 rw = Math.max(2, initRm.rect.width - snappedDeltaX);
               }
             }
-            return {
+            return constrainFurnitureToRoom({
               ...rm,
               rect: { x: rx, y: ry, width: rw, length: rl },
               area_sqft: Math.round(rw * rl),
-            };
+            });
           });
 
           // Move attached doors & windows
@@ -865,11 +1575,14 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
     // 2. Wall Endpoint Resizing (Extend / Shorten)
     if (resizingWallEndpoint) {
-      const deltaXFeet = (e.clientX - resizingWallEndpoint.startMouseX) / (SCALE * zoom);
-      const deltaYFeet = (e.clientY - resizingWallEndpoint.startMouseY) / (SCALE * zoom);
-
       const isHorizontal = Math.abs(resizingWallEndpoint.initialY1 - resizingWallEndpoint.initialY2) < 0.2;
-      const snapDelta = (v: number) => Math.round(v * 2) / 2;
+      const point = getModelPoint(e.clientX, e.clientY);
+      if (!point) return;
+      const endpoint = resizingWallEndpoint.endpoint;
+      const excludedEndpoint = endpoint === "start"
+        ? { x: resizingWallEndpoint.initialX1, y: resizingWallEndpoint.initialY1 }
+        : { x: resizingWallEndpoint.initialX2, y: resizingWallEndpoint.initialY2 };
+      const snapped = snapWallPoint(point, resizingWallEndpoint.wallId, excludedEndpoint);
 
       setLayout((prev) => {
         const nextFloors = prev.floors ? [...prev.floors] : [];
@@ -877,14 +1590,14 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           const floor = nextFloors[activeFloorIndex];
           const updateWallEndpoint = (w: Wall) => {
             if (w.id === resizingWallEndpoint.wallId) {
-              if (resizingWallEndpoint.endpoint === "start") {
-                const nextX = isHorizontal ? resizingWallEndpoint.initialX1 + snapDelta(deltaXFeet) : w.x1;
-                const nextY = isHorizontal ? w.y1 : resizingWallEndpoint.initialY1 + snapDelta(deltaYFeet);
-                return { ...w, x1: nextX, y1: nextY };
+              if (endpoint === "start") {
+                const nextX = isHorizontal ? snapped.x : w.x1;
+                const nextY = isHorizontal ? w.y1 : snapped.y;
+                return { ...w, x1: nextX, y1: nextY, start: { x: nextX, y: nextY } };
               } else {
-                const nextX = isHorizontal ? resizingWallEndpoint.initialX2 + snapDelta(deltaXFeet) : w.x2;
-                const nextY = isHorizontal ? w.y2 : resizingWallEndpoint.initialY2 + snapDelta(deltaYFeet);
-                return { ...w, x2: nextX, y2: nextY };
+                const nextX = isHorizontal ? snapped.x : w.x2;
+                const nextY = isHorizontal ? w.y2 : snapped.y;
+                return { ...w, x2: nextX, y2: nextY, end: { x: nextX, y: nextY } };
               }
             }
             return w;
@@ -1116,6 +1829,34 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const handleMouseUp = async () => {
     setIsPanning(false);
 
+    if (drawingWall) {
+      finishWallDrawing();
+      return;
+    }
+
+    if (draggingOpening) {
+      const activeDrag = draggingOpening;
+      setDraggingOpening(null);
+      const allOpenings: Array<Door | Window> = [
+        ...(currentFloor.doors || []),
+        ...(currentFloor.windows || []),
+      ];
+      const candidate = allOpenings.find((opening) => opening.id === activeDrag.id);
+      const wall = canonicalWallNet.walls.find((item) => item.id === activeDrag.wallId);
+      if (!candidate || !wall || openingOverlaps(candidate, allOpenings, wall)) {
+        const restoredOpening = activeDrag.initialOpening;
+        const restoredFloor = activeDrag.kind === "door"
+          ? { doors: (currentFloor.doors || []).map((opening) => opening.id === activeDrag.id ? restoredOpening as Door : opening) }
+          : { windows: (currentFloor.windows || []).map((opening) => opening.id === activeDrag.id ? restoredOpening as Window : opening) };
+        commitFloorUpdate(restoredFloor);
+        setInvalidMoveNotice("Opening must remain attached to its host wall without overlapping another opening.");
+        setTimeout(() => setInvalidMoveNotice(null), 3000);
+      } else {
+        pushSnapshot(layout);
+      }
+      return;
+    }
+
     // Wall Dragging Completion: Validate and Update Canonical Model
     if (draggingWall) {
       const activeDrag = draggingWall;
@@ -1143,6 +1884,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           if (nextFloors[activeFloorIndex]) {
             nextFloors[activeFloorIndex] = {
               ...nextFloors[activeFloorIndex],
+              exterior_walls: activeDrag.initialWalls.filter((wall) => wall.is_exterior),
+              interior_walls: activeDrag.initialWalls.filter((wall) => !wall.is_exterior),
               rooms: activeDrag.initialRooms,
               doors: activeDrag.initialDoors,
               windows: activeDrag.initialWindows,
@@ -1154,33 +1897,53 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         return;
       }
 
+      if (activeDrag.affectedRoomIds.length === 0) {
+        const walls = [
+          ...(currentFloor.exterior_walls || []),
+          ...(currentFloor.interior_walls || []),
+        ];
+        if (!hasValidWallGeometry(walls, layout.plot_width, layout.plot_length)) {
+          commitFloorUpdate({
+            exterior_walls: activeDrag.initialWalls.filter((wall) => wall.is_exterior),
+            interior_walls: activeDrag.initialWalls.filter((wall) => !wall.is_exterior),
+            rooms: activeDrag.initialRooms,
+            doors: activeDrag.initialDoors,
+            windows: activeDrag.initialWindows,
+          });
+          setInvalidMoveNotice("Wall geometry is invalid; the previous geometry was restored.");
+          setTimeout(() => setInvalidMoveNotice(null), 3000);
+          return;
+        }
+        commitFloorUpdate({
+          exterior_walls: currentFloor.exterior_walls || [],
+          interior_walls: currentFloor.interior_walls || [],
+          doors: currentFloor.doors || [],
+          windows: currentFloor.windows || [],
+        });
+        return;
+      }
+
       // Valid: Synchronize canonical wall network and openings
-      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(
+      const { exteriorWalls, interiorWalls, doors: syncedDoors, windows: syncedWindows } = regenerateFloorGeometry(
         currentRooms,
-        undefined,
-        9.5
-      );
-      const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
         currentFloor.doors || [],
-        currentFloor.windows || [],
-        [...exteriorWalls, ...interiorWalls]
+        currentFloor.windows || []
+      );
+      const movedWall = [
+        ...(currentFloor.exterior_walls || []),
+        ...(currentFloor.interior_walls || []),
+      ].find((wall) => wall.id === activeDrag.wallId);
+      setSelectedWallId(
+        movedWall
+          ? findCanonicalWallMatch([...exteriorWalls, ...interiorWalls], movedWall)?.id || null
+          : null
       );
 
-      setLayout((prev) => {
-        const nextFloors = prev.floors ? [...prev.floors] : [];
-        if (nextFloors[activeFloorIndex]) {
-          nextFloors[activeFloorIndex] = {
-            ...nextFloors[activeFloorIndex],
-            exterior_walls: exteriorWalls,
-            interior_walls: interiorWalls,
-            doors: syncedDoors,
-            windows: syncedWindows,
-          };
-          const updated = { ...prev, floors: nextFloors };
-          pushSnapshot(updated);
-          return updated;
-        }
-        return prev;
+      commitFloorUpdate({
+        exterior_walls: exteriorWalls,
+        interior_walls: interiorWalls,
+        doors: syncedDoors,
+        windows: syncedWindows,
       });
       return;
     }
@@ -1214,6 +1977,137 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           });
           return;
         }
+        const walls = activeEndpoint.initialWalls.map((wall) => {
+          const current = [
+            ...(currentFloor.exterior_walls || []),
+            ...(currentFloor.interior_walls || []),
+          ].find((item) => item.id === wall.id);
+          return current || wall;
+        });
+        if (!hasValidWallGeometry(walls, layout.plot_width, layout.plot_length)) {
+          commitFloorUpdate({
+            exterior_walls: activeEndpoint.initialWalls.filter((wall) => wall.is_exterior),
+            interior_walls: activeEndpoint.initialWalls.filter((wall) => !wall.is_exterior),
+          });
+          setInvalidMoveNotice("Wall geometry is invalid; the previous endpoint was restored.");
+          setTimeout(() => setInvalidMoveNotice(null), 3000);
+          return;
+        }
+        const initialWall = activeEndpoint.initialWalls.find((wall) => wall.id === currentWall.id);
+        if (initialWall?.adjacent_room_ids?.length) {
+          const initialX = activeEndpoint.endpoint === "start" ? initialWall.x1 : initialWall.x2;
+          const initialY = activeEndpoint.endpoint === "start" ? initialWall.y1 : initialWall.y2;
+          const targetX = activeEndpoint.endpoint === "start" ? currentWall.x1 : currentWall.x2;
+          const targetY = activeEndpoint.endpoint === "start" ? currentWall.y1 : currentWall.y2;
+          let changedBoundary = false;
+          const updatedRooms = activeEndpoint.initialRooms.map((room) => {
+            if (!initialWall.adjacent_room_ids?.includes(room.id) || !room.rect) return room;
+            let rect = { ...room.rect };
+            if (Math.abs(initialWall.y1 - initialWall.y2) < 0.05) {
+              if (Math.abs(rect.x - initialX) < 0.05) {
+                rect = { ...rect, x: targetX, width: rect.x + rect.width - targetX };
+                changedBoundary = true;
+              } else if (Math.abs(rect.x + rect.width - initialX) < 0.05) {
+                rect = { ...rect, width: targetX - rect.x };
+                changedBoundary = true;
+              }
+            } else if (Math.abs(rect.y - initialY) < 0.05) {
+              rect = { ...rect, y: targetY, length: rect.y + rect.length - targetY };
+              changedBoundary = true;
+            } else if (Math.abs(rect.y + rect.length - initialY) < 0.05) {
+              rect = { ...rect, length: targetY - rect.y };
+              changedBoundary = true;
+            }
+            if (rect.width === room.rect.width && rect.length === room.rect.length && rect.x === room.rect.x && rect.y === room.rect.y) {
+              return room;
+            }
+            return constrainFurnitureToRoom({
+              ...room,
+              rect,
+              area_sqft: Math.round(rect.width * rect.length),
+            });
+          });
+          const invalidRoom = updatedRooms.some((room) =>
+            !room.rect ||
+            room.rect.width < 4 ||
+            room.rect.length < 4 ||
+            room.rect.x < 0 ||
+            room.rect.y < 0 ||
+            room.rect.x + room.rect.width > layout.plot_width ||
+            room.rect.y + room.rect.length > layout.plot_length
+          );
+          if (!changedBoundary || invalidRoom) {
+            commitFloorUpdate({
+              exterior_walls: activeEndpoint.initialWalls.filter((wall) => wall.is_exterior),
+              interior_walls: activeEndpoint.initialWalls.filter((wall) => !wall.is_exterior),
+            });
+            setInvalidMoveNotice("This endpoint cannot be moved without violating room boundaries.");
+            setTimeout(() => setInvalidMoveNotice(null), 3000);
+            return;
+          }
+          const { exteriorWalls, interiorWalls, doors, windows } = regenerateFloorGeometry(
+            updatedRooms,
+            currentFloor.doors || [],
+            currentFloor.windows || []
+          );
+          setSelectedWallId(
+            findCanonicalWallMatch(
+              [...exteriorWalls, ...interiorWalls],
+              currentWall
+            )?.id || null
+          );
+          commitFloorUpdate({
+            rooms: updatedRooms,
+            exterior_walls: exteriorWalls,
+            interior_walls: interiorWalls,
+            doors,
+            windows,
+          });
+          return;
+        }
+        const nextDoors = (currentFloor.doors || []).map((opening) => {
+          if ((opening.host_wall_id || opening.wall_id) !== currentWall.id) return opening;
+          const geometry = projectOpeningToWall(
+            currentWall,
+            { x: (opening.x1 + opening.x2) / 2, y: (opening.y1 + opening.y2) / 2 },
+            opening.width
+          );
+          return geometry ? { ...opening, ...geometry } : opening;
+        });
+        const nextWindows = (currentFloor.windows || []).map((opening) => {
+          if ((opening.host_wall_id || opening.wall_id) !== currentWall.id) return opening;
+          const geometry = projectOpeningToWall(
+            currentWall,
+            { x: (opening.x1 + opening.x2) / 2, y: (opening.y1 + opening.y2) / 2 },
+            opening.width
+          );
+          return geometry ? { ...opening, ...geometry } : opening;
+        });
+        const allOpenings: Array<Door | Window> = [...nextDoors, ...nextWindows];
+        const attachedOpenings = allOpenings.filter(
+          (opening) => (opening.host_wall_id || opening.wall_id) === currentWall.id
+        );
+        if (
+          attachedOpenings.some((opening) =>
+            opening.width > Math.hypot(currentWall.x2 - currentWall.x1, currentWall.y2 - currentWall.y1) - 0.5 ||
+            openingOverlaps(opening, attachedOpenings, currentWall)
+          )
+        ) {
+          commitFloorUpdate({
+            exterior_walls: activeEndpoint.initialWalls.filter((wall) => wall.is_exterior),
+            interior_walls: activeEndpoint.initialWalls.filter((wall) => !wall.is_exterior),
+          });
+          setInvalidMoveNotice("Endpoint edit would detach or overlap an opening; the previous geometry was restored.");
+          setTimeout(() => setInvalidMoveNotice(null), 3000);
+          return;
+        }
+        commitFloorUpdate({
+          exterior_walls: currentFloor.exterior_walls || [],
+          interior_walls: currentFloor.interior_walls || [],
+          doors: nextDoors,
+          windows: nextWindows,
+        });
+        return;
       }
       pushSnapshot(layout);
       return;
@@ -1247,28 +2141,16 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         return;
       }
 
-      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(currentRooms, undefined, 9.5);
-      const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
+      const { exteriorWalls, interiorWalls, doors: syncedDoors, windows: syncedWindows } = regenerateFloorGeometry(
+        currentRooms,
         currentFloor.doors || [],
-        currentFloor.windows || [],
-        [...exteriorWalls, ...interiorWalls]
+        currentFloor.windows || []
       );
-
-      setLayout((prev) => {
-        const nextFloors = prev.floors ? [...prev.floors] : [];
-        if (nextFloors[activeFloorIndex]) {
-          nextFloors[activeFloorIndex] = {
-            ...nextFloors[activeFloorIndex],
-            exterior_walls: exteriorWalls,
-            interior_walls: interiorWalls,
-            doors: syncedDoors,
-            windows: syncedWindows,
-          };
-          const updated = { ...prev, floors: nextFloors };
-          pushSnapshot(updated);
-          return updated;
-        }
-        return prev;
+      commitFloorUpdate({
+        exterior_walls: exteriorWalls,
+        interior_walls: interiorWalls,
+        doors: syncedDoors,
+        windows: syncedWindows,
       });
       return;
     }
@@ -1278,28 +2160,17 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       setDraggingRoom(null);
       setAlignmentGuides([]);
       const currentRooms = currentFloor.rooms || [];
-      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(currentRooms, undefined, 9.5);
-      const { doors: syncedDoors, windows: syncedWindows } = synchronizeOpeningsWithWalls(
+      const { exteriorWalls, interiorWalls, doors: syncedDoors, windows: syncedWindows } = regenerateFloorGeometry(
+        currentRooms,
         currentFloor.doors || [],
-        currentFloor.windows || [],
-        [...exteriorWalls, ...interiorWalls]
+        currentFloor.windows || []
       );
 
-      setLayout((prev) => {
-        const nextFloors = prev.floors ? [...prev.floors] : [];
-        if (nextFloors[activeFloorIndex]) {
-          nextFloors[activeFloorIndex] = {
-            ...nextFloors[activeFloorIndex],
-            exterior_walls: exteriorWalls,
-            interior_walls: interiorWalls,
-            doors: syncedDoors,
-            windows: syncedWindows,
-          };
-          const updated = { ...prev, floors: nextFloors };
-          pushSnapshot(updated);
-          return updated;
-        }
-        return prev;
+      commitFloorUpdate({
+        exterior_walls: exteriorWalls,
+        interior_walls: interiorWalls,
+        doors: syncedDoors,
+        windows: syncedWindows,
       });
       return;
     }
@@ -1466,11 +2337,10 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       };
     });
 
-    const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(updatedRooms, undefined, 9.5);
-    const { doors: sDoors, windows: sWins } = synchronizeOpeningsWithWalls(
+    const { exteriorWalls, interiorWalls, doors: sDoors, windows: sWins } = regenerateFloorGeometry(
+      updatedRooms,
       currentFloor.doors || [],
-      currentFloor.windows || [],
-      [...exteriorWalls, ...interiorWalls]
+      currentFloor.windows || []
     );
 
     const nextFloors = layout.floors
@@ -1570,28 +2440,17 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         return;
       }
       const remainingRooms = (currentFloor.rooms || []).filter((r) => r.id !== selectedRoomId);
-      const { exteriorWalls, interiorWalls } = generateCanonicalWallNetwork(remainingRooms, undefined, 9.5);
-      const { doors: sDoors, windows: sWins } = synchronizeOpeningsWithWalls(
+      const { exteriorWalls, interiorWalls, doors: sDoors, windows: sWins } = regenerateFloorGeometry(
+        remainingRooms,
         (currentFloor.doors || []).filter((d) => d.room_id !== selectedRoomId),
-        (currentFloor.windows || []).filter((w) => w.room_id !== selectedRoomId),
-        [...exteriorWalls, ...interiorWalls]
+        (currentFloor.windows || []).filter((w) => w.room_id !== selectedRoomId)
       );
-      setLayout((prev) => {
-        const nextFloors = prev.floors ? [...prev.floors] : [];
-        if (nextFloors[activeFloorIndex]) {
-          nextFloors[activeFloorIndex] = {
-            ...nextFloors[activeFloorIndex],
-            rooms: remainingRooms,
-            exterior_walls: exteriorWalls,
-            interior_walls: interiorWalls,
-            doors: sDoors,
-            windows: sWins,
-          };
-          const updated = { ...prev, floors: nextFloors };
-          pushSnapshot(updated);
-          return updated;
-        }
-        return prev;
+      commitFloorUpdate({
+        rooms: remainingRooms,
+        exterior_walls: exteriorWalls,
+        interior_walls: interiorWalls,
+        doors: sDoors,
+        windows: sWins,
       });
       handleSelectRoom(null);
     } else if (selectedDoorId) {
@@ -1626,58 +2485,65 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // Flip Door Swing (Inward / Outward & Hinge Side)
   const handleFlipDoorSwing = () => {
     if (!selectedDoorId) return;
-    setLayout((prev) => {
-      const nextFloors = prev.floors ? [...prev.floors] : [];
-      if (nextFloors[activeFloorIndex]) {
-        const floor = nextFloors[activeFloorIndex];
-        const nextDoors = (floor.doors || []).map((d) => {
-          if (d.id !== selectedDoorId) return d;
-          return {
-            ...d,
-            swing: d.swing === "inward" ? ("outward" as const) : ("inward" as const),
-            swing_direction: d.swing_direction === "inward" ? ("outward" as const) : ("inward" as const),
-            hinge_side: d.hinge_side === "left" ? ("right" as const) : ("left" as const),
-          };
-        });
-        nextFloors[activeFloorIndex] = { ...floor, doors: nextDoors };
-        const updated = { ...prev, floors: nextFloors };
-        pushSnapshot(updated);
-        return updated;
-      }
-      return prev;
+    const nextDoors = (currentFloor.doors || []).map((door) => {
+      if (door.id !== selectedDoorId) return door;
+      return {
+        ...door,
+        swing: door.swing === "inward" ? ("outward" as const) : ("inward" as const),
+        swing_direction: door.swing_direction === "inward" ? ("outward" as const) : ("inward" as const),
+        hinge_side: door.hinge_side === "left" ? ("right" as const) : ("left" as const),
+      };
     });
+    commitFloorUpdate({ doors: nextDoors });
   };
 
-  // Resize Window Width (+1ft / -1ft)
-  const handleResizeWindowWidth = (deltaFt: number) => {
+  const resizeOpeningWidth = (kind: "door" | "window", deltaFt: number) => {
+    const id = kind === "door" ? selectedDoorId : selectedWindowId;
+    if (!id) return;
+    const existing = kind === "door"
+      ? (currentFloor.doors || []).find((opening) => opening.id === id)
+      : (currentFloor.windows || []).find((opening) => opening.id === id);
+    if (!existing) return;
+    const wallId = existing.host_wall_id || existing.wall_id;
+    const wall = canonicalWallNet.walls.find((item) => item.id === wallId);
+    if (!wall) return;
+    const maxWidth = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1) - 0.5;
+    const width = Math.max(kind === "door" ? 2 : 1, Math.min(maxWidth, existing.width + deltaFt));
+    const geometry = projectOpeningToWall(
+      wall,
+      { x: (existing.x1 + existing.x2) / 2, y: (existing.y1 + existing.y2) / 2 },
+      width
+    );
+    if (!geometry) return;
+    const candidate = { ...existing, ...geometry };
+    const siblings = [...(currentFloor.doors || []), ...(currentFloor.windows || [])];
+    if (openingOverlaps(candidate, siblings, wall)) {
+      setInvalidMoveNotice("Opening resize would overlap another opening.");
+      setTimeout(() => setInvalidMoveNotice(null), 2500);
+      return;
+    }
+    if (kind === "door") {
+      commitFloorUpdate({
+        doors: (currentFloor.doors || []).map((opening) => opening.id === id ? candidate as Door : opening),
+      });
+    } else {
+      commitFloorUpdate({
+        windows: (currentFloor.windows || []).map((opening) => opening.id === id ? candidate as Window : opening),
+      });
+    }
+  };
+
+  const handleResizeDoorWidth = (deltaFt: number) => resizeOpeningWidth("door", deltaFt);
+  const handleResizeWindowWidth = (deltaFt: number) => resizeOpeningWidth("window", deltaFt);
+
+  const handleResizeWindowHeight = (deltaFt: number) => {
     if (!selectedWindowId) return;
-    setLayout((prev) => {
-      const nextFloors = prev.floors ? [...prev.floors] : [];
-      if (nextFloors[activeFloorIndex]) {
-        const floor = nextFloors[activeFloorIndex];
-        const updatedWindows = (floor.windows || []).map((w) => {
-          if (w.id === selectedWindowId) {
-            const newW = Math.max(2.5, Math.min(8.0, (w.width || 4.0) + deltaFt));
-            const midX = (w.x1 + w.x2) / 2;
-            const midY = (w.y1 + w.y2) / 2;
-            const isHoriz = Math.abs(w.y1 - w.y2) < 0.2;
-            return {
-              ...w,
-              width: newW,
-              x1: isHoriz ? midX - newW / 2 : w.x1,
-              x2: isHoriz ? midX + newW / 2 : w.x2,
-              y1: isHoriz ? w.y1 : midY - newW / 2,
-              y2: isHoriz ? w.y2 : midY + newW / 2,
-            };
-          }
-          return w;
-        });
-        nextFloors[activeFloorIndex] = { ...floor, windows: updatedWindows };
-        const updated = { ...prev, floors: nextFloors };
-        pushSnapshot(updated);
-        return updated;
-      }
-      return prev;
+    commitFloorUpdate({
+      windows: (currentFloor.windows || []).map((opening) =>
+        opening.id === selectedWindowId
+          ? { ...opening, height: Math.max(1, Math.min(10, (opening.height || 4) + deltaFt)) }
+          : opening
+      ),
     });
   };
 
@@ -2042,6 +2908,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     <svg
             ref={svgRef}
             id="architectural-svg"
+            onMouseDownCapture={handleSvgMouseDownCapture}
+            onClickCapture={handleSvgClickCapture}
             width={svgWidth + padding * 2}
             height={svgHeight + padding * 2}
             viewBox={`-${padding} -${padding} ${svgWidth + padding * 2} ${svgHeight + padding * 2}`}
@@ -2083,6 +2951,18 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               strokeWidth={1.5}
               strokeDasharray="8 4"
             />
+            {drawingWall && (
+              <line
+                x1={drawingWall.start.x * SCALE}
+                y1={drawingWall.start.y * SCALE}
+                x2={drawingWall.end.x * SCALE}
+                y2={drawingWall.end.y * SCALE}
+                stroke="#C48446"
+                strokeWidth={3}
+                strokeDasharray="7 4"
+                pointerEvents="none"
+              />
+            )}
 
             {/* Site Boundary Label */}
             <text x={10} y={-14} fill="#475569" className="font-mono text-[10px] tracking-widest uppercase font-semibold">
@@ -3011,6 +3891,12 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                           initialY2: wall.y2,
                           affectedRoomIds: wall.adjacent_room_ids || [],
                           initialRooms: JSON.parse(JSON.stringify(currentFloor.rooms || [])),
+                          initialWalls: JSON.parse(
+                            JSON.stringify([
+                              ...(currentFloor.exterior_walls || []),
+                              ...(currentFloor.interior_walls || []),
+                            ])
+                          ),
                           initialDoors: JSON.parse(JSON.stringify(currentFloor.doors || [])),
                           initialWindows: JSON.parse(JSON.stringify(currentFloor.windows || [])),
                         });
@@ -3094,6 +3980,24 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                     e.stopPropagation();
                     setSelectedWindowId(wGeom.id);
                   }}
+                  onMouseDown={(e) => {
+                    if (mode !== "edit" || activeTool !== "select") return;
+                    e.stopPropagation();
+                    const opening = (currentFloor.windows || []).find((item) => item.id === wGeom.id);
+                    if (!opening) return;
+                    setSelectedWindowId(opening.id);
+                    setSelectedDoorId(null);
+                    setDraggingOpening({
+                      kind: "window",
+                      id: opening.id,
+                      wallId:
+                        opening.host_wall_id ||
+                        opening.wall_id ||
+                        findWallAtPoint({ x: (opening.x1 + opening.x2) / 2, y: (opening.y1 + opening.y2) / 2 })?.id ||
+                        "",
+                      initialOpening: { ...opening },
+                    });
+                  }}
                   className={`${mode === "edit" ? "cursor-pointer" : "pointer-events-none"}`}
                 >
                   {/* Clean wall opening mask */}
@@ -3170,6 +4074,24 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedDoorId(dGeom.id);
+                  }}
+                  onMouseDown={(e) => {
+                    if (mode !== "edit" || activeTool !== "select") return;
+                    e.stopPropagation();
+                    const opening = (currentFloor.doors || []).find((item) => item.id === dGeom.id);
+                    if (!opening) return;
+                    setSelectedDoorId(opening.id);
+                    setSelectedWindowId(null);
+                    setDraggingOpening({
+                      kind: "door",
+                      id: opening.id,
+                      wallId:
+                        opening.host_wall_id ||
+                        opening.wall_id ||
+                        findWallAtPoint({ x: (opening.x1 + opening.x2) / 2, y: (opening.y1 + opening.y2) / 2 })?.id ||
+                        "",
+                      initialOpening: { ...opening },
+                    });
                   }}
                   className={`${mode === "edit" ? "cursor-pointer" : "pointer-events-none"}`}
                 >
@@ -3450,6 +4372,55 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 BUILT-UP: <tspan fill="#0F172A" fontWeight="bold">{layout.total_area_sqft || Math.round((currentFloor.rooms || []).reduce((acc, r) => acc + (r.area_sqft || (r.rect ? r.rect.width * r.rect.length : 0)), 0))} SQ FT</tspan> · FACING: <tspan fill="#0F172A" fontWeight="bold">{(layout.facing || layout.orientation || layout.site?.road_side || "SOUTH").toUpperCase()}</tspan>
               </text>
             </g>
+            {layout.mep_plan && (
+              <g id="canonical-mep-plan" pointerEvents="none">
+                {layout.mep_plan.routes
+                  .filter((route) => route.floor_number === currentFloor.floor_number && mepVisibility[route.category])
+                  .map((route) => {
+                    const color = route.category === "electrical"
+                      ? "#D97706"
+                      : route.category === "plumbing"
+                        ? "#0284C7"
+                        : "#9333EA";
+                    return (
+                      <polyline
+                        key={route.id}
+                        data-mep-id={route.id}
+                        points={route.points.map((point) => `${point.x * SCALE},${point.y * SCALE}`).join(" ")}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={2}
+                        strokeDasharray="5 3"
+                        opacity={0.85}
+                      >
+                        <title>{`${route.category}: ${route.kind} (preliminary)`}</title>
+                      </polyline>
+                    );
+                  })}
+                {layout.mep_plan.points
+                  .filter((point) => point.floor_number === currentFloor.floor_number && mepVisibility[point.category])
+                  .map((point) => {
+                    const color = point.category === "electrical"
+                      ? "#D97706"
+                      : point.category === "plumbing"
+                        ? "#0284C7"
+                        : "#9333EA";
+                    return (
+                      <g key={point.id} data-mep-id={point.id}>
+                        <circle
+                          cx={point.position.x * SCALE}
+                          cy={point.position.y * SCALE}
+                          r={4.5}
+                          fill="#FFFFFF"
+                          stroke={color}
+                          strokeWidth={2}
+                        />
+                        <title>{`${point.category}: ${point.kind} (preliminary)`}</title>
+                      </g>
+                    );
+                  })}
+              </g>
+            )}
           </svg>
   );
 
@@ -3467,10 +4438,10 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               id="btn-exit"
               onClick={handleExit}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-[#E2E8F0] hover:text-white border border-white/5 transition-all shrink-0"
-              title="Exit to Plan Overview"
+              title="Back to Plan Overview"
             >
               <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
-              <span className="font-semibold hidden xs:inline">EXIT</span>
+              <span className="font-semibold hidden xs:inline">BACK</span>
             </button>
             <button
               id="btn-toggle-layers"
@@ -3662,6 +4633,20 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             </button>
           </div>
         </header>
+
+        {showAtelierNav && onStudioNavigate && (
+          <FloatingNav
+            currentView="plan"
+            onNavigate={onStudioNavigate}
+            isProjectWorkspace
+            hasProject
+            onOpenVastuAudit={onOpenVastuAudit}
+            hasVastuResult={hasVastuResult}
+            isPlanEditMode
+            onTogglePlanEditMode={onToggleEditMode}
+            placement="flow"
+          />
+        )}
 
         {/* WORKBENCH BODY: Left Panel + Dominant Canvas + Right Inspector Panel */}
         <div className="flex-1 flex overflow-hidden relative">
@@ -4203,8 +5188,47 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                     TOGGLE THICKNESS (4.5&quot; / 9&quot;)
                   </button>
 
+                  <label className="block space-y-1 text-[10px] font-mono text-[#94A3B8]">
+                    WALL THICKNESS (INCHES)
+                    <input
+                      type="number"
+                      min="1.5"
+                      max="18"
+                      step="0.5"
+                      value={(selectedWall.thickness * 12).toFixed(1)}
+                      onChange={(event) => handleSetWallThickness(Number(event.target.value) / 12)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#202227] border border-white/10 text-xs text-white focus:outline-none focus:border-[#C48446]"
+                    />
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSplitSelectedWall}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-mono text-white"
+                    >
+                      SPLIT WALL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleJoinSelectedWall}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-mono text-white"
+                    >
+                      JOIN WALL
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    className="w-full py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-mono flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Wall</span>
+                  </button>
+
                   <div className="text-[10px] text-[#94A3B8] leading-relaxed">
-                    Direct wall editing: drag the wall line to move and resize rooms, or drag circle endpoints to extend/shorten.
+                    Drag the wall to move it. Drag either endpoint to extend or shorten it.
                   </div>
                 </div>
               ) : selectedDoor ? (
@@ -4232,6 +5256,23 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       <span className="text-[#94A3B8]">Type:</span>
                       <span className="text-white font-bold capitalize">{selectedDoor.door_type || selectedDoor.type || "Single Leaf"}</span>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleResizeDoorWidth(0.5)}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                    >
+                      +6&quot; Width
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResizeDoorWidth(-0.5)}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                    >
+                      -6&quot; Width
+                    </button>
                   </div>
 
                   <button
@@ -4270,6 +5311,10 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       <span className="text-white font-bold">{feetToArchitectural(selectedWindow.width || 4.0)}</span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-[#94A3B8]">Height:</span>
+                      <span className="text-white font-bold">{feetToArchitectural(selectedWindow.height || 4.0)}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-[#94A3B8]">Type:</span>
                       <span className="text-white font-bold capitalize">{selectedWindow.window_type || selectedWindow.type || "Casement"}</span>
                     </div>
@@ -4289,6 +5334,23 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
                     >
                       -1&apos; Width
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleResizeWindowHeight(0.5)}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                    >
+                      +6&quot; Height
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResizeWindowHeight(-0.5)}
+                      className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white"
+                    >
+                      -6&quot; Height
                     </button>
                   </div>
 

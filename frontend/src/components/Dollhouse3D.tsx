@@ -38,6 +38,7 @@ import {
   Door,
   WindowItem,
   Rect,
+  MEPCategory,
 } from "@/types/house";
 import {
   generateArchitecturalLandscape,
@@ -69,6 +70,7 @@ export interface Dollhouse3DProps {
   onToggleLandscape?: () => void;
   initialPresentationMode?: PresentationMode;
   hasNotification?: boolean;
+  mepVisibility?: Partial<Record<MEPCategory, boolean>>;
 }
 
 export type PresentationMode = "cutaway" | "exterior" | "interior" | "landscape" | "all";
@@ -180,6 +182,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   onToggleLandscape,
   initialPresentationMode,
   hasNotification,
+  mepVisibility = {},
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -1029,6 +1032,18 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         if ((child as THREE.Mesh).isMesh) {
           const geometry = (child as THREE.Mesh).geometry;
           if (!cachedAssetGeometries.has(geometry)) geometry.dispose();
+          if (child.userData.mepId) {
+            const material = (child as THREE.Mesh).material;
+            if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
+            else material.dispose();
+          }
+        } else if ((child as THREE.Line).isLine) {
+          (child as THREE.Line).geometry.dispose();
+          if (child.userData.mepId) {
+            const material = (child as THREE.Line).material;
+            if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
+            else material.dispose();
+          }
         }
       });
     }
@@ -1119,6 +1134,52 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
         interiorLights,
         { x: plinthX, z: plinthZ }
       ));
+
+      const floorNumber = floorPlans[floorIndex].floor_number;
+      const mepPoints = layout.mep_plan?.points.filter(
+        (point) => point.floor_number === floorNumber && mepVisibility[point.category]
+      ) || [];
+      const mepRoutes = layout.mep_plan?.routes.filter(
+        (route) => route.floor_number === floorNumber && mepVisibility[route.category]
+      ) || [];
+      const mepLayer = new THREE.Group();
+      mepLayer.name = `canonical-mep-floor-${floorNumber}`;
+      mepRoutes.forEach((route) => {
+        if (route.points.length < 2) return;
+        const y = floorBaseY + (route.category === "plumbing" ? 0.9 : 8.4);
+        const geometry = new THREE.BufferGeometry().setFromPoints(
+          route.points.map((point) => new THREE.Vector3(point.x, y, point.y))
+        );
+        const color = route.category === "electrical"
+          ? 0xd97706
+          : route.category === "plumbing"
+            ? 0x0284c7
+            : 0x9333ea;
+        const material = new THREE.LineDashedMaterial({ color, dashSize: 0.6, gapSize: 0.35, linewidth: 2 });
+        const line = new THREE.Line(geometry, material);
+        line.computeLineDistances();
+        line.userData.mepId = route.id;
+        mepLayer.add(line);
+      });
+      mepPoints.forEach((point) => {
+        const color = point.category === "electrical"
+          ? 0xd97706
+          : point.category === "plumbing"
+            ? 0x0284c7
+            : 0x9333ea;
+        const marker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.2, 8, 6),
+          new THREE.MeshBasicMaterial({ color })
+        );
+        marker.position.set(
+          point.position.x,
+          floorBaseY + (point.category === "plumbing" ? 1.1 : 8.45),
+          point.position.y
+        );
+        marker.userData.mepId = point.id;
+        mepLayer.add(marker);
+      });
+      rootGroup.add(mepLayer);
     });
 
     // 4. Architectural roof follows the visible top-floor exterior wall footprint.
@@ -1278,6 +1339,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     isDarkMode,
     resolvedFacing,
     buildFloorGeometry,
+    mepVisibility,
   ]);
 
   // Three.js Mount, HDRI Environment, Postprocessing & Animation Loop

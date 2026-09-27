@@ -1068,10 +1068,23 @@ class EditIntent(BaseModel):
         "change_parking",
         "change_entrance",
         "change_plot_dimensions",
+        "add_wall",
+        "delete_wall",
+        "move_wall",
+        "resize_wall",
+        "add_door",
+        "delete_door",
+        "move_door",
+        "resize_door",
+        "add_window",
+        "delete_window",
+        "move_window",
+        "resize_window",
         "general_adjust",
     ] = "general_adjust"
     target_room_id: Optional[str] = None
     target_room_type: Optional[str] = None
+    target_entity_id: Optional[str] = None
     constraints: Dict[str, Any] = Field(default_factory=dict)
     relationship_constraints: List[str] = Field(default_factory=list)
     delta_width: float = 0.0
@@ -1079,6 +1092,82 @@ class EditIntent(BaseModel):
     target_value: Optional[float] = None
     architectural_rationale: str = ""
     llm_source: Optional[str] = "deterministic_fallback"
+
+
+MEPCategory = Literal["electrical", "plumbing", "hvac"]
+MEPPointKind = Literal[
+    "light", "switch", "outlet", "fan", "ac_point", "distribution_board",
+    "wc", "basin", "shower", "sink", "floor_drain", "supply", "waste", "stack",
+    "indoor_ac", "outdoor_ac", "exhaust", "ventilation", "return",
+]
+
+
+class MEPPoint(BaseModel):
+    """A preliminary, room-associated MEP point in plan coordinates (feet)."""
+
+    id: str
+    category: MEPCategory
+    kind: MEPPointKind
+    position: Point2D
+    floor_id: str
+    floor_number: int
+    room_id: str
+    semantic_key: Optional[str] = None
+    generated: bool = True
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MEPRoute(BaseModel):
+    """A preliminary MEP polyline contained within its associated room."""
+
+    id: str
+    category: MEPCategory
+    kind: str
+    points: List[Point2D]
+    floor_id: str
+    floor_number: int
+    room_id: str
+    point_ids: List[str] = Field(default_factory=list)
+    semantic_key: Optional[str] = None
+    generated: bool = True
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MEPRoomAssociation(BaseModel):
+    floor_id: str
+    floor_number: int
+    room_id: str
+    point_id: str
+
+
+class MEPVerticalStack(BaseModel):
+    """Preliminary cross-floor wet-service alignment, not a final riser design."""
+
+    id: str
+    category: Literal["plumbing"] = "plumbing"
+    kind: Literal["soil_waste_stack", "water_supply_stack"]
+    room_associations: List[MEPRoomAssociation]
+    alignment: Point2D
+    semantic_key: str
+    generated: bool = True
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MEPPlan(BaseModel):
+    """Canonical preliminary MEP data. This is not for construction or certification."""
+
+    points: List[MEPPoint] = Field(default_factory=list)
+    routes: List[MEPRoute] = Field(default_factory=list)
+    vertical_stacks: List[MEPVerticalStack] = Field(default_factory=list)
+    planning_stage: Literal["preliminary"] = "preliminary"
+    certified: bool = False
+    metadata: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "planning_stage": "preliminary",
+            "certified": False,
+            "disclaimer": "For preliminary coordination only; requires licensed engineering and code review.",
+        }
+    )
 
 
 class HouseLayout(BaseModel):
@@ -1103,6 +1192,7 @@ class HouseLayout(BaseModel):
     quantities: Optional[MaterialQuantities] = None
     cost_estimate: Optional[CostEstimate] = None
     building_services: Optional[BuildingServices] = None
+    mep_plan: Optional[MEPPlan] = None
     structural_planning: Optional[StructuralPlanning] = None
     structural_system: Optional[str] = "RCC_FRAME"
     landscape: Optional[LandscapePlan] = None
@@ -1169,6 +1259,12 @@ class ProjectEditRequest(BaseModel):
     edit_instruction: str
     current_layout: Optional[HouseLayout] = None
     target_room_id: Optional[str] = None
+    target_entity_id: Optional[str] = None
+
+    def __init__(self, **data):
+        if not data.get("target_room_id") and data.get("target_entity_id"):
+            data["target_room_id"] = data["target_entity_id"]
+        super().__init__(**data)
 
 
 class RoomAllocationItem(BaseModel):

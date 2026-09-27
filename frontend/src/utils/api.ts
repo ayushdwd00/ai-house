@@ -353,6 +353,7 @@ export interface ProjectEditRequest {
   edit_instruction: string;
   current_layout?: HouseLayout;
   target_room_id?: string;
+  target_entity_id?: string;
 }
 
 export interface ProjectEditResult {
@@ -364,6 +365,32 @@ export interface ProjectEditResult {
   revision_id?: string;
   version_number?: number;
   reason?: string;
+}
+
+export interface ProjectEditIntentPreview {
+  instruction: string;
+  intent: Record<string, unknown>;
+}
+
+export async function previewProjectEditIntent(
+  projectId: string,
+  req: ProjectEditRequest
+): Promise<ProjectEditIntentPreview> {
+  const url = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/edit-intent`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.message || `Edit intent failed (HTTP ${res.status})`);
+    }
+    return data as ProjectEditIntentPreview;
+  } catch (err) {
+    throw new Error(formatApiError(err));
+  }
 }
 
 /**
@@ -385,9 +412,121 @@ export async function applyProjectEdit(
     // 422 = rejected but with data — parse it
     if (!res.ok && res.status !== 422) {
       const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.detail || errData.message || `Edit failed (HTTP ${res.status})`);
+      throw new Error(errData.detail || errData.message || errData.reason || `Edit failed (HTTP ${res.status})`);
     }
+
     return await res.json();
+  } catch (err) {
+    throw new Error(formatApiError(err));
+  }
+}
+
+export async function generateMepPlan(layout: HouseLayout): Promise<HouseLayout> {
+  const url = `${API_BASE_URL}/api/mep/plan`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(layout),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.message || `MEP planning failed (HTTP ${res.status})`);
+    }
+    return data as HouseLayout;
+  } catch (err) {
+    throw new Error(formatApiError(err));
+  }
+}
+
+export interface DesignScheme {
+  id: string;
+  name: string;
+  concept: string;
+  characteristics: string[];
+  validation_status: "valid" | "invalid";
+  validation_message?: string;
+  layout: HouseLayout;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isHouseLayout(value: unknown): value is HouseLayout {
+  return isRecord(value)
+    && typeof value.id === "string"
+    && typeof value.title === "string"
+    && typeof value.plot_width === "number"
+    && typeof value.plot_length === "number"
+    && Array.isArray(value.rooms)
+    && Array.isArray(value.floors)
+    && isRecord(value.stats);
+}
+
+export async function generateDesignSchemes(
+  layout: HouseLayout,
+  vastuEnabled: boolean
+): Promise<DesignScheme[]> {
+  const url = `${API_BASE_URL}/api/design-schemes?count=4&vastu_enabled=${vastuEnabled}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(layout),
+    });
+    const data: unknown = await res.json();
+    if (!res.ok) {
+      const detail = isRecord(data) ? data.detail || data.message : undefined;
+      throw new Error(typeof detail === "string" ? detail : `Scheme generation failed (HTTP ${res.status})`);
+    }
+    const rawSchemes = Array.isArray(data)
+      ? data
+      : isRecord(data) && Array.isArray(data.schemes)
+        ? data.schemes
+        : [];
+    const schemes = rawSchemes.filter(isRecord).map((entry): DesignScheme => {
+      if (!isHouseLayout(entry.layout)) {
+        throw new Error("The architectural engine returned a scheme without a canonical HouseLayout.");
+      }
+      const rawCharacteristics = entry.characteristics;
+      const characteristics = Array.isArray(rawCharacteristics)
+        ? rawCharacteristics.filter((item): item is string => typeof item === "string")
+        : isRecord(rawCharacteristics)
+          ? [
+              ...(Array.isArray(rawCharacteristics.tags)
+                ? rawCharacteristics.tags.filter((item): item is string => typeof item === "string")
+                : []),
+              ...(Array.isArray(rawCharacteristics.feature_summary)
+                ? rawCharacteristics.feature_summary.filter((item): item is string => typeof item === "string")
+                : []),
+            ]
+          : [];
+      const validation = entry.validation_status;
+      const validationStatus = typeof validation === "string"
+        ? validation.toLowerCase() === "valid" ? "valid" : "invalid"
+        : isRecord(validation) && validation.is_valid === true ? "valid" : "invalid";
+      const messages = isRecord(validation)
+        ? [
+            ...(Array.isArray(validation.hard_failures) ? validation.hard_failures : []),
+            ...(Array.isArray(validation.errors) ? validation.errors : []),
+          ].filter((item): item is string => typeof item === "string")
+        : [];
+      return {
+        id: typeof entry.id === "string" ? entry.id : "",
+        name: typeof entry.name === "string" ? entry.name : "",
+        concept: typeof entry.concept === "string" ? entry.concept : "",
+        characteristics,
+        validation_status: validationStatus,
+        validation_message: messages.join("; ") || undefined,
+        layout: entry.layout,
+      };
+    });
+    const validSchemes = schemes.filter((scheme) => scheme.validation_status === "valid" && scheme.layout);
+    if (validSchemes.length < 3) {
+      throw new Error("The architectural engine returned fewer than three valid design schemes.");
+    }
+    return validSchemes;
   } catch (err) {
     throw new Error(formatApiError(err));
   }

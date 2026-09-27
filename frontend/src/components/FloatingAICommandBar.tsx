@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Sparkles, ArrowRight, Loader2, MessageSquare, X } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, MessageSquare, X, ChevronDown, ChevronUp } from "lucide-react";
 
 // ============================================================
 // QUICK EDIT SUGGESTIONS
@@ -75,6 +75,7 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
 }) => {
   const [instruction, setInstruction] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const suggestions =
@@ -106,34 +107,58 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
     : "What would you like to change?";
 
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-3 pointer-events-auto">
-      <div
-        className={`bg-[#0F1117]/92 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 transition-all duration-200 ${
-          isFocused
-            ? "border border-[#C48446]/30 ring-1 ring-[#C48446]/10"
-            : "border border-white/8"
-        }`}
-      >
-        {/* ── Suggestion chips ── */}
-        <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5 overflow-x-auto scrollbar-hide">
-          <div className="shrink-0 flex items-center gap-1 text-[#C48446] mr-0.5">
-            <Sparkles className="w-2.5 h-2.5" />
-            <span className="text-[9px] font-mono uppercase tracking-widest">AI</span>
-          </div>
-          {suggestions.map((s) => (
+    <div className="fixed left-4 top-28 z-40 w-[min(20rem,calc(100vw-2rem))] pointer-events-auto">
+      {!isExpanded ? (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          aria-label="Open AI Architect"
+          aria-expanded={false}
+          className="flex items-center gap-2 rounded-full border border-white/10 bg-[#0F1117]/95 px-3.5 py-2.5 text-[#E69F58] shadow-2xl shadow-black/50 backdrop-blur-xl transition-colors hover:bg-[#1A1C22]"
+        >
+          <Sparkles className="h-4 w-4" />
+          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider">AI Architect</span>
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <div
+          className={`bg-[#0F1117]/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 transition-all duration-200 ${
+            isFocused
+              ? "border border-[#C48446]/30 ring-1 ring-[#C48446]/10"
+              : "border border-white/8"
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
+            <div className="flex items-center gap-1.5 text-[#C48446]">
+              <Sparkles className="h-3 w-3" />
+              <span className="text-[10px] font-mono uppercase tracking-widest">AI Architect</span>
+            </div>
             <button
-              key={s}
               type="button"
-              onClick={() => handleSuggestion(s)}
-              className="shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-[#9E9C98] hover:text-[#F5F3EF] text-[10px] font-mono transition-colors whitespace-nowrap max-w-[220px] truncate"
+              onClick={() => setIsExpanded(false)}
+              aria-label="Collapse AI Architect"
+              aria-expanded={true}
+              className="rounded-md p-1 text-[#9E9C98] transition-colors hover:bg-white/10 hover:text-white"
             >
-              {s}
+              <ChevronUp className="h-4 w-4" />
             </button>
-          ))}
-        </div>
+          </div>
+        {/* ── Suggestion chips ── */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2.5 pb-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handleSuggestion(s)}
+                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-[#9E9C98] hover:text-[#F5F3EF] text-[10px] font-mono transition-colors whitespace-nowrap max-w-full truncate"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
 
         {/* ── Input row ── */}
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 px-3 pb-2.5">
+          <form onSubmit={handleSubmit} className="flex items-center gap-2 px-3 pb-2.5">
           <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/30 border border-white/5 focus-within:border-white/15 transition-colors">
             <MessageSquare className="w-3 h-3 text-[#6B6964] shrink-0" />
             <input
@@ -172,8 +197,9 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
               <ArrowRight className="w-3.5 h-3.5" />
             )}
           </button>
-        </form>
-      </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

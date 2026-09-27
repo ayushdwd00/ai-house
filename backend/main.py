@@ -22,6 +22,8 @@ from models import (
     DreamHomeStructuredRequirements, LandscapePreferences, ProjectEditRequest
 )
 from architecture.architectural_engine import generate_architectural_house_layout
+from architecture import generate_design_schemes
+from architecture.scheme_generation import SchemeGenerationError
 from ai.refinement_engine import refine_current_house_layout
 from architecture.architectural_validator import validate_design
 from architecture.architectural_scorer import calculate_architectural_scores
@@ -32,6 +34,7 @@ from estimation.material_quantity_engine import calculate_material_quantities
 from estimation.cost_estimator import estimate_construction_cost
 from architecture.floorplan_reconstruction import reconstruct_floorplan_vector, validate_floorplan_upload
 from architecture.geometry_normalizer import calibrate_scale
+from mep_planning import generate_mep_plan as build_mep_plan
 from shapely.geometry import box
 from infrastructure.storage import save_project, get_project, list_project_versions, restore_project_version, undo_project_version, delete_project
 from ai.groq_service import (
@@ -312,6 +315,30 @@ def generate_layout_endpoint(req: IntakeRequest, async_job: bool = False):
         return JSONResponse(status_code=202, content={"job_id": job_id, "status": "queued"})
 
     return _execute_generation(req)
+
+
+@app.post("/api/mep/plan", response_model=HouseLayout)
+def generate_mep_plan_endpoint(layout: HouseLayout):
+    """Derive preliminary MEP layers from the supplied canonical architectural layout."""
+    return build_mep_plan(layout)
+
+
+@app.post("/api/design-schemes")
+def generate_design_schemes_endpoint(
+    base_layout: HouseLayout,
+    count: int = 4,
+    vastu_enabled: bool = False,
+):
+    """Generate validated canonical alternatives from the same architectural brief."""
+    try:
+        schemes = generate_design_schemes(
+            base_layout=base_layout,
+            count=count,
+            vastu_enabled=vastu_enabled,
+        )
+    except (SchemeGenerationError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"schemes": schemes}
 
 
 @app.get("/api/jobs/{job_id}")
@@ -901,6 +928,7 @@ async def edit_room_endpoint(req: EditRoomRequest):
     layout.validation = validation
     layout.quantities = calculate_material_quantities(layout, layout.construction_spec)
     layout.cost_estimate = estimate_construction_cost(layout, layout.quantities)
+    layout = build_mep_plan(layout)
 
     # 9. Auto-Persist to project storage
     try:
@@ -932,6 +960,7 @@ async def websocket_refine(websocket: WebSocket):
             if current_layout_dict and instruction:
                 current_layout = HouseLayout.model_validate(current_layout_dict)
                 refined, diff = refine_current_house_layout(current_layout, instruction)
+                refined = build_mep_plan(refined)
                 await websocket.send_json({"status": "ok", "layout": refined.model_dump(), "diff": diff})
             else:
                 await websocket.send_json({"status": "error", "message": "Missing layout or instruction"})
@@ -997,80 +1026,184 @@ async def export_project_svg(project_id: str = FastPath(...)):
 # New HouseLayout Revision → 2D + 3D
 # ============================================================
 
+def _canonical_edit_snapshot(layout: HouseLayout) -> dict:
+    floors = layout.floors or []
+    return {
+        "id": layout.id,
+        "project_id": layout.project_id,
+        "plot_width": layout.plot_width,
+        "plot_length": layout.plot_length,
+        "site": layout.site.model_dump(mode="json") if layout.site else None,
+        "rooms": [room.model_dump(mode="json") for room in layout.rooms],
+        "walls": [wall.model_dump(mode="json") for wall in layout.walls],
+        "doors": [door.model_dump(mode="json") for door in layout.doors],
+        "windows": [window.model_dump(mode="json") for window in layout.windows],
+        "floors": [
+            {
+                "floor_id": floor.floor_id,
+                "floor_number": floor.floor_number,
+                "rooms": [room.model_dump(mode="json") for room in floor.rooms],
+                "walls": [wall.model_dump(mode="json") for wall in floor.walls],
+                "doors": [door.model_dump(mode="json") for door in floor.doors],
+                "windows": [window.model_dump(mode="json") for window in floor.windows],
+                "staircase": floor.staircase.model_dump(mode="json") if floor.staircase else None,
+            }
+            for floor in floors
+        ],
+    }
+
+
+def _require_current_edit_snapshot(req: ProjectEditRequest, project_id: str, persisted: HouseLayout) -> None:
+    submitted = req.current_layout
+    if submitted is None:
+        return
+    submitted_ids = {submitted.id, submitted.project_id}
+    persisted_ids = {persisted.id, persisted.project_id}
+    if project_id not in submitted_ids or project_id not in persisted_ids:
+        raise HTTPException(status_code=409, detail="The submitted layout does not belong to this project.")
+    if _canonical_edit_snapshot(submitted) != _canonical_edit_snapshot(persisted):
+        raise HTTPException(
+            status_code=409,
+            detail="The submitted canonical layout is not saved yet. Wait for project save to complete, then retry.",
+        )
+
+
 @app.post("/api/projects/{project_id}/edit")
 async def project_edit_endpoint(project_id: str, req: ProjectEditRequest):
     """
-    Applies a natural-language edit instruction to the canonical HouseLayout.
-    Flow:
-      1. Load current project
-      2. Groq → structured EditIntent / NaturalLanguageModificationCommand
-      3. Refinement engine → localized geometry update
-      4. Validate updated HouseLayout
-      5. Save as new revision (version_number++)
-      6. Return updated HouseLayout + progress stages
-    
-    On invalid edit: rollback, return old HouseLayout with reason.
+    Applies an edit through the canonical intent → candidate → validation pipeline.
     """
-    layout = get_project(project_id)
-    if not layout:
+    current_layout = get_project(project_id)
+    if not current_layout:
         raise HTTPException(status_code=404, detail="Project not found")
+    _require_current_edit_snapshot(req, project_id, current_layout)
 
-    current_layout = req.current_layout or layout
     instruction = req.edit_instruction
 
     if not instruction or not instruction.strip():
         raise HTTPException(status_code=400, detail="Edit instruction is required.")
 
-    stages = []
-    stages.append({"stage": "understanding_change", "status": "ok", "label": "Understanding change"})
+    from architecture.edit_pipeline import apply_canonical_edit
+    from models import EditIntent
+
+    stages = [
+        {"stage": "understanding_change", "status": "ok", "label": "Understanding change"},
+        {"stage": "updating_architecture", "status": "in_progress", "label": "Updating architecture"},
+    ]
 
     try:
-        refined_layout, diff = refine_current_house_layout(
+        candidate, raw_diff, error = apply_canonical_edit(
             current_layout=current_layout,
             instruction=instruction,
             target_room_id=req.target_room_id,
+            target_entity_id=req.target_entity_id,
         )
-        stages.append({"stage": "updating_architecture", "status": "ok", "label": "Updating architecture"})
-    except Exception as e:
+    except Exception:
+        candidate, raw_diff, error = current_layout, {}, "The edit pipeline could not apply this request."
+
+    raw_diff = raw_diff if isinstance(raw_diff, dict) else {}
+    raw_intent = raw_diff.get("edit_intent")
+    try:
+        intent = EditIntent.model_validate(raw_intent) if raw_intent else None
+    except Exception:
+        intent = None
+
+    def intent_payload(value):
+        if value is None:
+            return None
+        result = value.model_dump(mode="json")
+        result["architectural_rationale"] = ""
+        return result
+
+    def compact_diff(value):
+        allowed = (
+            "operation", "modified_element", "modified_room", "previous_dimensions",
+            "new_dimensions", "affected_neighbors", "unaffected_rooms_count",
+            "parking_capacity", "plot_width", "plot_length", "status", "reason",
+        )
+        result = {key: value[key] for key in allowed if key in value}
+        if isinstance(result.get("affected_neighbors"), list):
+            result["affected_neighbors"] = result["affected_neighbors"][:5]
+        if raw_intent:
+            result.pop("architectural_rationale", None)
+        return result
+
+    if intent and intent.operation == "change_entrance":
+        error = f"The '{intent.operation}' operation is not supported by the canonical geometry pipeline."
+
+    if error:
+        stages[-1]["status"] = "rejected"
         return JSONResponse(
             status_code=422,
             content={
                 "status": "rejected",
-                "reason": f"That change could not be applied without breaking the layout. {str(e)}",
+                "reason": str(error),
+                "project_id": project_id,
                 "layout": current_layout.model_dump(mode="json"),
+                "intent": intent_payload(intent),
+                "diff": compact_diff(raw_diff),
                 "stages": stages,
-            }
+            },
         )
 
-    # Validate
-    validation = validate_design(refined_layout)
-    stages.append({
-        "stage": "validating_layout",
-        "status": "ok" if validation.is_valid or not validation.hard_failures else "warning",
-        "label": "Validating layout",
-        "warnings": validation.warnings[:3],
-    })
-
-    if not validation.is_valid and validation.hard_failures and len(validation.hard_failures) > 0:
+    stages[-1]["status"] = "ok"
+    stages.append({"stage": "validating_layout", "status": "in_progress", "label": "Validating layout"})
+    try:
+        candidate = build_mep_plan(candidate)
+        validation = validate_design(candidate)
+    except Exception:
+        stages[-1]["status"] = "rejected"
         return JSONResponse(
             status_code=422,
             content={
                 "status": "rejected",
-                "reason": f"That change could not be applied without breaking the layout. {validation.hard_failures[0]}",
+                "reason": "The proposed layout could not be validated.",
+                "project_id": project_id,
                 "layout": current_layout.model_dump(mode="json"),
+                "intent": intent_payload(intent),
+                "diff": compact_diff(raw_diff),
                 "stages": stages,
-            }
+            },
+        )
+    candidate.validation = validation
+
+    if not validation.is_valid:
+        stages[-1]["status"] = "rejected"
+        stages[-1]["warnings"] = validation.warnings[:3]
+        return JSONResponse(
+            status_code=422,
+            content={
+                "status": "rejected",
+                "reason": (validation.errors or validation.hard_failures or ["The candidate failed validation."])[0],
+                "project_id": project_id,
+                "layout": current_layout.model_dump(mode="json"),
+                "intent": intent_payload(intent),
+                "diff": compact_diff(raw_diff),
+                "stages": stages,
+            },
         )
 
-    # Ensure revision ID and increment version
+    stages[-1]["status"] = "ok"
+    stages[-1]["warnings"] = validation.warnings[:3]
     import uuid as _uuid
-    refined_layout.revision_id = f"rev_{_uuid.uuid4().hex[:8]}"
-    refined_layout.version_number = (current_layout.version_number or 1) + 1
+    candidate.revision_id = f"rev_{_uuid.uuid4().hex[:8]}"
+    candidate.version_number = (current_layout.version_number or 1) + 1
 
     try:
-        save_project(refined_layout, project_id)
-    except Exception as e:
-        print(f"[STORAGE WARNING] Failed to save edited project {project_id}: {e}")
+        save_project(candidate, project_id)
+    except Exception:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "rejected",
+                "reason": "The validated edit could not be persisted.",
+                "project_id": project_id,
+                "layout": current_layout.model_dump(mode="json"),
+                "intent": intent_payload(intent),
+                "diff": compact_diff(raw_diff),
+                "stages": stages,
+            },
+        )
 
     stages.append({"stage": "updating_2d_plan", "status": "ok", "label": "Updating 2D plan"})
     stages.append({"stage": "updating_3d_model", "status": "ok", "label": "Updating 3D model"})
@@ -1078,11 +1211,12 @@ async def project_edit_endpoint(project_id: str, req: ProjectEditRequest):
     return {
         "status": "ok",
         "project_id": project_id,
-        "layout": refined_layout.model_dump(mode="json"),
-        "diff": diff if isinstance(diff, dict) else {},
+        "layout": candidate.model_dump(mode="json"),
+        "intent": intent_payload(intent),
+        "diff": compact_diff(raw_diff),
         "stages": stages,
-        "revision_id": refined_layout.revision_id,
-        "version_number": refined_layout.version_number,
+        "revision_id": candidate.revision_id,
+        "version_number": candidate.version_number,
     }
 
 
@@ -1097,14 +1231,23 @@ def project_edit_intent_endpoint(project_id: str, req: ProjectEditRequest):
     Returns the structured EditIntent that would be applied for a given instruction.
     For UI preview / confirmation flows.
     """
-    from ai.groq_service import interpret_modification_with_groq
+    from architecture.edit_pipeline import interpret_edit_intent
     layout = get_project(project_id)
     if not layout:
         raise HTTPException(status_code=404, detail="Project not found")
-    current_layout = req.current_layout or layout
-    rooms_summary = {"rooms": [r.type for r in getattr(current_layout, "rooms", [])]}
-    cmd = interpret_modification_with_groq(req.edit_instruction, rooms_summary)
+    _require_current_edit_snapshot(req, project_id, layout)
+    if not req.edit_instruction or not req.edit_instruction.strip():
+        raise HTTPException(status_code=400, detail="Edit instruction is required.")
+    intent = interpret_edit_intent(
+        req.edit_instruction,
+        layout,
+        target_room_id=req.target_room_id,
+        target_entity_id=req.target_entity_id,
+    )
+    intent_payload = intent.model_dump(mode="json")
+    intent_payload["architectural_rationale"] = ""
     return {
+        "project_id": project_id,
         "instruction": req.edit_instruction,
-        "intent": cmd.model_dump(),
+        "intent": intent_payload,
     }

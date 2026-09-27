@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 
@@ -24,6 +24,7 @@ interface FloatingNavProps {
   hasVastuResult?: boolean;
   isPlanEditMode?: boolean;
   onTogglePlanEditMode?: () => void;
+  placement?: "fixed" | "flow";
 }
 
 // ============================================================
@@ -36,10 +37,45 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
   hasProject = false,
   onOpenProjects,
   onOpenVastuAudit,
-  hasVastuResult = false,
   isPlanEditMode = false,
   onTogglePlanEditMode,
+  placement = "fixed",
 }) => {
+  const [isVisible, setIsVisible] = useState(true);
+  const scrollPositions = useRef(new WeakMap<object, number>());
+
+  useEffect(() => {
+    const updateVisibility = (event: Event) => {
+      const target = event.target;
+      const scrollElement =
+        target instanceof HTMLElement &&
+        target !== document.body &&
+        target !== document.documentElement &&
+        target.scrollHeight > target.clientHeight
+          ? target
+          : null;
+      const source: object = scrollElement || window;
+      const scrollPosition = scrollElement
+        ? scrollElement.scrollTop
+        : window.scrollY || document.documentElement.scrollTop;
+      const previousPosition = scrollPositions.current.get(source) ?? scrollPosition;
+
+      if (scrollPosition <= 4) {
+        setIsVisible(true);
+      } else if (Math.abs(scrollPosition - previousPosition) > 4) {
+        setIsVisible(scrollPosition < previousPosition);
+      }
+      scrollPositions.current.set(source, scrollPosition);
+    };
+
+    window.addEventListener("scroll", updateVisibility, { passive: true });
+    document.addEventListener("scroll", updateVisibility, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("scroll", updateVisibility);
+      document.removeEventListener("scroll", updateVisibility, true);
+    };
+  }, [placement]);
+
   // Inside a project workspace: HOME | PLAN | EDIT MODE | MODEL | STRUCTURE | ESTIMATE
   // On home / landing: HOME | PROJECTS
   const projectNavItems: { id: NavView; label: string }[] = [
@@ -84,10 +120,26 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
 
   return (
     <>
-      <header className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none max-w-[calc(100vw-12px)]">
-        <nav
-          aria-label="Studio Navigation"
-          className="pointer-events-auto flex w-max max-w-full flex-nowrap items-center gap-0 sm:gap-1 px-1 max-[360px]:px-0.5 sm:px-2 py-1 sm:py-1.5 rounded-full bg-[#0F1117]/92 backdrop-blur-md border border-white/10 shadow-2xl shadow-black/40 text-[9px] max-[360px]:text-[8px] sm:text-[11px] font-mono tracking-normal sm:tracking-widest text-[#9E9C98]"
+      <header
+        className={
+          placement === "flow"
+                ? `relative z-50 mx-auto flex w-full justify-center pt-2 pointer-events-none max-w-[calc(100vw-12px)] transition-all duration-300 ease-in-out ${
+                    isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+                  }`
+                : `fixed transition-all duration-300 ease-in-out ${
+                    isPlanEditMode ? "top-16 sm:top-[72px]" : "top-4 sm:top-6"
+                  } left-1/2 -translate-x-1/2 z-50 pointer-events-none max-w-[calc(100vw-12px)] ${
+                    isVisible ? "translate-y-0 opacity-100" : "-translate-y-[calc(100%+1.5rem)] opacity-0"
+                  }`
+            }
+            aria-hidden={!isVisible}
+            inert={!isVisible}
+          >
+            <nav
+              aria-label="Studio Navigation"
+              className={`${
+                !isVisible ? "pointer-events-none" : "pointer-events-auto"
+              } flex w-max max-w-full flex-nowrap items-center gap-0 sm:gap-1 px-1 max-[360px]:px-0.5 sm:px-2 py-1 sm:py-1.5 rounded-full bg-[#0F1117]/92 backdrop-blur-md border border-white/10 shadow-2xl shadow-black/40 text-[9px] max-[360px]:text-[8px] sm:text-[11px] font-mono tracking-normal sm:tracking-widest text-[#9E9C98]`}
         >
         {/* ── Brand emblem ── */}
         <button
@@ -137,10 +189,10 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
           </div>
 
         {/* ── Vastu pill (project workspace only) ── */}
-        {isProjectWorkspace && hasVastuResult && onOpenVastuAudit && (
+        {isProjectWorkspace && onOpenVastuAudit && (
           <button
             onClick={onOpenVastuAudit}
-            className="hidden lg:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#C48446]/15 hover:bg-[#C48446]/25 border border-[#C48446]/30 text-[#C48446] text-[10px] font-mono transition-colors shrink-0"
+            className="inline-flex items-center gap-1 px-1 max-[360px]:px-0.5 sm:px-2.5 py-1 sm:py-1.5 rounded-full bg-[#C48446]/15 hover:bg-[#C48446]/25 border border-[#C48446]/30 text-[#C48446] text-[9px] max-[360px]:text-[8px] sm:text-[10px] font-mono transition-colors shrink-0"
             title="View Vastu Compliance Audit"
           >
             VASTU

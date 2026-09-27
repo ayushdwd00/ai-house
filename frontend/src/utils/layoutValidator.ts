@@ -216,6 +216,7 @@ export function validateAndSanitizeHouseLayoutDetailed(
     );
 
     sanitizedFloors.push({
+      floor_id: rawFloor.floor_id || `${layout.id || "layout"}_floor_${fIdx + 1}`,
       floor_number: fIdx + 1,
       floor_name: rawFloor.floor_name || (fIdx === 0 ? "Ground Floor" : `Level ${fIdx + 1}`),
       rooms: sanitizedRooms,
@@ -260,6 +261,7 @@ export function validateAndSanitizeHouseLayoutDetailed(
     vastu_result: layout.vastu_result,
     critic_notes: Array.isArray(layout.critic_notes) ? layout.critic_notes : [],
     metadata: layout.metadata || {},
+    mep_plan: layout.mep_plan,
     rooms: primaryFloor.rooms,
     walls: primaryFloor.walls,
     exterior_walls: primaryFloor.exterior_walls,

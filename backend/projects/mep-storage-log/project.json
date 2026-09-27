@@ -1,0 +1,2641 @@
+{
+  "id": "mep-storage-log",
+  "project_id": "mep-storage-log",
+  "version_number": 1,
+  "revision_id": null,
+  "parent_revision_id": null,
+  "title": "Trace",
+  "designer_rationale": "Optimized functional floor plan.",
+  "plot_width": 20.0,
+  "plot_length": 18.0,
+  "num_floors": 1,
+  "site": null,
+  "stats": {
+    "total_area_sqft": 100.0,
+    "living_area_sqft": 80.0,
+    "width_ft": 10.0,
+    "length_ft": 10.0,
+    "num_floors": 1,
+    "bedroom_count": 0,
+    "bathroom_count": 1.0,
+    "aspect_ratio": 1.0,
+    "coverage_percentage": 25.0,
+    "circulation_area_sqft": 0.0
+  },
+  "floors": [
+    {
+      "floor_id": "g",
+      "floor_number": 1,
+      "floor_name": "Ground",
+      "elevation_ft": 0.0,
+      "floor_to_floor_height_ft": 10.5,
+      "clear_ceiling_height_ft": 9.5,
+      "wall_height_ft": 10.0,
+      "slab_thickness_ft": 0.5,
+      "rooms": [
+        {
+          "id": "r",
+          "room_id": "r",
+          "floor_id": "floor_1",
+          "name": "Living",
+          "type": "living_room",
+          "zone": "public",
+          "floor": 1,
+          "rect": {
+            "x": 2.0,
+            "y": 2.0,
+            "width": 8.0,
+            "length": 10.0
+          },
+          "x": 2.0,
+          "y": 2.0,
+          "width": 8.0,
+          "depth": 10.0,
+          "area": 80.0,
+          "orientation": null,
+          "color": "#F8F4EE",
+          "floor_material": "hardwood_oak",
+          "furniture": [],
+          "furniture_ids": [],
+          "door_ids": [],
+          "window_ids": [],
+          "adjacency": [],
+          "circulation": [],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 8.0,
+          "min_length": 8.0,
+          "preferred_width": 12.0,
+          "preferred_length": 14.0,
+          "max_width": null,
+          "max_length": null,
+          "actual_width": 8.0,
+          "actual_length": 10.0,
+          "area_sqft": 80.0,
+          "is_hard_constraint": false,
+          "size_mode": "ai_recommended",
+          "privacy_level": "public",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "8.0' \u00d7 10.0'",
+          "rationale": null,
+          "metadata": {}
+        },
+        {
+          "id": "b",
+          "room_id": "b",
+          "floor_id": "floor_1",
+          "name": "Bath",
+          "type": "bathroom",
+          "zone": "private",
+          "floor": 1,
+          "rect": {
+            "x": 10.0,
+            "y": 2.0,
+            "width": 4.0,
+            "length": 5.0
+          },
+          "x": 10.0,
+          "y": 2.0,
+          "width": 4.0,
+          "depth": 5.0,
+          "area": 20.0,
+          "orientation": null,
+          "color": "#F8F4EE",
+          "floor_material": "hardwood_oak",
+          "furniture": [],
+          "furniture_ids": [],
+          "door_ids": [],
+          "window_ids": [],
+          "adjacency": [],
+          "circulation": [],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 8.0,
+          "min_length": 8.0,
+          "preferred_width": 12.0,
+          "preferred_length": 14.0,
+          "max_width": null,
+          "max_length": null,
+          "actual_width": 4.0,
+          "actual_length": 5.0,
+          "area_sqft": 20.0,
+          "is_hard_constraint": false,
+          "size_mode": "ai_recommended",
+          "privacy_level": "public",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "4.0' \u00d7 5.0'",
+          "rationale": null,
+          "metadata": {}
+        }
+      ],
+      "walls": [
+        {
+          "id": "w_001",
+          "wall_id": "w_001",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 2.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 10.0,
+          "end_y": 2.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 10.0,
+          "y2": 2.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 57.0,
+          "net_surface_area_sqft": 76.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_002",
+          "wall_id": "w_002",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "start_x": 10.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 2.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "b"
+          ],
+          "room_ids": [
+            "b"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 2.0,
+          "connected_room_ids": [
+            "b"
+          ],
+          "volume_cuft": 28.5,
+          "net_surface_area_sqft": 38.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_003",
+          "wall_id": "w_003",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 7.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 7.0
+          },
+          "start_x": 10.0,
+          "start_y": 7.0,
+          "end_x": 14.0,
+          "end_y": 7.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "b"
+          ],
+          "room_ids": [
+            "b"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 7.0,
+          "x2": 14.0,
+          "y2": 7.0,
+          "connected_room_ids": [
+            "b"
+          ],
+          "volume_cuft": 28.5,
+          "net_surface_area_sqft": 38.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_004",
+          "wall_id": "w_004",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 12.0,
+          "end_x": 10.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 12.0,
+          "x2": 10.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 57.0,
+          "net_surface_area_sqft": 76.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_005",
+          "wall_id": "w_005",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 2.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 2.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 71.3,
+          "net_surface_area_sqft": 95.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_007",
+          "wall_id": "w_007",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 7.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 12.0
+          },
+          "start_x": 10.0,
+          "start_y": 7.0,
+          "end_x": 10.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 7.0,
+          "x2": 10.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 35.6,
+          "net_surface_area_sqft": 47.5,
+          "metadata": {}
+        },
+        {
+          "id": "w_008",
+          "wall_id": "w_008",
+          "floor_id": null,
+          "start": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 7.0
+          },
+          "start_x": 14.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 7.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "b"
+          ],
+          "room_ids": [
+            "b"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 14.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 7.0,
+          "connected_room_ids": [
+            "b"
+          ],
+          "volume_cuft": 35.6,
+          "net_surface_area_sqft": 47.5,
+          "metadata": {}
+        },
+        {
+          "id": "w_006",
+          "wall_id": "w_006",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 7.0
+          },
+          "start_x": 10.0,
+          "start_y": 2.0,
+          "end_x": 10.0,
+          "end_y": 7.0,
+          "thickness": 0.375,
+          "height": 9.5,
+          "wall_type": "interior",
+          "type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "r",
+            "b"
+          ],
+          "room_ids": [
+            "r",
+            "b"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 2.0,
+          "x2": 10.0,
+          "y2": 7.0,
+          "connected_room_ids": [
+            "r",
+            "b"
+          ],
+          "volume_cuft": 17.8,
+          "net_surface_area_sqft": 47.5,
+          "metadata": {}
+        }
+      ],
+      "exterior_walls": [
+        {
+          "id": "w_001",
+          "wall_id": "w_001",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 2.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 10.0,
+          "end_y": 2.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 10.0,
+          "y2": 2.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 57.0,
+          "net_surface_area_sqft": 76.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_002",
+          "wall_id": "w_002",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "start_x": 10.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 2.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "b"
+          ],
+          "room_ids": [
+            "b"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 2.0,
+          "connected_room_ids": [
+            "b"
+          ],
+          "volume_cuft": 28.5,
+          "net_surface_area_sqft": 38.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_003",
+          "wall_id": "w_003",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 7.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 7.0
+          },
+          "start_x": 10.0,
+          "start_y": 7.0,
+          "end_x": 14.0,
+          "end_y": 7.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "b"
+          ],
+          "room_ids": [
+            "b"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 7.0,
+          "x2": 14.0,
+          "y2": 7.0,
+          "connected_room_ids": [
+            "b"
+          ],
+          "volume_cuft": 28.5,
+          "net_surface_area_sqft": 38.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_004",
+          "wall_id": "w_004",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 12.0,
+          "end_x": 10.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 12.0,
+          "x2": 10.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 57.0,
+          "net_surface_area_sqft": 76.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_005",
+          "wall_id": "w_005",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 2.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 2.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 71.3,
+          "net_surface_area_sqft": 95.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_007",
+          "wall_id": "w_007",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 7.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 12.0
+          },
+          "start_x": 10.0,
+          "start_y": 7.0,
+          "end_x": 10.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "r"
+          ],
+          "room_ids": [
+            "r"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 7.0,
+          "x2": 10.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "r"
+          ],
+          "volume_cuft": 35.6,
+          "net_surface_area_sqft": 47.5,
+          "metadata": {}
+        },
+        {
+          "id": "w_008",
+          "wall_id": "w_008",
+          "floor_id": null,
+          "start": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 7.0
+          },
+          "start_x": 14.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 7.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "b"
+          ],
+          "room_ids": [
+            "b"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 14.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 7.0,
+          "connected_room_ids": [
+            "b"
+          ],
+          "volume_cuft": 35.6,
+          "net_surface_area_sqft": 47.5,
+          "metadata": {}
+        }
+      ],
+      "interior_walls": [
+        {
+          "id": "w_006",
+          "wall_id": "w_006",
+          "floor_id": null,
+          "start": {
+            "x": 10.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 10.0,
+            "y": 7.0
+          },
+          "start_x": 10.0,
+          "start_y": 2.0,
+          "end_x": 10.0,
+          "end_y": 7.0,
+          "thickness": 0.375,
+          "height": 9.5,
+          "wall_type": "interior",
+          "type": "interior",
+          "is_exterior": false,
+          "adjacent_room_ids": [
+            "r",
+            "b"
+          ],
+          "room_ids": [
+            "r",
+            "b"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 10.0,
+          "y1": 2.0,
+          "x2": 10.0,
+          "y2": 7.0,
+          "connected_room_ids": [
+            "r",
+            "b"
+          ],
+          "volume_cuft": 17.8,
+          "net_surface_area_sqft": 47.5,
+          "metadata": {}
+        }
+      ],
+      "doors": [],
+      "windows": [],
+      "staircase": null,
+      "circulation": null,
+      "floor_slab_area": 0.0
+    }
+  ],
+  "scores": null,
+  "validation": null,
+  "critic_notes": [],
+  "vastu_result": null,
+  "construction_spec": null,
+  "quantities": null,
+  "cost_estimate": null,
+  "building_services": null,
+  "mep_plan": {
+    "points": [
+      {
+        "id": "mep-point-822f04bde43389d4",
+        "category": "electrical",
+        "kind": "light",
+        "position": {
+          "x": 12.0,
+          "y": 4.5
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|electrical|light",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-0b299788c9ec795b",
+        "category": "electrical",
+        "kind": "switch",
+        "position": {
+          "x": 10.74,
+          "y": 4.5
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|electrical|switch",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-ed9e0d75d3514d80",
+        "category": "plumbing",
+        "kind": "wc",
+        "position": {
+          "x": 11.25,
+          "y": 3.5
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|plumbing|wc",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-20637736ddef897a",
+        "category": "plumbing",
+        "kind": "basin",
+        "position": {
+          "x": 12.66,
+          "y": 3.5
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|plumbing|basin",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-6176b43125e7f5bb",
+        "category": "plumbing",
+        "kind": "shower",
+        "position": {
+          "x": 11.25,
+          "y": 5.38
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|plumbing|shower",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-de30e920051b7fa6",
+        "category": "plumbing",
+        "kind": "floor_drain",
+        "position": {
+          "x": 12.84,
+          "y": 5.62
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|plumbing|floor_drain",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-cbdafffa3b3f59a4",
+        "category": "plumbing",
+        "kind": "supply",
+        "position": {
+          "x": 12.66,
+          "y": 5.38
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|plumbing|supply",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-38794a7e1a574c17",
+        "category": "plumbing",
+        "kind": "waste",
+        "position": {
+          "x": 11.25,
+          "y": 5.78
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|plumbing|waste",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-17210c0b6b18f1d2",
+        "category": "hvac",
+        "kind": "exhaust",
+        "position": {
+          "x": 12.84,
+          "y": 3.38
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|hvac|exhaust",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-4089091d4683ea0b",
+        "category": "hvac",
+        "kind": "ventilation",
+        "position": {
+          "x": 11.16,
+          "y": 3.38
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|hvac|ventilation",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-7f0d3e669570a2c6",
+        "category": "electrical",
+        "kind": "light",
+        "position": {
+          "x": 6.0,
+          "y": 7.0
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|electrical|light",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-2cee604cd8507bd0",
+        "category": "electrical",
+        "kind": "switch",
+        "position": {
+          "x": 3.06,
+          "y": 7.0
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|electrical|switch",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-450ce8a114b7cd50",
+        "category": "electrical",
+        "kind": "outlet",
+        "position": {
+          "x": 3.34,
+          "y": 3.58
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|electrical|outlet",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-286352b5156c7efe",
+        "category": "electrical",
+        "kind": "fan",
+        "position": {
+          "x": 6.0,
+          "y": 7.0
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|electrical|fan",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-ad2937d60edeb11b",
+        "category": "electrical",
+        "kind": "ac_point",
+        "position": {
+          "x": 8.66,
+          "y": 3.58
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|electrical|ac_point",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-0fccde01fec60930",
+        "category": "hvac",
+        "kind": "supply",
+        "position": {
+          "x": 4.25,
+          "y": 7.0
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|hvac|supply",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-69c05e4b1b313e15",
+        "category": "hvac",
+        "kind": "return",
+        "position": {
+          "x": 7.75,
+          "y": 7.0
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|hvac|return",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-fda4cc967df82c54",
+        "category": "hvac",
+        "kind": "indoor_ac",
+        "position": {
+          "x": 8.1,
+          "y": 4.3
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|hvac|indoor_ac",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-e084989875a07eea",
+        "category": "hvac",
+        "kind": "outdoor_ac",
+        "position": {
+          "x": 9.15,
+          "y": 9.7
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|hvac|outdoor_ac",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-00568a6897772fff",
+        "category": "hvac",
+        "kind": "ventilation",
+        "position": {
+          "x": 6.0,
+          "y": 3.22
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "semantic_key": "g|r|hvac|ventilation",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-7d0ab96cd68d7ede",
+        "category": "electrical",
+        "kind": "distribution_board",
+        "position": {
+          "x": 10.86,
+          "y": 2.98
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|electrical|distribution_board",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+        }
+      },
+      {
+        "id": "mep-point-591b487276dd14d0",
+        "category": "plumbing",
+        "kind": "stack",
+        "position": {
+          "x": 13.14,
+          "y": 6.02
+        },
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "semantic_key": "g|b|plumbing|stack|local",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review.",
+          "stack_kind": "local_waste_stack"
+        }
+      }
+    ],
+    "routes": [
+      {
+        "id": "mep-route-47950500f7f81fd9",
+        "category": "electrical",
+        "kind": "room_branch",
+        "points": [
+          {
+            "x": 12.0,
+            "y": 4.5
+          },
+          {
+            "x": 10.74,
+            "y": 4.5
+          }
+        ],
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "point_ids": [
+          "mep-point-822f04bde43389d4",
+          "mep-point-0b299788c9ec795b"
+        ],
+        "semantic_key": "g|b|electrical|room_branch",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review.",
+          "wall_ids_considered": [
+            "w_001",
+            "w_002",
+            "w_003",
+            "w_004",
+            "w_005",
+            "w_007",
+            "w_008",
+            "w_006"
+          ],
+          "opening_ids_considered": []
+        }
+      },
+      {
+        "id": "mep-route-60ec4138bcd48b1f",
+        "category": "plumbing",
+        "kind": "room_branch",
+        "points": [
+          {
+            "x": 12.66,
+            "y": 3.5
+          },
+          {
+            "x": 12.84,
+            "y": 3.5
+          },
+          {
+            "x": 12.84,
+            "y": 5.62
+          },
+          {
+            "x": 11.25,
+            "y": 5.62
+          },
+          {
+            "x": 11.25,
+            "y": 5.38
+          },
+          {
+            "x": 12.66,
+            "y": 5.38
+          },
+          {
+            "x": 11.25,
+            "y": 5.38
+          },
+          {
+            "x": 11.25,
+            "y": 5.78
+          },
+          {
+            "x": 11.25,
+            "y": 3.5
+          }
+        ],
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "point_ids": [
+          "mep-point-20637736ddef897a",
+          "mep-point-de30e920051b7fa6",
+          "mep-point-6176b43125e7f5bb",
+          "mep-point-cbdafffa3b3f59a4",
+          "mep-point-38794a7e1a574c17",
+          "mep-point-ed9e0d75d3514d80"
+        ],
+        "semantic_key": "g|b|plumbing|room_branch",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review.",
+          "wall_ids_considered": [
+            "w_001",
+            "w_002",
+            "w_003",
+            "w_004",
+            "w_005",
+            "w_007",
+            "w_008",
+            "w_006"
+          ],
+          "opening_ids_considered": []
+        }
+      },
+      {
+        "id": "mep-route-7fd51b8879938705",
+        "category": "hvac",
+        "kind": "room_branch",
+        "points": [
+          {
+            "x": 12.84,
+            "y": 3.38
+          },
+          {
+            "x": 11.16,
+            "y": 3.38
+          }
+        ],
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "b",
+        "point_ids": [
+          "mep-point-17210c0b6b18f1d2",
+          "mep-point-4089091d4683ea0b"
+        ],
+        "semantic_key": "g|b|hvac|room_branch",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review.",
+          "wall_ids_considered": [
+            "w_001",
+            "w_002",
+            "w_003",
+            "w_004",
+            "w_005",
+            "w_007",
+            "w_008",
+            "w_006"
+          ],
+          "opening_ids_considered": []
+        }
+      },
+      {
+        "id": "mep-route-cdbcfbe59b352aae",
+        "category": "electrical",
+        "kind": "room_branch",
+        "points": [
+          {
+            "x": 8.66,
+            "y": 3.58
+          },
+          {
+            "x": 6.0,
+            "y": 3.58
+          },
+          {
+            "x": 6.0,
+            "y": 7.0
+          },
+          {
+            "x": 3.34,
+            "y": 7.0
+          },
+          {
+            "x": 3.34,
+            "y": 3.58
+          },
+          {
+            "x": 3.06,
+            "y": 3.58
+          },
+          {
+            "x": 3.06,
+            "y": 7.0
+          }
+        ],
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "point_ids": [
+          "mep-point-ad2937d60edeb11b",
+          "mep-point-286352b5156c7efe",
+          "mep-point-7f0d3e669570a2c6",
+          "mep-point-450ce8a114b7cd50",
+          "mep-point-2cee604cd8507bd0"
+        ],
+        "semantic_key": "g|r|electrical|room_branch",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review.",
+          "wall_ids_considered": [
+            "w_001",
+            "w_002",
+            "w_003",
+            "w_004",
+            "w_005",
+            "w_007",
+            "w_008",
+            "w_006"
+          ],
+          "opening_ids_considered": []
+        }
+      },
+      {
+        "id": "mep-route-337f9c10ad43f986",
+        "category": "hvac",
+        "kind": "room_branch",
+        "points": [
+          {
+            "x": 8.1,
+            "y": 4.3
+          },
+          {
+            "x": 9.15,
+            "y": 4.3
+          },
+          {
+            "x": 9.15,
+            "y": 9.7
+          },
+          {
+            "x": 7.75,
+            "y": 9.7
+          },
+          {
+            "x": 7.75,
+            "y": 7.0
+          },
+          {
+            "x": 4.25,
+            "y": 7.0
+          },
+          {
+            "x": 6.0,
+            "y": 7.0
+          },
+          {
+            "x": 6.0,
+            "y": 3.22
+          }
+        ],
+        "floor_id": "g",
+        "floor_number": 1,
+        "room_id": "r",
+        "point_ids": [
+          "mep-point-fda4cc967df82c54",
+          "mep-point-e084989875a07eea",
+          "mep-point-69c05e4b1b313e15",
+          "mep-point-0fccde01fec60930",
+          "mep-point-00568a6897772fff"
+        ],
+        "semantic_key": "g|r|hvac|room_branch",
+        "generated": true,
+        "metadata": {
+          "planning_stage": "preliminary",
+          "certified": false,
+          "disclaimer": "For preliminary coordination only; requires licensed engineering and code review.",
+          "wall_ids_considered": [
+            "w_001",
+            "w_002",
+            "w_003",
+            "w_004",
+            "w_005",
+            "w_007",
+            "w_008",
+            "w_006"
+          ],
+          "opening_ids_considered": []
+        }
+      }
+    ],
+    "vertical_stacks": [],
+    "planning_stage": "preliminary",
+    "certified": false,
+    "metadata": {
+      "planning_stage": "preliminary",
+      "certified": false,
+      "disclaimer": "For preliminary coordination only; requires licensed engineering and code review."
+    }
+  },
+  "structural_planning": null,
+  "structural_system": "RCC_FRAME",
+  "landscape": {
+    "plan_id": "PLAN_FALLBACK_DEFAULT",
+    "zones": [
+      {
+        "zone_id": "ZONE_FRONT_GARDEN",
+        "name": "Front Garden & Approach",
+        "zone_type": "front_garden",
+        "rect": {
+          "x": 0.0,
+          "y": 15.0,
+          "width": 20.0,
+          "length": 5.0
+        },
+        "area_sqft": 100.0,
+        "description": null
+      },
+      {
+        "zone_id": "ZONE_REAR_GARDEN",
+        "name": "Rear Private Garden",
+        "zone_type": "rear_garden",
+        "rect": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 20.0,
+          "length": 4.0
+        },
+        "area_sqft": 80.0,
+        "description": null
+      }
+    ],
+    "elements": [
+      {
+        "element_id": "LAWN_FRONT_FALLBACK",
+        "type": "lawn",
+        "x": 6.0,
+        "y": 17.5,
+        "width": 6.0,
+        "length": 4.2,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "front_garden",
+        "properties": {
+          "grass_type": "bermuda",
+          "density": "manicured"
+        },
+        "points": null
+      },
+      {
+        "element_id": "LAWN_REAR_FALLBACK",
+        "type": "lawn",
+        "x": 10.0,
+        "y": 2.0,
+        "width": 12.0,
+        "length": 3.2,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "grass_type": "zoysia",
+          "density": "soft"
+        },
+        "points": null
+      },
+      {
+        "element_id": "PLANTER_ENTRY_L",
+        "type": "planter",
+        "x": -1.2,
+        "y": 3.4,
+        "width": 2.2,
+        "length": 1.4,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {
+          "plant": "boxwood_topiary"
+        },
+        "points": null
+      },
+      {
+        "element_id": "PLANTER_ENTRY_R",
+        "type": "planter",
+        "x": 5.2,
+        "y": 3.4,
+        "width": 2.2,
+        "length": 1.4,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {
+          "plant": "boxwood_topiary"
+        },
+        "points": null
+      },
+      {
+        "element_id": "HEDGE_LEFT",
+        "type": "hedge",
+        "x": 1.5,
+        "y": 10.0,
+        "width": 1.6,
+        "length": 16.0,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "boundary_planting",
+        "properties": {
+          "height": 4.2
+        },
+        "points": null
+      },
+      {
+        "element_id": "HEDGE_RIGHT",
+        "type": "hedge",
+        "x": 18.5,
+        "y": 10.0,
+        "width": 1.6,
+        "length": 16.0,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "boundary_planting",
+        "properties": {
+          "height": 4.2
+        },
+        "points": null
+      },
+      {
+        "element_id": "HEDGE_REAR",
+        "type": "hedge",
+        "x": 10.0,
+        "y": 1.0,
+        "width": 16.0,
+        "length": 1.6,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "boundary_planting",
+        "properties": {
+          "height": 4.8
+        },
+        "points": null
+      },
+      {
+        "element_id": "TREE_REAR_L",
+        "type": "tree",
+        "x": 6.0,
+        "y": 2.0,
+        "width": null,
+        "length": null,
+        "radius": 3.5,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "species": "Jacaranda",
+          "foliage_type": "conical"
+        },
+        "points": null
+      },
+      {
+        "element_id": "TREE_REAR_R",
+        "type": "tree",
+        "x": 14.0,
+        "y": 2.0,
+        "width": null,
+        "length": null,
+        "radius": 3.8,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "species": "Magnolia",
+          "foliage_type": "round"
+        },
+        "points": null
+      },
+      {
+        "element_id": "TREE_FRONT_ACCENT",
+        "type": "tree",
+        "x": 6.2,
+        "y": 17.5,
+        "width": null,
+        "length": null,
+        "radius": 3.2,
+        "height": null,
+        "species": null,
+        "zone": "front_garden",
+        "properties": {
+          "species": "Silver Birch",
+          "foliage_type": "round"
+        },
+        "points": null
+      },
+      {
+        "element_id": "LIGHT_01",
+        "type": "outdoor_light",
+        "x": -0.8,
+        "y": 4.0,
+        "width": null,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {},
+        "points": null
+      },
+      {
+        "element_id": "LIGHT_02",
+        "type": "outdoor_light",
+        "x": 4.8,
+        "y": 4.0,
+        "width": null,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {},
+        "points": null
+      },
+      {
+        "element_id": "LIGHT_03",
+        "type": "outdoor_light",
+        "x": 6.2,
+        "y": 15.0,
+        "width": null,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "front_garden",
+        "properties": {},
+        "points": null
+      },
+      {
+        "element_id": "WATER_FEATURE_01",
+        "type": "water_feature",
+        "x": 10.0,
+        "y": 2.0,
+        "width": null,
+        "length": null,
+        "radius": 2.8,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "style": "reflecting_pool",
+          "finish": "dark_granite"
+        },
+        "points": null
+      }
+    ],
+    "paths": [
+      {
+        "element_id": "PATH_FALLBACK_01",
+        "type": "pathway",
+        "x": 2.0,
+        "y": 4.0,
+        "width": 3.5,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {
+          "style": "stepping_stones",
+          "paver_material": "limestone"
+        },
+        "points": [
+          {
+            "x": 5.0,
+            "y": 20.0
+          },
+          {
+            "x": 2.0,
+            "y": 4.0
+          },
+          {
+            "x": 2.0,
+            "y": 2.0
+          }
+        ]
+      }
+    ],
+    "driveway": {
+      "element_id": "DW_FALLBACK_01",
+      "type": "driveway",
+      "x": 12.0,
+      "y": 16.5,
+      "width": 10.0,
+      "length": 7.0,
+      "radius": null,
+      "height": null,
+      "species": null,
+      "zone": "driveway",
+      "properties": {
+        "surface": "paved_concrete",
+        "texture": "brushed"
+      },
+      "points": null
+    },
+    "outdoor_features": [],
+    "total_green_area_sqft": 64.0,
+    "green_coverage_percentage": 16.0,
+    "trees_count": 3,
+    "lights_count": 3,
+    "water_features_count": 1,
+    "style": "modern_minimal",
+    "summary": "Balanced site landscape with lawn setbacks, trees, entry pathway, and driveway."
+  },
+  "floorplan_source": null,
+  "materials": [],
+  "facing": "SOUTH",
+  "orientation": "south",
+  "metadata": {},
+  "rooms": [
+    {
+      "id": "r",
+      "room_id": "r",
+      "floor_id": "floor_1",
+      "name": "Living",
+      "type": "living_room",
+      "zone": "public",
+      "floor": 1,
+      "rect": {
+        "x": 2.0,
+        "y": 2.0,
+        "width": 8.0,
+        "length": 10.0
+      },
+      "x": 2.0,
+      "y": 2.0,
+      "width": 8.0,
+      "depth": 10.0,
+      "area": 80.0,
+      "orientation": null,
+      "color": "#F8F4EE",
+      "floor_material": "hardwood_oak",
+      "furniture": [],
+      "furniture_ids": [],
+      "door_ids": [],
+      "window_ids": [],
+      "adjacency": [],
+      "circulation": [],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 8.0,
+      "min_length": 8.0,
+      "preferred_width": 12.0,
+      "preferred_length": 14.0,
+      "max_width": null,
+      "max_length": null,
+      "actual_width": 8.0,
+      "actual_length": 10.0,
+      "area_sqft": 80.0,
+      "is_hard_constraint": false,
+      "size_mode": "ai_recommended",
+      "privacy_level": "public",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "8.0' \u00d7 10.0'",
+      "rationale": null,
+      "metadata": {}
+    },
+    {
+      "id": "b",
+      "room_id": "b",
+      "floor_id": "floor_1",
+      "name": "Bath",
+      "type": "bathroom",
+      "zone": "private",
+      "floor": 1,
+      "rect": {
+        "x": 10.0,
+        "y": 2.0,
+        "width": 4.0,
+        "length": 5.0
+      },
+      "x": 10.0,
+      "y": 2.0,
+      "width": 4.0,
+      "depth": 5.0,
+      "area": 20.0,
+      "orientation": null,
+      "color": "#F8F4EE",
+      "floor_material": "hardwood_oak",
+      "furniture": [],
+      "furniture_ids": [],
+      "door_ids": [],
+      "window_ids": [],
+      "adjacency": [],
+      "circulation": [],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 8.0,
+      "min_length": 8.0,
+      "preferred_width": 12.0,
+      "preferred_length": 14.0,
+      "max_width": null,
+      "max_length": null,
+      "actual_width": 4.0,
+      "actual_length": 5.0,
+      "area_sqft": 20.0,
+      "is_hard_constraint": false,
+      "size_mode": "ai_recommended",
+      "privacy_level": "public",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "4.0' \u00d7 5.0'",
+      "rationale": null,
+      "metadata": {}
+    }
+  ],
+  "walls": [
+    {
+      "id": "w_001",
+      "wall_id": "w_001",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 2.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 10.0,
+      "end_y": 2.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 10.0,
+      "y2": 2.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 57.0,
+      "net_surface_area_sqft": 76.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_002",
+      "wall_id": "w_002",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "start_x": 10.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 2.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "b"
+      ],
+      "room_ids": [
+        "b"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 2.0,
+      "connected_room_ids": [
+        "b"
+      ],
+      "volume_cuft": 28.5,
+      "net_surface_area_sqft": 38.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_003",
+      "wall_id": "w_003",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 7.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 7.0
+      },
+      "start_x": 10.0,
+      "start_y": 7.0,
+      "end_x": 14.0,
+      "end_y": 7.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "b"
+      ],
+      "room_ids": [
+        "b"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 7.0,
+      "x2": 14.0,
+      "y2": 7.0,
+      "connected_room_ids": [
+        "b"
+      ],
+      "volume_cuft": 28.5,
+      "net_surface_area_sqft": 38.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_004",
+      "wall_id": "w_004",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 12.0,
+      "end_x": 10.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 12.0,
+      "x2": 10.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 57.0,
+      "net_surface_area_sqft": 76.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_005",
+      "wall_id": "w_005",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 2.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 2.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 71.3,
+      "net_surface_area_sqft": 95.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_007",
+      "wall_id": "w_007",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 7.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 12.0
+      },
+      "start_x": 10.0,
+      "start_y": 7.0,
+      "end_x": 10.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 7.0,
+      "x2": 10.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 35.6,
+      "net_surface_area_sqft": 47.5,
+      "metadata": {}
+    },
+    {
+      "id": "w_008",
+      "wall_id": "w_008",
+      "floor_id": null,
+      "start": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 7.0
+      },
+      "start_x": 14.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 7.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "b"
+      ],
+      "room_ids": [
+        "b"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 14.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 7.0,
+      "connected_room_ids": [
+        "b"
+      ],
+      "volume_cuft": 35.6,
+      "net_surface_area_sqft": 47.5,
+      "metadata": {}
+    },
+    {
+      "id": "w_006",
+      "wall_id": "w_006",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 7.0
+      },
+      "start_x": 10.0,
+      "start_y": 2.0,
+      "end_x": 10.0,
+      "end_y": 7.0,
+      "thickness": 0.375,
+      "height": 9.5,
+      "wall_type": "interior",
+      "type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "r",
+        "b"
+      ],
+      "room_ids": [
+        "r",
+        "b"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 2.0,
+      "x2": 10.0,
+      "y2": 7.0,
+      "connected_room_ids": [
+        "r",
+        "b"
+      ],
+      "volume_cuft": 17.8,
+      "net_surface_area_sqft": 47.5,
+      "metadata": {}
+    }
+  ],
+  "exterior_walls": [
+    {
+      "id": "w_001",
+      "wall_id": "w_001",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 2.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 10.0,
+      "end_y": 2.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 10.0,
+      "y2": 2.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 57.0,
+      "net_surface_area_sqft": 76.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_002",
+      "wall_id": "w_002",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "start_x": 10.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 2.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "b"
+      ],
+      "room_ids": [
+        "b"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 2.0,
+      "connected_room_ids": [
+        "b"
+      ],
+      "volume_cuft": 28.5,
+      "net_surface_area_sqft": 38.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_003",
+      "wall_id": "w_003",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 7.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 7.0
+      },
+      "start_x": 10.0,
+      "start_y": 7.0,
+      "end_x": 14.0,
+      "end_y": 7.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "b"
+      ],
+      "room_ids": [
+        "b"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 7.0,
+      "x2": 14.0,
+      "y2": 7.0,
+      "connected_room_ids": [
+        "b"
+      ],
+      "volume_cuft": 28.5,
+      "net_surface_area_sqft": 38.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_004",
+      "wall_id": "w_004",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 12.0,
+      "end_x": 10.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 12.0,
+      "x2": 10.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 57.0,
+      "net_surface_area_sqft": 76.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_005",
+      "wall_id": "w_005",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 2.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 2.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 71.3,
+      "net_surface_area_sqft": 95.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_007",
+      "wall_id": "w_007",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 7.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 12.0
+      },
+      "start_x": 10.0,
+      "start_y": 7.0,
+      "end_x": 10.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "r"
+      ],
+      "room_ids": [
+        "r"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 7.0,
+      "x2": 10.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "r"
+      ],
+      "volume_cuft": 35.6,
+      "net_surface_area_sqft": 47.5,
+      "metadata": {}
+    },
+    {
+      "id": "w_008",
+      "wall_id": "w_008",
+      "floor_id": null,
+      "start": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 7.0
+      },
+      "start_x": 14.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 7.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "b"
+      ],
+      "room_ids": [
+        "b"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 14.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 7.0,
+      "connected_room_ids": [
+        "b"
+      ],
+      "volume_cuft": 35.6,
+      "net_surface_area_sqft": 47.5,
+      "metadata": {}
+    }
+  ],
+  "interior_walls": [
+    {
+      "id": "w_006",
+      "wall_id": "w_006",
+      "floor_id": null,
+      "start": {
+        "x": 10.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 10.0,
+        "y": 7.0
+      },
+      "start_x": 10.0,
+      "start_y": 2.0,
+      "end_x": 10.0,
+      "end_y": 7.0,
+      "thickness": 0.375,
+      "height": 9.5,
+      "wall_type": "interior",
+      "type": "interior",
+      "is_exterior": false,
+      "adjacent_room_ids": [
+        "r",
+        "b"
+      ],
+      "room_ids": [
+        "r",
+        "b"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 10.0,
+      "y1": 2.0,
+      "x2": 10.0,
+      "y2": 7.0,
+      "connected_room_ids": [
+        "r",
+        "b"
+      ],
+      "volume_cuft": 17.8,
+      "net_surface_area_sqft": 47.5,
+      "metadata": {}
+    }
+  ],
+  "doors": [],
+  "windows": [],
+  "entry_point": {
+    "x": 2.0,
+    "y": 2.0,
+    "direction": 0.0
+  }
+}

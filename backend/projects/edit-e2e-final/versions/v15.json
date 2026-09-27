@@ -1,0 +1,1363 @@
+{
+  "id": "edit-e2e-final",
+  "project_id": "edit-e2e-final",
+  "version_number": 15,
+  "revision_id": null,
+  "parent_revision_id": null,
+  "title": "Edit E2E",
+  "designer_rationale": "fixture",
+  "plot_width": 30.0,
+  "plot_length": 20.0,
+  "num_floors": 1,
+  "site": null,
+  "stats": {
+    "total_area_sqft": 120.0,
+    "living_area_sqft": 120.0,
+    "width_ft": 30.0,
+    "length_ft": 20.0,
+    "num_floors": 1,
+    "bedroom_count": 0,
+    "bathroom_count": 0.0,
+    "aspect_ratio": 1.5,
+    "coverage_percentage": 20.0,
+    "circulation_area_sqft": 0.0
+  },
+  "floors": [
+    {
+      "floor_id": "g",
+      "floor_number": 1,
+      "floor_name": "Ground Floor",
+      "elevation_ft": 0.0,
+      "floor_to_floor_height_ft": 10.5,
+      "clear_ceiling_height_ft": 9.5,
+      "wall_height_ft": 10.0,
+      "slab_thickness_ft": 0.5,
+      "rooms": [
+        {
+          "id": "living",
+          "room_id": "living",
+          "floor_id": "floor_1",
+          "name": "Living Room",
+          "type": "living_room",
+          "zone": "public",
+          "floor": 1,
+          "rect": {
+            "x": 2.0,
+            "y": 2.0,
+            "width": 12.0,
+            "length": 10.0
+          },
+          "x": 2.0,
+          "y": 2.0,
+          "width": 12.0,
+          "depth": 10.0,
+          "area": 120.0,
+          "orientation": null,
+          "color": "#F8F4EE",
+          "floor_material": "hardwood_oak",
+          "furniture": [],
+          "furniture_ids": [],
+          "door_ids": [],
+          "window_ids": [],
+          "adjacency": [],
+          "circulation": [],
+          "parent_room_id": null,
+          "attached_room_id": null,
+          "min_width": 8.0,
+          "min_length": 8.0,
+          "preferred_width": 12.0,
+          "preferred_length": 14.0,
+          "max_width": null,
+          "max_length": null,
+          "actual_width": 12.0,
+          "actual_length": 10.0,
+          "area_sqft": 120.0,
+          "is_hard_constraint": false,
+          "size_mode": "ai_recommended",
+          "privacy_level": "public",
+          "daylight_requirement": "medium",
+          "ventilation_requirement": "direct_exterior",
+          "exterior_wall_requirement": false,
+          "required_adjacencies": [],
+          "preferred_adjacencies": [],
+          "forbidden_adjacencies": [],
+          "dimensions_label": "12.0' \u00d7 10.0'",
+          "rationale": null,
+          "metadata": {}
+        }
+      ],
+      "walls": [
+        {
+          "id": "w_001",
+          "wall_id": "w_001",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 2.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [
+            "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e"
+          ],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 2.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 85.5,
+          "net_surface_area_sqft": 114.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_002",
+          "wall_id": "w_002",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 12.0,
+          "end_x": 14.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 12.0,
+          "x2": 14.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 85.5,
+          "net_surface_area_sqft": 114.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_003",
+          "wall_id": "w_003",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 2.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 2.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 71.3,
+          "net_surface_area_sqft": 95.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_004",
+          "wall_id": "w_004",
+          "floor_id": null,
+          "start": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 12.0
+          },
+          "start_x": 14.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 14.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 71.3,
+          "net_surface_area_sqft": 95.0,
+          "metadata": {}
+        },
+        {
+          "id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+          "wall_id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+          "floor_id": null,
+          "start": {
+            "x": 9.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 9.0,
+            "y": 10.0
+          },
+          "start_x": 9.0,
+          "start_y": 4.0,
+          "end_x": 9.0,
+          "end_y": 10.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "partition",
+          "type": "partition",
+          "is_exterior": false,
+          "adjacent_room_ids": [],
+          "room_ids": [],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 9.0,
+          "y1": 4.0,
+          "x2": 9.0,
+          "y2": 10.0,
+          "connected_room_ids": [],
+          "volume_cuft": null,
+          "net_surface_area_sqft": null,
+          "metadata": {}
+        }
+      ],
+      "exterior_walls": [
+        {
+          "id": "w_001",
+          "wall_id": "w_001",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 2.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [
+            "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e"
+          ],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 2.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 85.5,
+          "net_surface_area_sqft": 114.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_002",
+          "wall_id": "w_002",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 12.0,
+          "end_x": 14.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "horizontal",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 12.0,
+          "x2": 14.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 85.5,
+          "net_surface_area_sqft": 114.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_003",
+          "wall_id": "w_003",
+          "floor_id": null,
+          "start": {
+            "x": 2.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 2.0,
+            "y": 12.0
+          },
+          "start_x": 2.0,
+          "start_y": 2.0,
+          "end_x": 2.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 2.0,
+          "y1": 2.0,
+          "x2": 2.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 71.3,
+          "net_surface_area_sqft": 95.0,
+          "metadata": {}
+        },
+        {
+          "id": "w_004",
+          "wall_id": "w_004",
+          "floor_id": null,
+          "start": {
+            "x": 14.0,
+            "y": 2.0
+          },
+          "end": {
+            "x": 14.0,
+            "y": 12.0
+          },
+          "start_x": 14.0,
+          "start_y": 2.0,
+          "end_x": 14.0,
+          "end_y": 12.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "exterior",
+          "type": "exterior",
+          "is_exterior": true,
+          "adjacent_room_ids": [
+            "living"
+          ],
+          "room_ids": [
+            "living"
+          ],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 14.0,
+          "y1": 2.0,
+          "x2": 14.0,
+          "y2": 12.0,
+          "connected_room_ids": [
+            "living"
+          ],
+          "volume_cuft": 71.3,
+          "net_surface_area_sqft": 95.0,
+          "metadata": {}
+        }
+      ],
+      "interior_walls": [
+        {
+          "id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+          "wall_id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+          "floor_id": null,
+          "start": {
+            "x": 9.0,
+            "y": 4.0
+          },
+          "end": {
+            "x": 9.0,
+            "y": 10.0
+          },
+          "start_x": 9.0,
+          "start_y": 4.0,
+          "end_x": 9.0,
+          "end_y": 10.0,
+          "thickness": 0.75,
+          "height": 9.5,
+          "wall_type": "partition",
+          "type": "partition",
+          "is_exterior": false,
+          "adjacent_room_ids": [],
+          "room_ids": [],
+          "wall_direction": "vertical",
+          "wall_orientation": null,
+          "openings": [],
+          "x1": 9.0,
+          "y1": 4.0,
+          "x2": 9.0,
+          "y2": 10.0,
+          "connected_room_ids": [],
+          "volume_cuft": null,
+          "net_surface_area_sqft": null,
+          "metadata": {}
+        }
+      ],
+      "doors": [],
+      "windows": [
+        {
+          "id": "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e",
+          "window_id": "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e",
+          "floor_id": "1",
+          "wall_id": "w_001",
+          "host_wall_id": "w_001",
+          "room_id": null,
+          "position_along_wall": 0.5,
+          "position": {
+            "x": 7.96,
+            "y": 2.0
+          },
+          "x": 7.96,
+          "y": 2.0,
+          "x1": 5.963918050130207,
+          "y1": 2.0,
+          "x2": 9.963918050130207,
+          "y2": 2.0,
+          "width": 4.0,
+          "height": 4.0,
+          "sill_height": 3.0,
+          "head_height": 7.0,
+          "window_type": "casement",
+          "type": "casement",
+          "orientation": "south",
+          "outward_direction": "south",
+          "direction_label": "W01 \u00b7 S",
+          "metadata": {}
+        }
+      ],
+      "staircase": null,
+      "circulation": null,
+      "floor_slab_area": 0.0
+    }
+  ],
+  "scores": null,
+  "validation": null,
+  "critic_notes": [],
+  "vastu_result": null,
+  "construction_spec": null,
+  "quantities": null,
+  "cost_estimate": null,
+  "building_services": null,
+  "mep_plan": null,
+  "structural_planning": null,
+  "structural_system": "RCC_FRAME",
+  "landscape": {
+    "plan_id": "PLAN_FALLBACK_DEFAULT",
+    "zones": [
+      {
+        "zone_id": "ZONE_FRONT_GARDEN",
+        "name": "Front Garden & Approach",
+        "zone_type": "front_garden",
+        "rect": {
+          "x": 0.0,
+          "y": 15.0,
+          "width": 30.0,
+          "length": 5.0
+        },
+        "area_sqft": 150.0,
+        "description": null
+      },
+      {
+        "zone_id": "ZONE_REAR_GARDEN",
+        "name": "Rear Private Garden",
+        "zone_type": "rear_garden",
+        "rect": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 30.0,
+          "length": 4.0
+        },
+        "area_sqft": 120.0,
+        "description": null
+      }
+    ],
+    "elements": [
+      {
+        "element_id": "LAWN_FRONT_FALLBACK",
+        "type": "lawn",
+        "x": 9.0,
+        "y": 17.5,
+        "width": 12.0,
+        "length": 4.2,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "front_garden",
+        "properties": {
+          "grass_type": "bermuda",
+          "density": "manicured"
+        },
+        "points": null
+      },
+      {
+        "element_id": "LAWN_REAR_FALLBACK",
+        "type": "lawn",
+        "x": 15.0,
+        "y": 2.0,
+        "width": 22.0,
+        "length": 3.2,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "grass_type": "zoysia",
+          "density": "soft"
+        },
+        "points": null
+      },
+      {
+        "element_id": "PLANTER_ENTRY_L",
+        "type": "planter",
+        "x": -0.2,
+        "y": 4.4,
+        "width": 2.2,
+        "length": 1.4,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {
+          "plant": "boxwood_topiary"
+        },
+        "points": null
+      },
+      {
+        "element_id": "PLANTER_ENTRY_R",
+        "type": "planter",
+        "x": 6.2,
+        "y": 4.4,
+        "width": 2.2,
+        "length": 1.4,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {
+          "plant": "boxwood_topiary"
+        },
+        "points": null
+      },
+      {
+        "element_id": "HEDGE_LEFT",
+        "type": "hedge",
+        "x": 1.5,
+        "y": 10.0,
+        "width": 1.6,
+        "length": 16.0,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "boundary_planting",
+        "properties": {
+          "height": 4.2
+        },
+        "points": null
+      },
+      {
+        "element_id": "HEDGE_RIGHT",
+        "type": "hedge",
+        "x": 28.5,
+        "y": 10.0,
+        "width": 1.6,
+        "length": 16.0,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "boundary_planting",
+        "properties": {
+          "height": 4.2
+        },
+        "points": null
+      },
+      {
+        "element_id": "HEDGE_REAR",
+        "type": "hedge",
+        "x": 15.0,
+        "y": 1.0,
+        "width": 26.0,
+        "length": 1.6,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "boundary_planting",
+        "properties": {
+          "height": 4.8
+        },
+        "points": null
+      },
+      {
+        "element_id": "TREE_REAR_L",
+        "type": "tree",
+        "x": 6.0,
+        "y": 2.0,
+        "width": null,
+        "length": null,
+        "radius": 3.5,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "species": "Jacaranda",
+          "foliage_type": "conical"
+        },
+        "points": null
+      },
+      {
+        "element_id": "TREE_REAR_R",
+        "type": "tree",
+        "x": 24.0,
+        "y": 2.0,
+        "width": null,
+        "length": null,
+        "radius": 3.8,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "species": "Magnolia",
+          "foliage_type": "round"
+        },
+        "points": null
+      },
+      {
+        "element_id": "TREE_FRONT_ACCENT",
+        "type": "tree",
+        "x": 6.2,
+        "y": 17.5,
+        "width": null,
+        "length": null,
+        "radius": 3.2,
+        "height": null,
+        "species": null,
+        "zone": "front_garden",
+        "properties": {
+          "species": "Silver Birch",
+          "foliage_type": "round"
+        },
+        "points": null
+      },
+      {
+        "element_id": "LIGHT_01",
+        "type": "outdoor_light",
+        "x": 0.2,
+        "y": 5.0,
+        "width": null,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {},
+        "points": null
+      },
+      {
+        "element_id": "LIGHT_02",
+        "type": "outdoor_light",
+        "x": 5.8,
+        "y": 5.0,
+        "width": null,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {},
+        "points": null
+      },
+      {
+        "element_id": "LIGHT_03",
+        "type": "outdoor_light",
+        "x": 6.2,
+        "y": 15.0,
+        "width": null,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "front_garden",
+        "properties": {},
+        "points": null
+      },
+      {
+        "element_id": "WATER_FEATURE_01",
+        "type": "water_feature",
+        "x": 15.0,
+        "y": 2.0,
+        "width": null,
+        "length": null,
+        "radius": 2.8,
+        "height": null,
+        "species": null,
+        "zone": "rear_garden",
+        "properties": {
+          "style": "reflecting_pool",
+          "finish": "dark_granite"
+        },
+        "points": null
+      }
+    ],
+    "paths": [
+      {
+        "element_id": "PATH_FALLBACK_01",
+        "type": "pathway",
+        "x": 3.0,
+        "y": 5.0,
+        "width": 3.5,
+        "length": null,
+        "radius": null,
+        "height": null,
+        "species": null,
+        "zone": "entrance_pathway",
+        "properties": {
+          "style": "stepping_stones",
+          "paver_material": "limestone"
+        },
+        "points": [
+          {
+            "x": 6.0,
+            "y": 20.0
+          },
+          {
+            "x": 3.0,
+            "y": 5.0
+          },
+          {
+            "x": 3.0,
+            "y": 3.0
+          }
+        ]
+      }
+    ],
+    "driveway": {
+      "element_id": "DW_FALLBACK_01",
+      "type": "driveway",
+      "x": 22.0,
+      "y": 16.5,
+      "width": 10.0,
+      "length": 7.0,
+      "radius": null,
+      "height": null,
+      "species": null,
+      "zone": "driveway",
+      "properties": {
+        "surface": "paved_concrete",
+        "texture": "brushed"
+      },
+      "points": null
+    },
+    "outdoor_features": [],
+    "total_green_area_sqft": 121.0,
+    "green_coverage_percentage": 20.0,
+    "trees_count": 3,
+    "lights_count": 3,
+    "water_features_count": 1,
+    "style": "modern_minimal",
+    "summary": "Balanced site landscape with lawn setbacks, trees, entry pathway, and driveway."
+  },
+  "floorplan_source": null,
+  "materials": [],
+  "facing": "SOUTH",
+  "orientation": "south",
+  "metadata": {},
+  "rooms": [
+    {
+      "id": "living",
+      "room_id": "living",
+      "floor_id": "floor_1",
+      "name": "Living Room",
+      "type": "living_room",
+      "zone": "public",
+      "floor": 1,
+      "rect": {
+        "x": 2.0,
+        "y": 2.0,
+        "width": 12.0,
+        "length": 10.0
+      },
+      "x": 2.0,
+      "y": 2.0,
+      "width": 12.0,
+      "depth": 10.0,
+      "area": 120.0,
+      "orientation": null,
+      "color": "#F8F4EE",
+      "floor_material": "hardwood_oak",
+      "furniture": [],
+      "furniture_ids": [],
+      "door_ids": [],
+      "window_ids": [],
+      "adjacency": [],
+      "circulation": [],
+      "parent_room_id": null,
+      "attached_room_id": null,
+      "min_width": 8.0,
+      "min_length": 8.0,
+      "preferred_width": 12.0,
+      "preferred_length": 14.0,
+      "max_width": null,
+      "max_length": null,
+      "actual_width": 12.0,
+      "actual_length": 10.0,
+      "area_sqft": 120.0,
+      "is_hard_constraint": false,
+      "size_mode": "ai_recommended",
+      "privacy_level": "public",
+      "daylight_requirement": "medium",
+      "ventilation_requirement": "direct_exterior",
+      "exterior_wall_requirement": false,
+      "required_adjacencies": [],
+      "preferred_adjacencies": [],
+      "forbidden_adjacencies": [],
+      "dimensions_label": "12.0' \u00d7 10.0'",
+      "rationale": null,
+      "metadata": {}
+    }
+  ],
+  "walls": [
+    {
+      "id": "w_001",
+      "wall_id": "w_001",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 2.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [
+        "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e"
+      ],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 2.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 85.5,
+      "net_surface_area_sqft": 114.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_002",
+      "wall_id": "w_002",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 12.0,
+      "end_x": 14.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 12.0,
+      "x2": 14.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 85.5,
+      "net_surface_area_sqft": 114.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_003",
+      "wall_id": "w_003",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 2.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 2.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 71.3,
+      "net_surface_area_sqft": 95.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_004",
+      "wall_id": "w_004",
+      "floor_id": null,
+      "start": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 12.0
+      },
+      "start_x": 14.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 14.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 71.3,
+      "net_surface_area_sqft": 95.0,
+      "metadata": {}
+    },
+    {
+      "id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+      "wall_id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+      "floor_id": null,
+      "start": {
+        "x": 9.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 9.0,
+        "y": 10.0
+      },
+      "start_x": 9.0,
+      "start_y": 4.0,
+      "end_x": 9.0,
+      "end_y": 10.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "partition",
+      "type": "partition",
+      "is_exterior": false,
+      "adjacent_room_ids": [],
+      "room_ids": [],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 9.0,
+      "y1": 4.0,
+      "x2": 9.0,
+      "y2": 10.0,
+      "connected_room_ids": [],
+      "volume_cuft": null,
+      "net_surface_area_sqft": null,
+      "metadata": {}
+    }
+  ],
+  "exterior_walls": [
+    {
+      "id": "w_001",
+      "wall_id": "w_001",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 2.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [
+        "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e"
+      ],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 2.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 85.5,
+      "net_surface_area_sqft": 114.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_002",
+      "wall_id": "w_002",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 12.0,
+      "end_x": 14.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "horizontal",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 12.0,
+      "x2": 14.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 85.5,
+      "net_surface_area_sqft": 114.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_003",
+      "wall_id": "w_003",
+      "floor_id": null,
+      "start": {
+        "x": 2.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 2.0,
+        "y": 12.0
+      },
+      "start_x": 2.0,
+      "start_y": 2.0,
+      "end_x": 2.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 2.0,
+      "y1": 2.0,
+      "x2": 2.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 71.3,
+      "net_surface_area_sqft": 95.0,
+      "metadata": {}
+    },
+    {
+      "id": "w_004",
+      "wall_id": "w_004",
+      "floor_id": null,
+      "start": {
+        "x": 14.0,
+        "y": 2.0
+      },
+      "end": {
+        "x": 14.0,
+        "y": 12.0
+      },
+      "start_x": 14.0,
+      "start_y": 2.0,
+      "end_x": 14.0,
+      "end_y": 12.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "exterior",
+      "type": "exterior",
+      "is_exterior": true,
+      "adjacent_room_ids": [
+        "living"
+      ],
+      "room_ids": [
+        "living"
+      ],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 14.0,
+      "y1": 2.0,
+      "x2": 14.0,
+      "y2": 12.0,
+      "connected_room_ids": [
+        "living"
+      ],
+      "volume_cuft": 71.3,
+      "net_surface_area_sqft": 95.0,
+      "metadata": {}
+    }
+  ],
+  "interior_walls": [
+    {
+      "id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+      "wall_id": "wall_e392c4b2-050b-4ecc-a1e5-efbf673b3d15",
+      "floor_id": null,
+      "start": {
+        "x": 9.0,
+        "y": 4.0
+      },
+      "end": {
+        "x": 9.0,
+        "y": 10.0
+      },
+      "start_x": 9.0,
+      "start_y": 4.0,
+      "end_x": 9.0,
+      "end_y": 10.0,
+      "thickness": 0.75,
+      "height": 9.5,
+      "wall_type": "partition",
+      "type": "partition",
+      "is_exterior": false,
+      "adjacent_room_ids": [],
+      "room_ids": [],
+      "wall_direction": "vertical",
+      "wall_orientation": null,
+      "openings": [],
+      "x1": 9.0,
+      "y1": 4.0,
+      "x2": 9.0,
+      "y2": 10.0,
+      "connected_room_ids": [],
+      "volume_cuft": null,
+      "net_surface_area_sqft": null,
+      "metadata": {}
+    }
+  ],
+  "doors": [],
+  "windows": [
+    {
+      "id": "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e",
+      "window_id": "win_f5c1fe21-2ee3-4a36-9ea9-cf131030628e",
+      "floor_id": "1",
+      "wall_id": "w_001",
+      "host_wall_id": "w_001",
+      "room_id": null,
+      "position_along_wall": 0.5,
+      "position": {
+        "x": 7.96,
+        "y": 2.0
+      },
+      "x": 7.96,
+      "y": 2.0,
+      "x1": 5.963918050130207,
+      "y1": 2.0,
+      "x2": 9.963918050130207,
+      "y2": 2.0,
+      "width": 4.0,
+      "height": 4.0,
+      "sill_height": 3.0,
+      "head_height": 7.0,
+      "window_type": "casement",
+      "type": "casement",
+      "orientation": "south",
+      "outward_direction": "south",
+      "direction_label": "W01 \u00b7 S",
+      "metadata": {}
+    }
+  ],
+  "entry_point": {
+    "x": 3.0,
+    "y": 3.0,
+    "direction": 0.0
+  }
+}

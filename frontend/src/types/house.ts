@@ -277,6 +277,7 @@ export interface CirculationNetwork {
 }
 
 export interface FloorPlan {
+  floor_id?: string;
   floor_number: number;
   floor_name: string;
   rooms: Room[];
@@ -524,6 +525,7 @@ export interface HouseLayout {
   vastu_result?: VastuResult;
   critic_notes?: string[];
   metadata?: Record<string, unknown>;
+  mep_plan?: MEPPlan;
   structural_planning?: StructuralPlanning;
   structural_system?: string;
   landscape?: LandscapePlan;
@@ -538,6 +540,80 @@ export interface HouseLayout {
   doors: Door[];
   windows: WindowItem[];
   entry_point: { x: number; y: number; direction: number };
+}
+
+export type MEPCategory = "electrical" | "plumbing" | "hvac";
+export type MEPPointKind =
+  | "light"
+  | "switch"
+  | "outlet"
+  | "fan"
+  | "ac_point"
+  | "distribution_board"
+  | "wc"
+  | "basin"
+  | "shower"
+  | "sink"
+  | "floor_drain"
+  | "supply"
+  | "waste"
+  | "stack"
+  | "indoor_ac"
+  | "outdoor_ac"
+  | "exhaust"
+  | "ventilation"
+  | "return";
+
+export interface MEPPoint {
+  id: string;
+  category: MEPCategory;
+  kind: MEPPointKind;
+  position: { x: number; y: number };
+  floor_id: string;
+  floor_number: number;
+  room_id: string;
+  semantic_key?: string;
+  generated?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MEPRoute {
+  id: string;
+  category: MEPCategory;
+  kind: string;
+  points: Array<{ x: number; y: number }>;
+  floor_id: string;
+  floor_number: number;
+  room_id: string;
+  point_ids: string[];
+  semantic_key?: string;
+  generated?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MEPVerticalStack {
+  id: string;
+  category: "plumbing";
+  kind: "soil_waste_stack" | "water_supply_stack";
+  room_associations: Array<{
+    floor_id: string;
+    floor_number: number;
+    room_id: string;
+    point_id: string;
+  }>;
+  alignment: { x: number; y: number };
+  semantic_key: string;
+  generated?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MEPPlan {
+  points: MEPPoint[];
+  routes: MEPRoute[];
+  vertical_stacks: MEPVerticalStack[];
+  planning_stage: "preliminary";
+  certified: false;
+  metadata: Record<string, unknown>;
 }
 
 export interface DreamHomeStructuredRequirements {

@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { HouseLayout, Room } from "@/types/house";
+import { HouseLayout, Room, MEPCategory } from "@/types/house";
+import { NavView } from "./FloatingNav";
 import {
   ArchitecturalPlanRenderer,
   feetToArchitectural,
@@ -16,12 +17,19 @@ export interface FloorPlan2DProps {
   selectedFurnitureId?: string | null;
   onSelectRoom: (roomId: string | null) => void;
   onSelectFurniture?: (furnitureId: string | null) => void;
+  onSelectEntity?: (entityId: string | null) => void;
   onRegenerateLayout?: (updatedRooms: Room[]) => Promise<void> | void;
   isRegenerating?: boolean;
   isDarkMode?: boolean;
   mode?: "view" | "edit";
   onUpdateLayout?: (newLayout: HouseLayout) => void;
   onSave?: (savedLayout: HouseLayout) => Promise<void> | void;
+  showAtelierNav?: boolean;
+  onStudioNavigate?: (view: NavView) => void;
+  onToggleEditMode?: () => void;
+  onOpenVastuAudit?: () => void;
+  hasVastuResult?: boolean;
+  mepVisibility?: Partial<Record<MEPCategory, boolean>>;
 }
 
 export { feetToArchitectural, getRoomBackgroundFill };
@@ -40,11 +48,18 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
   selectedFurnitureId,
   onSelectRoom,
   onSelectFurniture,
+  onSelectEntity,
   onRegenerateLayout,
   isRegenerating,
   mode = "view",
   onUpdateLayout,
   onSave,
+  showAtelierNav,
+  onStudioNavigate,
+  onToggleEditMode,
+  onOpenVastuAudit,
+  hasVastuResult,
+  mepVisibility,
 }) => {
   return (
     <ArchitecturalPlanRenderer
@@ -56,10 +71,17 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
       selectedFurnitureId={selectedFurnitureId}
       onSelectRoom={onSelectRoom}
       onSelectFurniture={onSelectFurniture}
+      onSelectEntity={onSelectEntity}
       onRegenerateLayout={onRegenerateLayout}
       isRegenerating={isRegenerating}
       onUpdateLayout={onUpdateLayout}
       onSave={onSave}
+      showAtelierNav={showAtelierNav}
+      onStudioNavigate={onStudioNavigate}
+      onToggleEditMode={onToggleEditMode}
+      onOpenVastuAudit={onOpenVastuAudit}
+      hasVastuResult={hasVastuResult}
+      mepVisibility={mepVisibility}
     />
   );
 };

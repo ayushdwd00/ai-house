@@ -10,7 +10,8 @@ import { ProjectsModal } from "@/components/ProjectsModal";
 import { useProject } from "@/context/ProjectContext";
 import { HouseLayout, IntakeRequest } from "@/types/house";
 import { validateAndSanitizeHouseLayout, validateAndSanitizeHouseLayoutDetailed } from "@/utils/layoutValidator";
-import { generateHouseLayout } from "@/utils/api";
+import { DesignScheme, generateDesignSchemes, generateHouseLayout } from "@/utils/api";
+import { DesignSchemeSelectionModal } from "@/components/DesignSchemeSelectionModal";
 
 // Code splitting: Heavy modals and consultation loaded on demand only
 const ArchitecturalConsultation = dynamic(
@@ -48,6 +49,8 @@ export default function HomePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [lastIntakeRequest, setLastIntakeRequest] = useState<IntakeRequest | null>(null);
+  const [designSchemes, setDesignSchemes] = useState<DesignScheme[]>([]);
+  const [schemeReturnFlow, setSchemeReturnFlow] = useState<"consultation" | "dreamHome">("consultation");
 
   const handleNavigate = (view: NavView) => {
     if (view === "create") {
@@ -75,10 +78,23 @@ export default function HomePage() {
     setIsDreamHomeOpen(true);
   };
 
-  const handleDreamHomeSuccess = (layout: HouseLayout) => {
+  const handleDreamHomeSuccess = async (layout: HouseLayout) => {
     setIsDreamHomeOpen(false);
-    const newProjectId = createProject(layout);
-    router.push(`/project/${newProjectId}/plan`);
+    setIsGenerating(true);
+    setGenerationError(null);
+    try {
+      const canonicalLayout = validateAndSanitizeHouseLayout(layout);
+      if (!canonicalLayout) {
+        throw new Error("The dream-home brief did not produce a valid canonical layout.");
+      }
+      const schemes = await generateDesignSchemes(canonicalLayout, Boolean(layout.metadata?.vastu_compliant));
+      setIsGenerating(false);
+      setSchemeReturnFlow("dreamHome");
+      setDesignSchemes(schemes);
+    } catch (error) {
+      setIsGenerating(false);
+      setGenerationError(error instanceof Error ? error.message : "Could not create architectural alternatives.");
+    }
   };
 
   // Submit intake from step-by-step Architectural Consultation
@@ -109,19 +125,30 @@ export default function HomePage() {
         throw new Error(reason);
       }
 
-      // Close consultation modals now that generation is successful
+      const schemes = await generateDesignSchemes(sanitized, Boolean(req.vastu_compliant));
       setIsGenerating(false);
       setIsConsultationOpen(false);
       setIsCreateChoiceOpen(false);
       setIsDreamHomeOpen(false);
-      const newProjectId = createProject(sanitized);
-      // Navigate directly to plan
-      router.push(`/project/${newProjectId}/plan`);
+      setSchemeReturnFlow("consultation");
+      setDesignSchemes(schemes);
     } catch (err) {
       console.error("[GENERATION ERROR]", err);
       setIsGenerating(false);
       setGenerationError(err instanceof Error ? err.message : "Failed to connect to architectural synthesis backend.");
     }
+  };
+
+  const handleSelectDesignScheme = (scheme: DesignScheme) => {
+    const sanitized = validateAndSanitizeHouseLayout(scheme.layout);
+    if (!sanitized) {
+      setGenerationError("The selected scheme failed canonical layout validation. Please choose another scheme.");
+      setDesignSchemes([]);
+      return;
+    }
+    setDesignSchemes([]);
+    const newProjectId = createProject(sanitized);
+    router.push(`/project/${newProjectId}/plan`);
   };
 
   // Floor plan upload callback
@@ -242,6 +269,18 @@ export default function HomePage() {
 
       {/* GENERATION PROGRESS MODAL */}
       <GenerationProgressModal key={isGenerating ? "generating" : "idle"} isOpen={isGenerating} />
+
+      {designSchemes.length > 0 && (
+        <DesignSchemeSelectionModal
+          schemes={designSchemes}
+          onSelect={handleSelectDesignScheme}
+          onBack={() => {
+            setDesignSchemes([]);
+            setIsConsultationOpen(schemeReturnFlow === "consultation");
+            setIsDreamHomeOpen(schemeReturnFlow === "dreamHome");
+          }}
+        />
+      )}
 
       {/* ERROR NOTICE MODAL */}
       {generationError && (
