@@ -7,8 +7,6 @@ import { ArchitecturalPlanRenderer } from "@/components/ArchitecturalPlanRendere
 import { HouseLayout } from "@/types/house";
 import { Loader2 } from "lucide-react";
 import { NavView } from "@/components/FloatingNav";
-import { FloatingAICommandBar } from "@/components/FloatingAICommandBar";
-import { applyProjectEdit, previewProjectEditIntent, saveProjectToServer } from "@/utils/api";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
 
 interface EditorPageClientProps {
@@ -22,47 +20,11 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeFloorIndex, setActiveFloorIndex] = useState(0);
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [isApplyingAIEdit, setIsApplyingAIEdit] = useState(false);
-  const [aiEditNotice, setAiEditNotice] = useState<string | null>(null);
   const handleLayoutUpdate = (updated: HouseLayout) => {
     const canonicalLayout = validateAndSanitizeHouseLayout(updated) || updated;
     setLayout(canonicalLayout);
     updateProject(canonicalLayout);
-  };
-
-  const handleApplyAIInstruction = async (instruction: string) => {
-    if (!layout || isApplyingAIEdit) return;
-    setIsApplyingAIEdit(true);
-    setAiEditNotice(null);
-    try {
-      if (!await saveProjectToServer(layout)) {
-        throw new Error("The current canonical layout could not be saved before editing.");
-      }
-      const preview = await previewProjectEditIntent(projectId, {
-        edit_instruction: instruction,
-        current_layout: layout,
-        target_entity_id: selectedEntityId || undefined,
-      });
-      const operation = preview.intent.operation || preview.intent.action;
-      setAiEditNotice(typeof operation === "string" ? `Applying ${operation.replaceAll("_", " ")}…` : "Applying architectural edit…");
-      const result = await applyProjectEdit(projectId, {
-        edit_instruction: instruction,
-        current_layout: layout,
-        target_entity_id: selectedEntityId || undefined,
-      });
-      if (result.status !== "ok" || !result.layout) {
-        setAiEditNotice(result.reason || "That edit was rejected by architectural validation.");
-        return;
-      }
-      handleLayoutUpdate(result.layout);
-      setAiEditNotice("Design updated. Undo is available in the editor toolbar.");
-    } catch (error) {
-      setAiEditNotice(error instanceof Error ? error.message : "The edit could not be applied.");
-    } finally {
-      setIsApplyingAIEdit(false);
-    }
   };
 
   useEffect(() => {
@@ -166,7 +128,6 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
         mode="edit"
         activeFloorIndex={activeFloorIndex}
         onSelectFloor={setActiveFloorIndex}
-        onSelectEntity={setSelectedEntityId}
         onUpdateLayout={handleLayoutUpdate}
         onSave={(saved) => {
           handleLayoutUpdate(saved);
@@ -184,18 +145,6 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
         onToggleEditMode={() => router.push(`/project/${projectId}/plan`)}
         onOpenVastuAudit={() => router.push(`/project/${projectId}/plan`)}
       />
-      <FloatingAICommandBar
-        onApplyInstruction={handleApplyAIInstruction}
-        isLoading={isApplyingAIEdit}
-      />
-      {aiEditNotice && (
-        <div
-          role="status"
-          className="fixed bottom-28 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-[#0F1117]/95 px-4 py-2 text-xs text-[#F5F3EF] shadow-xl"
-        >
-          {aiEditNotice}
-        </div>
-      )}
     </div>
   );
 };
