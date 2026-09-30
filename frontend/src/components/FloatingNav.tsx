@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 
 export type NavView =
@@ -44,6 +44,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
   const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
   const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 });
+  const [expandedNav, setExpandedNav] = useState<"create" | "projects" | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const scrollPositions = useRef(new WeakMap<object, number>());
 
@@ -104,23 +105,31 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
     { id: "estimate", label: "ESTIMATE" },
   ];
 
-  const homeNavItems: { id: NavView; label: string }[] = [
-    { id: "home", label: "HOME" },
-    { id: "plan", label: "PLAN" },
-    { id: "model", label: "MODEL" },
-    { id: "structure", label: "STRUCTURE" },
-    { id: "estimate", label: "ESTIMATE" },
-    { id: "projects", label: "PROJECTS" },
-  ];
-
-  const navItems = isProjectWorkspace ? projectNavItems : homeNavItems;
+  const navItems = isProjectWorkspace
+    ? projectNavItems
+    : expandedNav
+      ? projectNavItems
+      : [];
 
   const handleNavClick = (id: NavView) => {
+    setExpandedNav(null);
     if (id === "projects" && onOpenProjects) {
       onOpenProjects();
     } else {
       onNavigate(id);
     }
+  };
+
+  const handleProjectsClick = () => {
+    setExpandedNav((current) => current === "projects" ? null : "projects");
+    onOpenProjects?.();
+  };
+
+  const handleCreateClick = () => {
+    if (!isProjectWorkspace) {
+      setExpandedNav((current) => current === "create" ? null : "create");
+    }
+    onNavigate("create");
   };
 
   const renderEditModeToggle = () => (
@@ -169,10 +178,10 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
         }}
         className={`${
           !isVisible ? "pointer-events-none" : "pointer-events-auto"
-        } relative flex w-max max-w-full items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-full border border-[rgba(96,165,250,0.18)] ${
+        } relative flex w-max max-w-full items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-full border border-[rgba(96,165,250,0.15)] ${
           isScrolled
-            ? "bg-[rgba(8,15,28,0.84)] shadow-[0_24px_70px_rgba(0,0,0,0.5),0_0_35px_rgba(37,99,235,0.18)]"
-            : "bg-[rgba(8,15,28,0.70)] shadow-[0_16px_50px_rgba(0,0,0,0.38),0_0_25px_rgba(37,99,235,0.12)]"
+            ? "bg-[rgba(8,9,11,0.86)] shadow-[0_24px_70px_rgba(0,0,0,0.5),0_0_30px_rgba(37,99,235,0.12),0_0_22px_rgba(139,92,246,0.035)]"
+            : "bg-[rgba(8,9,11,0.76)] shadow-[0_16px_50px_rgba(0,0,0,0.38),0_0_24px_rgba(37,99,235,0.08),0_0_18px_rgba(139,92,246,0.03)]"
         } backdrop-blur-[24px] saturate-[135%] text-[10px] sm:text-[11px] font-mono tracking-[0.2em] text-[rgba(255,255,255,0.64)]`}
       >
         {/* Subtle Atmospheric Top Highlight */}
@@ -194,8 +203,20 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
         </button>
 
         {/* ── Nav items ── */}
-        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-          {navItems.map((item) => {
+        <div id="home-secondary-navigation" className="contents">
+          <AnimatePresence initial={false}>
+            {navItems.length > 0 && (
+              <motion.div
+                key={isProjectWorkspace ? "workspace-navigation" : `${expandedNav}-navigation`}
+                initial={{ opacity: 0, width: 0, x: -8 }}
+                animate={{ opacity: 1, width: "auto", x: 0 }}
+                exit={{ opacity: 0, width: 0, x: -8 }}
+                transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+                className="flex min-w-0 shrink items-center gap-0.5 sm:gap-1 overflow-hidden border-r border-white/10 pr-1 sm:pr-2"
+                role="group"
+                aria-label={expandedNav === "projects" ? "Project navigation" : "Create navigation"}
+              >
+                {navItems.map((item) => {
             const isActive = currentView === item.id;
             const itemButton = (
               <button
@@ -225,8 +246,34 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
                 {itemButton}
               </React.Fragment>
             );
-          })}
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+
+        {!isProjectWorkspace && onOpenProjects && (
+          <button
+            type="button"
+            onClick={handleProjectsClick}
+            aria-expanded={expandedNav === "projects"}
+            aria-controls="home-secondary-navigation"
+            className={`relative flex shrink-0 items-center whitespace-nowrap px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all duration-200 ${
+              expandedNav === "projects"
+                ? "text-[#F5F5F5] font-medium"
+                : "text-[rgba(255,255,255,0.62)] hover:text-[#F5F5F5] hover:-translate-y-[1px]"
+            }`}
+          >
+            {expandedNav === "projects" && (
+              <motion.span
+                layoutId="activeNavIndicator"
+                className="absolute inset-0 rounded-full border border-[rgba(96,165,250,0.28)] bg-[linear-gradient(135deg,rgba(37,99,235,0.18),rgba(6,182,212,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_18px_rgba(37,99,235,0.22)]"
+                transition={{ type: "spring", stiffness: 450, damping: 35 }}
+              />
+            )}
+            <span className="relative z-10">PROJECTS</span>
+          </button>
+        )}
 
         {/* ── Vastu pill (project workspace only) ── */}
         {isProjectWorkspace && onOpenVastuAudit && (
@@ -241,7 +288,9 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
 
         {/* ── Create CTA ── */}
         <button
-          onClick={() => onNavigate("create")}
+          onClick={handleCreateClick}
+          aria-expanded={!isProjectWorkspace && expandedNav === "create"}
+          aria-controls="home-secondary-navigation"
           className={`ml-1 sm:ml-2 flex shrink-0 items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-[11px] font-medium tracking-[0.2em] transition-all duration-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_25px_rgba(37,99,235,0.35)] hover:-translate-y-[1px] hover:brightness-110 active:translate-y-0 active:scale-[0.98] ${
             currentView === "create"
               ? "bg-[linear-gradient(135deg,#3B82F6,#06B6D4)] text-white shadow-[0_0_25px_rgba(59,130,246,0.5)]"

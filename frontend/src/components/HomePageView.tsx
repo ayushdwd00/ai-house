@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { ArchitecturalHero3D } from "./ArchitecturalHero3D";
 
 interface HomePageViewProps {
   onStartDesign: () => void;
@@ -39,75 +38,62 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
   onSelectPreset,
 }) => {
   const cardRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const [activeCardIndex, setActiveCardIndex] = React.useState(-1);
 
   React.useEffect(() => {
-    let rafId: number | null = null;
+    const cards = cardRefs.current.filter((card): card is HTMLDivElement => card !== null);
+    if (cards.length === 0) return;
 
-    const updateCardTransforms = () => {
-      const cards = cardRefs.current;
-      if (!cards || cards.length === 0) return;
+    const scrollRoot = cards[0].closest("main");
+    let observer: IntersectionObserver;
 
-      const isDesktop = window.innerWidth >= 768;
-      const targetTop = isDesktop ? 104 : 88;
-      const windowH = window.innerHeight;
+    const updateActiveCard = () => {
+      const topOffset = window.innerWidth >= 768 ? 104 : 92;
+      const rootTop = scrollRoot?.getBoundingClientRect().top ?? 0;
+      const stickyLine = rootTop + topOffset;
+      const nextActiveCardIndex = cards.reduce((activeIndex, card, index) => {
+        const bounds = card.getBoundingClientRect();
+        return bounds.top <= stickyLine + 1 && bounds.bottom > stickyLine
+          ? index
+          : activeIndex;
+      }, -1);
 
-      for (let i = 0; i < cards.length; i++) {
-        const card = cards[i];
-        if (!card) continue;
-
-        // Calculate how much subsequent cards are covering card i
-        let stackDepth = 0;
-        for (let j = i + 1; j < cards.length; j++) {
-          const nextCard = cards[j];
-          if (!nextCard) continue;
-
-          const rect = nextCard.getBoundingClientRect();
-          // Trigger threshold: when nextCard starts entering viewport and approaching targetTop
-          const startY = windowH * 0.88;
-          const endY = targetTop;
-
-          if (rect.top < startY) {
-            const progress = Math.min(1, Math.max(0, (startY - rect.top) / (startY - endY)));
-            stackDepth += progress;
-          }
-        }
-
-        // Physical deck offsets:
-        // - translateY shifts the covered card down by ~22px per layer so its bottom tab peeks out
-        // - scale subtly steps down (1.0 -> 0.98 -> 0.96) so outer borders remain visible
-        // - brightness dims slightly (1.0 -> 0.85 -> 0.72) to visually recess older cards
-        const translateY = stackDepth * (isDesktop ? 22 : 16);
-        const scale = Math.max(0.91, 1 - stackDepth * 0.022);
-        const brightness = Math.max(0.55, 1 - stackDepth * 0.12);
-
-        card.style.transform = `translateY(${translateY}px) scale(${scale})`;
-        card.style.filter = `brightness(${brightness})`;
-        card.style.transformOrigin = "center top";
-      }
+      setActiveCardIndex((currentIndex) =>
+        currentIndex === nextActiveCardIndex ? currentIndex : nextActiveCardIndex
+      );
     };
 
-    const handleScroll = () => {
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          updateCardTransforms();
-          rafId = null;
-        });
-      }
+    const observeCardsAtStickyOffset = () => {
+      observer?.disconnect();
+
+      const topOffset = window.innerWidth >= 768 ? 104 : 92;
+      const rootHeight = scrollRoot?.clientHeight ?? window.innerHeight;
+      const rootTop = Math.min(topOffset, rootHeight - 1);
+      const rootBottom = Math.max(0, rootHeight - rootTop - 1);
+      observer = new IntersectionObserver(updateActiveCard, {
+        root: scrollRoot,
+        rootMargin: `-${rootTop}px 0px -${rootBottom}px 0px`,
+        threshold: 0,
+      });
+
+      cards.forEach((card) => observer.observe(card));
+      updateActiveCard();
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleScroll, { passive: true });
-    updateCardTransforms();
+    observeCardsAtStickyOffset();
+    window.addEventListener("resize", observeCardsAtStickyOffset);
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
-      if (rafId !== null) cancelAnimationFrame(rafId);
+      observer.disconnect();
+      window.removeEventListener("resize", observeCardsAtStickyOffset);
     };
   }, []);
 
+  const getCardDepth = (index: number) =>
+    Math.min(Math.max(activeCardIndex - index, 0), 4);
+
   return (
-    <div className="relative isolate w-full min-h-screen bg-[#030303] text-[#F5F5F5] overflow-x-hidden selection:bg-[#2563EB]/40 selection:text-white">
+    <div className="relative isolate w-full min-h-screen bg-[#030303] text-[#F5F5F5] overflow-x-clip selection:bg-[#2563EB]/40 selection:text-white">
       {/* ────────────────────────────────────────────────────────
           LAYER 0: EXACT THREEUI SIGNAL PARTICLES BACKGROUND
           Fixed atmospheric canvas sitting behind all Home UI
@@ -126,13 +112,12 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
       </div>
 
       {/* ────────────────────────────────────────────────────────
-          LAYER 1: ATMOSPHERIC BLUE / CYAN ENVIRONMENTAL LIGHTING
-          Large blurred radial lighting fields (40px - 140px)
+          LAYER 1: RESTRAINED AMBIENT STUDIO LIGHTING
           ──────────────────────────────────────────────────────── */}
       <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[55vw] h-[55vw] rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.12)_0%,transparent_70%)] blur-[120px]" />
-        <div className="absolute top-[25%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-[radial-gradient(circle,rgba(6,182,212,0.09)_0%,transparent_70%)] blur-[140px]" />
-        <div className="absolute top-[65%] left-[10%] w-[60vw] h-[60vw] rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.06)_0%,transparent_70%)] blur-[130px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[55vw] h-[55vw] rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.07)_0%,transparent_70%)] blur-[120px]" />
+        <div className="absolute top-[25%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.045)_0%,transparent_70%)] blur-[140px]" />
+        <div className="absolute top-[65%] left-[10%] w-[60vw] h-[60vw] rounded-full bg-[radial-gradient(circle,rgba(214,184,120,0.035)_0%,transparent_70%)] blur-[130px]" />
       </div>
 
       {/* ────────────────────────────────────────────────────────
@@ -142,9 +127,6 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
         {/* ── 1. CINEMATIC HERO SECTION ── */}
         <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden border-b border-white/5">
-          {/* Real-time Cinematic 3D Architectural Pavilion Canvas */}
-          <ArchitecturalHero3D />
-
           {/* Top spacer for floating navbar */}
           <div className="w-full h-24 sm:h-28 relative z-20 pointer-events-none" />
 
@@ -166,10 +148,10 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
               initial={{ opacity: 0, y: 22 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.85, delay: 0.1, ease: [0.23, 1, 0.32, 1] }}
-              className="text-5xl sm:text-7xl md:text-8xl lg:text-[7.2rem] font-serif font-light tracking-[-0.04em] text-[#F5F5F5] leading-[0.92] mb-7 drop-shadow-[0_10px_35px_rgba(0,0,0,0.7)]"
+              className="text-5xl sm:text-7xl md:text-8xl lg:text-[7.2rem] font-serif font-light tracking-[-0.04em] text-[#F4F1EA] leading-[0.92] mb-7 drop-shadow-[0_10px_35px_rgba(0,0,0,0.7)]"
             >
               YOUR HOME. <br />
-              <span className="italic font-normal text-[#E0E7FF] drop-shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+              <span className="italic font-normal text-[#DED8F0] drop-shadow-[0_0_36px_rgba(139,92,246,0.16)]">
                 DESIGNED INTELLIGENTLY.
               </span>
             </motion.h1>
@@ -203,7 +185,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
               <button
                 onClick={onOpenModelMode}
-                className="w-full sm:w-auto px-8 py-4 rounded-full btn-secondary-glass font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_25px_rgba(6,182,212,0.1)]"
+                className="w-full sm:w-auto px-8 py-4 rounded-full btn-secondary-glass font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_25px_rgba(139,92,246,0.06)]"
               >
                 <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
                 <span>EXPLORE 3D MODEL</span>
@@ -236,7 +218,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         <section className="relative w-full py-24 px-4 sm:px-8 md:px-16">
           {/* Section Section Header */}
           <div className="max-w-4xl mx-auto text-center mb-16">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(37,99,235,0.1)] border border-[rgba(96,165,250,0.2)] text-[10px] font-mono tracking-[0.24em] text-[#93C5FD] uppercase mb-4">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(214,184,120,0.08)] border border-[rgba(214,184,120,0.18)] text-[10px] font-mono tracking-[0.24em] text-[#D6B878] uppercase mb-4">
               ARCHITECTURAL JOURNEY
             </span>
             <h2 className="text-3xl sm:text-5xl md:text-6xl font-serif font-light text-[#F5F5F5] leading-tight">
@@ -253,10 +235,11 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             {/* ══ CARD 1: PHILOSOPHY // 01 ══ */}
             <div
               ref={(el) => { cardRefs.current[0] = el; }}
-              className="sticky top-[92px] md:top-[104px] z-10 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.22)] shadow-[0_30px_90px_rgba(0,0,0,0.85),0_0_40px_rgba(37,99,235,0.08)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+              data-stack-depth={getCardDepth(0)}
+              className={`stacking-card accent-architecture sticky top-[92px] md:top-[104px] z-10 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_30px_90px_rgba(0,0,0,0.85)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 0 ? " is-active" : ""}`}
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-                <span className="text-xs font-mono tracking-[0.22em] text-[#60A5FA] uppercase font-semibold">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#D6B878] uppercase font-semibold">
                   PHILOSOPHY // 01
                 </span>
                 <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
@@ -300,14 +283,14 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0A0E1A] via-transparent to-transparent" />
                   <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between text-xs font-mono text-[#F5F5F5]">
-                    <span className="text-[#93C5FD]">RESIDENTIAL STUDY // LOT 42</span>
+                    <span className="text-[#D6B878]">RESIDENTIAL STUDY // LOT 42</span>
                     <span className="text-[rgba(255,255,255,0.5)]">SCANDINAVIAN MODERN</span>
                   </div>
                 </div>
               </div>
 
               <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
-                <span className="text-[#60A5FA] font-semibold">01 // PHILOSOPHY</span>
+                <span className="text-[#D6B878] font-semibold">01 // PHILOSOPHY</span>
                 <span className="text-[rgba(255,255,255,0.45)]">DATUM REF ±0.000M</span>
               </div>
             </div>
@@ -315,10 +298,11 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             {/* ══ CARD 2: PRECISION // 02 ══ */}
             <div
               ref={(el) => { cardRefs.current[1] = el; }}
-              className="sticky top-[92px] md:top-[104px] z-20 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.24)] shadow-[0_35px_100px_rgba(0,0,0,0.9),0_-15px_40px_rgba(0,0,0,0.6)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+              data-stack-depth={getCardDepth(1)}
+              className={`stacking-card accent-architecture sticky top-[92px] md:top-[104px] z-20 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_35px_100px_rgba(0,0,0,0.9),0_-15px_40px_rgba(0,0,0,0.6)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 1 ? " is-active" : ""}`}
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-                <span className="text-xs font-mono tracking-[0.22em] text-[#38BDF8] uppercase font-semibold">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#D6B878] uppercase font-semibold">
                   PRECISION // 02
                 </span>
                 <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
@@ -336,28 +320,28 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="p-6 sm:p-8 rounded-2xl bg-[rgba(12,20,36,0.7)] border border-white/10 hover:border-[#38BDF8]/40 transition-colors">
-                    <Compass className="w-6 h-6 text-[#38BDF8] mb-5" />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
+                  <div className="p-4 sm:p-8 rounded-2xl bg-[rgba(18,17,14,0.68)] border border-white/10 hover:border-[rgba(214,184,120,0.38)] transition-colors duration-300">
+                    <Compass className="w-6 h-6 text-[#D6B878] mb-5" />
                     <h4 className="text-xl font-serif text-[#F5F5F5] mb-2">Solar Orientation</h4>
                     <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light leading-relaxed">
-                      Living spaces align with cardinal solar trajectories, flooding gathering rooms with natural daylight while buffering bedrooms.
+                      Orient living spaces to daylight while keeping bedrooms naturally shaded.
                     </p>
                   </div>
 
-                  <div className="p-6 sm:p-8 rounded-2xl bg-[rgba(12,20,36,0.7)] border border-white/10 hover:border-[#38BDF8]/40 transition-colors">
-                    <Layers className="w-6 h-6 text-[#38BDF8] mb-5" />
+                  <div className="p-4 sm:p-8 rounded-2xl bg-[rgba(15,13,20,0.68)] border border-white/10 hover:border-[rgba(167,139,250,0.34)] transition-colors duration-300">
+                    <Layers className="w-6 h-6 text-[#A78BFA] mb-5" />
                     <h4 className="text-xl font-serif text-[#F5F5F5] mb-2">Acoustic Zoning</h4>
                     <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light leading-relaxed">
-                      Resting suites are buffered by dressing vestibules and bathrooms, insulating quiet quarters from culinary and social zones.
+                      Buffer quiet bedrooms from kitchens and shared spaces with vestibules.
                     </p>
                   </div>
 
-                  <div className="p-6 sm:p-8 rounded-2xl bg-[rgba(12,20,36,0.7)] border border-white/10 hover:border-[#38BDF8]/40 transition-colors">
-                    <ShieldCheck className="w-6 h-6 text-[#38BDF8] mb-5" />
+                  <div className="p-4 sm:p-8 rounded-2xl bg-[rgba(18,17,14,0.68)] border border-white/10 hover:border-[rgba(214,184,120,0.38)] transition-colors duration-300">
+                    <ShieldCheck className="w-6 h-6 text-[#D6B878] mb-5" />
                     <h4 className="text-xl font-serif text-[#F5F5F5] mb-2">Structural Integrity</h4>
                     <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light leading-relaxed">
-                      Vertical structural columns and plumbing chases align across floor levels to guarantee buildability and cost optimization.
+                      Align columns and service shafts across floors for buildable, efficient homes.
                     </p>
                   </div>
                 </div>
@@ -372,7 +356,8 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             {/* ══ CARD 3: INTELLIGENCE // 03 ══ */}
             <div
               ref={(el) => { cardRefs.current[2] = el; }}
-              className="sticky top-[92px] md:top-[104px] z-30 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.26)] shadow-[0_40px_110px_rgba(0,0,0,0.92),0_-15px_40px_rgba(0,0,0,0.65)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+              data-stack-depth={getCardDepth(2)}
+              className={`stacking-card accent-ai sticky top-[92px] md:top-[104px] z-30 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_40px_110px_rgba(0,0,0,0.92),0_-15px_40px_rgba(0,0,0,0.65)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 2 ? " is-active" : ""}`}
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
                 <span className="text-xs font-mono tracking-[0.22em] text-[#06B6D4] uppercase font-semibold">
@@ -393,7 +378,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                     className="w-full h-full object-cover contrast-115"
                   />
                   <div className="absolute inset-0 bg-[#030303]/35" />
-                  <div className="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-[#080E1A]/90 border border-white/10 text-[10px] font-mono text-[#06B6D4]">
+                  <div className="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-[#101216]/90 border border-[rgba(167,139,250,0.22)] text-[10px] font-mono text-[#A78BFA]">
                     TOPOLOGY SOLVER // SHAPELY + NETWORKX
                   </div>
                 </div>
@@ -408,15 +393,15 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   </p>
                   <ul className="space-y-3.5 text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light">
                     <li className="flex items-center gap-3">
-                      <CheckCircle2 className="w-4 h-4 text-[#06B6D4] shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-[#A78BFA] shrink-0" />
                       <span>Deterministic constraint-satisfaction (Google OR-Tools CP-SAT)</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <CheckCircle2 className="w-4 h-4 text-[#06B6D4] shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-[#A78BFA] shrink-0" />
                       <span>Real-time mathematical room scoring and circulation analysis</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <CheckCircle2 className="w-4 h-4 text-[#06B6D4] shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-[#A78BFA] shrink-0" />
                       <span>Export-ready 2D blueprint vectors and Three.js 3D meshes</span>
                     </li>
                   </ul>
@@ -424,7 +409,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
               </div>
 
               <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
-                <span className="text-[#06B6D4] font-semibold">03 // INTELLIGENCE</span>
+                <span className="text-[#A78BFA] font-semibold">03 // INTELLIGENCE</span>
                 <span className="text-[rgba(255,255,255,0.45)]">CP-SAT SOLVER</span>
               </div>
             </div>
@@ -432,10 +417,11 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             {/* ══ CARD 4: IMMERSION // 04 ══ */}
             <div
               ref={(el) => { cardRefs.current[3] = el; }}
-              className="sticky top-[92px] md:top-[104px] z-40 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.28)] shadow-[0_45px_120px_rgba(0,0,0,0.95),0_-15px_40px_rgba(0,0,0,0.7)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+              data-stack-depth={getCardDepth(3)}
+              className={`stacking-card accent-landscape sticky top-[92px] md:top-[104px] z-40 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_45px_120px_rgba(0,0,0,0.95),0_-15px_40px_rgba(0,0,0,0.7)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 3 ? " is-active" : ""}`}
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-                <span className="text-xs font-mono tracking-[0.22em] text-[#60A5FA] uppercase font-semibold">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#78A887] uppercase font-semibold">
                   IMMERSION // 04
                 </span>
                 <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
@@ -473,7 +459,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
               </div>
 
               <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
-                <span className="text-[#60A5FA] font-semibold">04 // IMMERSION</span>
+                <span className="text-[#78A887] font-semibold">04 // IMMERSION</span>
                 <span className="text-[rgba(255,255,255,0.45)]">3D DOLLHOUSE</span>
               </div>
             </div>
@@ -481,10 +467,11 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             {/* ══ CARD 5: TYPOLOGIES // 05 ══ */}
             <div
               ref={(el) => { cardRefs.current[4] = el; }}
-              className="sticky top-[92px] md:top-[104px] z-50 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.30)] shadow-[0_50px_130px_rgba(0,0,0,0.98),0_-15px_40px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between mb-0 overflow-hidden will-change-transform"
+              data-stack-depth={getCardDepth(4)}
+              className={`stacking-card accent-architecture sticky top-[92px] md:top-[104px] z-50 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_50px_130px_rgba(0,0,0,0.98),0_-15px_40px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between mb-0 overflow-hidden${activeCardIndex === 4 ? " is-active" : ""}`}
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-                <span className="text-xs font-mono tracking-[0.22em] text-[#93C5FD] uppercase font-semibold">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#D6B878] uppercase font-semibold">
                   TYPOLOGIES // 05
                 </span>
                 <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
@@ -504,14 +491,14 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   </div>
                   <button
                     onClick={onStartDesign}
-                    className="text-xs font-mono tracking-widest text-[#60A5FA] hover:text-[#FFFFFF] transition-colors flex items-center gap-2 group cursor-pointer"
+                    className="text-xs font-mono tracking-widest text-[#D6B878] hover:text-[#F4F1EA] transition-colors flex items-center gap-2 group cursor-pointer"
                   >
                     <span>CREATE BESPOKE HOME</span>
                     <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                   {[
                     {
                       title: "Nordic Courtyard Residence",
@@ -562,7 +549,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                     <div
                       key={idx}
                       onClick={() => onSelectPreset(p.intake)}
-                      className="group cursor-pointer flex flex-col p-3 rounded-2xl bg-[rgba(12,20,36,0.6)] border border-white/10 hover:border-[#60A5FA]/40 transition-all hover:-translate-y-1"
+                      className="group cursor-pointer flex flex-col p-3 rounded-2xl bg-[rgba(15,15,14,0.72)] border border-white/10 hover:border-[rgba(214,184,120,0.4)] hover:bg-[rgba(20,19,16,0.86)] transition-all duration-300 hover:-translate-y-1"
                     >
                       <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3 border border-white/8 bg-[#05070B]">
                         <img
@@ -578,7 +565,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                           </span>
                         </div>
                       </div>
-                      <h4 className="text-base font-serif text-[#F5F5F5] mb-1 group-hover:text-[#60A5FA] transition-colors">
+                      <h4 className="text-base font-serif text-[#F4F1EA] mb-1 group-hover:text-[#D6B878] transition-colors">
                         {p.title}
                       </h4>
                       <span className="text-xs font-mono text-[rgba(255,255,255,0.62)]">
@@ -590,7 +577,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
               </div>
 
               <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
-                <span className="text-[#93C5FD] font-semibold">05 // TYPOLOGIES</span>
+                <span className="text-[#D6B878] font-semibold">05 // TYPOLOGIES</span>
                 <span className="text-[rgba(255,255,255,0.45)]">DECK COMPLETE · 5 OF 5</span>
               </div>
             </div>
@@ -599,15 +586,15 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </section>
 
         {/* ── 3. FINAL CALL-TO-ACTION SECTION ── */}
-        <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-[linear-gradient(180deg,#030303_0%,#080E1A_100%)] text-center overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.12)_0%,transparent_65%)]" />
+        <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-[linear-gradient(180deg,#030303_0%,#101216_100%)] text-center overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_48%_38%,rgba(139,92,246,0.055)_0%,transparent_55%),radial-gradient(ellipse_at_75%_72%,rgba(214,184,120,0.045)_0%,transparent_48%),radial-gradient(ellipse_at_24%_70%,rgba(37,99,235,0.035)_0%,transparent_52%)]" />
 
           <div className="relative z-10 max-w-3xl mx-auto flex flex-col items-center">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(37,99,235,0.12)] border border-[rgba(96,165,250,0.22)] text-[10px] font-mono tracking-[0.24em] text-[#93C5FD] uppercase mb-5">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(214,184,120,0.08)] border border-[rgba(214,184,120,0.18)] text-[10px] font-mono tracking-[0.24em] text-[#D6B878] uppercase mb-5">
               BEGIN CONSULTATION
             </span>
 
-            <h2 className="text-4xl sm:text-6xl md:text-7xl font-serif font-light text-[#F5F5F5] mb-6 tracking-tight leading-tight">
+            <h2 className="text-4xl sm:text-6xl md:text-7xl font-serif font-light text-[#F4F1EA] mb-6 tracking-tight leading-tight">
               Ready to design your residence?
             </h2>
 
