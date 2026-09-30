@@ -48,14 +48,14 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md">
       <AnimatePresence>
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-lg bg-[#12141A] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+          className="relative w-full max-w-lg bg-[#080D1A]/95 border border-blue-500/20 rounded-3xl p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-2xl"
         >
           {/* Close button */}
           <button
@@ -64,18 +64,18 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
               onClose();
             }}
             aria-label="Close archive"
-            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-[#9E9C98] hover:text-white flex items-center justify-center transition-colors"
+            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-[#9E9C98] hover:text-white flex items-center justify-center transition-colors border border-white/5"
           >
             <X className="w-4 h-4" />
           </button>
 
           {/* Header */}
           <div className="mb-6">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#C48446]/10 border border-[#C48446]/20 text-[10px] font-mono tracking-widest text-[#C48446] uppercase mb-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-[10px] font-mono tracking-widest text-cyan-400 uppercase mb-2">
               <FolderGit2 className="w-3 h-3" />
               ARCHITECTURAL ARCHIVE
             </span>
-            <h2 className="text-2xl font-serif font-light text-[#F5F3EF]">
+            <h2 className="text-2xl font-serif font-light text-[#F5F5F5]">
               Your Projects
             </h2>
             <p className="text-xs text-[#9E9C98] font-light mt-1">
@@ -98,7 +98,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                     onClose();
                     onStartNew();
                   }}
-                  className="px-5 py-2.5 rounded-full bg-[#C48446] text-[#0A0B0E] font-medium text-xs tracking-wider uppercase inline-flex items-center gap-2 hover:bg-[#D49354] transition-colors"
+                  className="px-5 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium text-xs tracking-wider uppercase inline-flex items-center gap-2 hover:from-blue-500 hover:to-cyan-400 transition-colors shadow-lg shadow-blue-500/20"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>START NEW DESIGN</span>
@@ -117,15 +117,15 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                   }}
                   className={`group cursor-pointer p-4 rounded-xl border transition-all duration-200 flex items-center justify-between ${
                     isActive
-                      ? "bg-[#C48446]/10 border-[#C48446]/40 text-[#F5F3EF]"
-                      : "bg-[#171A22]/70 hover:bg-[#1C202B] border-white/5 hover:border-white/20 text-[#DCD8D0]"
+                      ? "bg-blue-950/40 border-blue-500/50 text-[#F5F5F5] shadow-[0_0_20px_rgba(37,99,235,0.15)]"
+                      : "bg-[#0B101C]/60 hover:bg-[#101726]/80 border-white/5 hover:border-blue-500/30 text-[#DCD8D0]"
                   }`}
                 >
                   <div className="min-w-0 flex-1 pr-3">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-serif font-medium truncate">{p.title}</span>
+                      <span className="text-sm font-serif font-medium truncate text-[#F5F5F5]">{p.title}</span>
                       {isActive && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-[#C48446] text-[#0A0B0E] font-bold">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-blue-600 text-white font-bold">
                           Active
                         </span>
                       )}

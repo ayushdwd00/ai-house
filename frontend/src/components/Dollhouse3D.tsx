@@ -1681,9 +1681,13 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       className="relative w-full h-full select-none overflow-hidden bg-[#0E1015]"
     >
       {/* MODEL VIEW CONTROLS */}
-      <div className="absolute top-20 xl:top-4 left-3 right-3 xl:left-4 xl:right-4 z-20 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2 pointer-events-none">
+      <div
+        className="absolute top-20 xl:top-4 left-3 right-3 xl:left-4 xl:right-4 z-20 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2 pointer-events-none"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div
-          className={`pointer-events-auto max-h-[calc(100dvh-21rem)] justify-self-start overflow-x-hidden overflow-y-auto rounded-2xl border border-white/10 bg-[#12141A]/95 text-[#9E9C98] shadow-2xl shadow-black/35 backdrop-blur-md transition-[width] duration-200 ease-out motion-reduce:transition-none ${
+          className={`pointer-events-auto max-h-[calc(100dvh-21rem)] justify-self-start overflow-x-hidden overflow-y-auto rounded-2xl border border-[rgba(96,165,250,0.2)] bg-[rgba(8,15,28,0.88)] text-[rgba(255,255,255,0.7)] shadow-[0_20px_50px_rgba(0,0,0,0.55),0_0_25px_rgba(37,99,235,0.12)] backdrop-blur-[24px] transition-[width] duration-200 ease-out motion-reduce:transition-none ${
             isControlPanelExpanded
               ? "w-64 max-w-[calc(100vw-1.5rem)] p-3"
               : "w-36 p-1"
@@ -1695,16 +1699,16 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               aria-label="Expand Model Controls"
               aria-expanded={false}
               onClick={() => setIsControlPanelExpanded(true)}
-              className="flex min-h-9 w-full items-center justify-center gap-2 rounded-full px-1.5 text-[#E69F58] transition-colors hover:bg-white/5 hover:text-[#F5F3EF]"
+              className="flex min-h-9 w-full items-center justify-center gap-2 rounded-full px-2 text-[#93C5FD] transition-colors hover:bg-white/5 hover:text-white"
             >
-              <SlidersHorizontal className="h-4 w-4 shrink-0 text-[#C48446]" />
+              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-[#60A5FA]" />
               <span className="whitespace-nowrap text-[10px] font-mono font-semibold uppercase tracking-wider">
                 Model Controls
               </span>
             </button>
           ) : (
             <div className="mb-2.5 flex items-center justify-between border-b border-white/10 pb-2">
-              <span className="text-[10px] font-mono font-semibold uppercase tracking-widest text-[#D6D2CA]">
+              <span className="text-[10px] font-mono font-semibold uppercase tracking-widest text-[#F5F5F5]">
                 Model Controls
               </span>
               <button
@@ -1712,7 +1716,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
                 aria-label="Collapse Model Controls"
                 aria-expanded={true}
                 onClick={() => setIsControlPanelExpanded(false)}
-                className="rounded-md p-1 text-[#9E9C98] transition-colors hover:bg-white/10 hover:text-[#F5F3EF]"
+                className="rounded-md p-1 text-[rgba(255,255,255,0.5)] transition-colors hover:bg-white/10 hover:text-white"
               >
                 <ChevronUp className="h-4 w-4" />
               </button>
@@ -1729,124 +1733,128 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
             }`}
           >
             <div className="min-h-0 overflow-hidden">
-          <div className="space-y-2 font-mono text-[10px]">
-            <div>
-              <span className="mb-1 block uppercase tracking-wider text-[#9E9C98]">View mode</span>
-              <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/25 p-1">
-                <button
-                  type="button"
-                  aria-pressed={isCutawayMode}
-                  onClick={() => {
-                    setIsCutawayMode(true);
-                    setPresentationMode("cutaway");
-                  }}
-                  className={`rounded-lg px-2 py-1.5 transition-colors ${
-                    isCutawayMode
-                      ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
-                      : "text-[#B8B4AC] hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  Dollhouse
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={!isCutawayMode}
-                  onClick={() => {
-                    setIsCutawayMode(false);
-                    setPresentationMode("exterior");
-                  }}
-                  className={`rounded-lg px-2 py-1.5 transition-colors ${
-                    !isCutawayMode
-                      ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
-                      : "text-[#B8B4AC] hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  Exterior
-                </button>
+              <div className="space-y-2.5 font-mono text-[10px]">
+                <div>
+                  <span className="mb-1 block uppercase tracking-wider text-[rgba(255,255,255,0.45)]">View mode</span>
+                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/40 p-1 border border-white/5">
+                    <button
+                      type="button"
+                      aria-pressed={isCutawayMode}
+                      onClick={() => {
+                        setIsCutawayMode(true);
+                        setPresentationMode("cutaway");
+                      }}
+                      className={`rounded-lg px-2 py-1.5 transition-colors ${
+                        isCutawayMode
+                          ? "bg-[linear-gradient(135deg,#2563EB,#06B6D4)] font-semibold text-white shadow-sm"
+                          : "text-[rgba(255,255,255,0.6)] hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      Dollhouse
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={!isCutawayMode}
+                      onClick={() => {
+                        setIsCutawayMode(false);
+                        setPresentationMode("exterior");
+                      }}
+                      className={`rounded-lg px-2 py-1.5 transition-colors ${
+                        !isCutawayMode
+                          ? "bg-[linear-gradient(135deg,#2563EB,#06B6D4)] font-semibold text-white shadow-sm"
+                          : "text-[rgba(255,255,255,0.6)] hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      Exterior
+                    </button>
+                  </div>
+                </div>
+
+                <label className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 uppercase tracking-wider text-[rgba(255,255,255,0.45)]">Floor</span>
+                  <select
+                    aria-label="Model floor"
+                    value={multiFloorStacked ? "all" : String(activeFloorIndex)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "all") {
+                        setMultiFloorStacked(true);
+                        return;
+                      }
+                      const floorIndex = Number(value);
+                      if (Number.isInteger(floorIndex) && floorIndex >= 0) {
+                        setMultiFloorStacked(false);
+                        onSelectFloor?.(floorIndex);
+                      }
+                    }}
+                    className="min-w-0 flex-1 rounded-lg border border-[rgba(96,165,250,0.2)] bg-[#0C1220] px-2 py-1.5 text-[#E8E4DC] outline-none transition-colors focus:border-[#60A5FA]"
+                  >
+                    <option value="all">All Floors</option>
+                    {(layout.floors || []).map((floor, index) => (
+                      <option key={floor.floor_id || floor.floor_number} value={index}>
+                        {floor.floor_name || `Floor ${floor.floor_number}`}
+                      </option>
+                    ))}
+                    {!layout.floors?.length && <option value={0}>Ground Floor</option>}
+                  </select>
+                </label>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="uppercase tracking-wider text-[rgba(255,255,255,0.45)]">Roof visibility</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="Roof visibility"
+                    aria-checked={effectiveShowRoof}
+                    onClick={() => {
+                      if (onToggleRoof) onToggleRoof();
+                      else setInternalShowRoof((visible) => !visible);
+                    }}
+                    className={`relative h-5 w-9 shrink-0 overflow-hidden rounded-full transition-colors ${
+                      effectiveShowRoof ? "bg-[#3B82F6]" : "bg-white/20"
+                    }`}
+                  >
+                    <span
+                      className={`absolute left-0 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                        effectiveShowRoof ? "translate-x-4" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <label className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 uppercase tracking-wider text-[rgba(255,255,255,0.45)]">Cutaway view</span>
+                  <select
+                    aria-label="Cutaway view"
+                    value={cameraView}
+                    onChange={(event) => handleCameraPreset(event.target.value as CameraPresetType)}
+                    className="min-w-0 flex-1 rounded-lg border border-[rgba(96,165,250,0.2)] bg-[#0C1220] px-2 py-1.5 text-[#E8E4DC] outline-none transition-colors focus:border-[#60A5FA]"
+                  >
+                    <option value="cutaway">Dollhouse 3/4</option>
+                    <option value="exterior">Exterior Perspective</option>
+                    <option value="iso">Isometric 45°</option>
+                    <option value="top">Top (Plan)</option>
+                    <option value="front">Front Facade</option>
+                    <option value="entrance">Main Entrance</option>
+                    <option value="living">Living Room</option>
+                    <option value="kitchen">Kitchen</option>
+                    <option value="bedroom">Master Bedroom</option>
+                    <option value="garden">Site &amp; Garden</option>
+                  </select>
+                </label>
               </div>
-            </div>
-
-            <label className="flex items-center justify-between gap-3">
-              <span className="shrink-0 uppercase tracking-wider text-[#9E9C98]">Floor</span>
-              <select
-                aria-label="Model floor"
-                value={multiFloorStacked ? "all" : String(activeFloorIndex)}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value === "all") {
-                    setMultiFloorStacked(true);
-                    return;
-                  }
-                  const floorIndex = Number(value);
-                  if (Number.isInteger(floorIndex) && floorIndex >= 0) {
-                    setMultiFloorStacked(false);
-                    onSelectFloor?.(floorIndex);
-                  }
-                }}
-                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#1A1D24] px-2 py-1.5 text-[#E8E4DC] outline-none transition-colors focus:border-[#C48446]/60"
-              >
-                <option value="all">All Floors</option>
-                {(layout.floors || []).map((floor, index) => (
-                  <option key={floor.floor_id || floor.floor_number} value={index}>
-                    {floor.floor_name || `Floor ${floor.floor_number}`}
-                  </option>
-                ))}
-                {!layout.floors?.length && <option value={0}>Ground Floor</option>}
-              </select>
-            </label>
-
-            <div className="flex items-center justify-between gap-3">
-              <span className="uppercase tracking-wider text-[#9E9C98]">Roof visibility</span>
-              <button
-                type="button"
-                role="switch"
-                aria-label="Roof visibility"
-                aria-checked={effectiveShowRoof}
-                onClick={() => {
-                  if (onToggleRoof) onToggleRoof();
-                  else setInternalShowRoof((visible) => !visible);
-                }}
-                className={`relative h-5 w-9 shrink-0 overflow-hidden rounded-full transition-colors ${
-                  effectiveShowRoof ? "bg-[#C48446]" : "bg-white/20"
-                }`}
-              >
-                <span
-                  className={`absolute left-0 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
-                    effectiveShowRoof ? "translate-x-4" : "translate-x-0.5"
-                  }`}
-                />
-              </button>
-            </div>
-
-            <label className="flex items-center justify-between gap-3">
-              <span className="shrink-0 uppercase tracking-wider text-[#9E9C98]">Cutaway view</span>
-              <select
-                aria-label="Cutaway view"
-                value={cameraView}
-                onChange={(event) => handleCameraPreset(event.target.value as CameraPresetType)}
-                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#1A1D24] px-2 py-1.5 text-[#E8E4DC] outline-none transition-colors focus:border-[#C48446]/60"
-              >
-                <option value="cutaway">Dollhouse 3/4</option>
-                <option value="exterior">Exterior Perspective</option>
-                <option value="iso">Isometric 45°</option>
-                <option value="top">Top (Plan)</option>
-                <option value="front">Front Facade</option>
-                <option value="entrance">Main Entrance</option>
-                <option value="living">Living Room</option>
-                <option value="kitchen">Kitchen</option>
-                <option value="bedroom">Master Bedroom</option>
-                <option value="garden">Site &amp; Garden</option>
-              </select>
-            </label>
-          </div>
             </div>
           </div>
         </div>
 
         {/* Right: Lighting Atmosphere */}
-        <div className="pointer-events-auto col-start-2 row-start-2 flex items-center justify-self-end gap-1 sm:row-start-1 sm:gap-2">
+        <div
+          className="pointer-events-auto col-start-2 row-start-2 flex items-center justify-self-end gap-1 sm:row-start-1 sm:gap-2"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Lighting Mode */}
-          <div className="flex items-center p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#9E9C98]">
+          <div className="flex items-center p-1 rounded-full bg-[rgba(8,15,28,0.88)] backdrop-blur-[24px] border border-[rgba(96,165,250,0.2)] shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(37,99,235,0.1)] text-xs font-mono text-[rgba(255,255,255,0.6)]">
             <button
               type="button"
               onClick={() => {
@@ -1855,7 +1863,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               }}
               className={`p-1.5 px-2.5 rounded-full flex items-center gap-1 transition-all ${
                 effectiveLightingPreset === "day"
-                  ? "bg-white/20 text-white font-medium"
+                  ? "bg-[rgba(59,130,246,0.2)] text-white font-medium shadow-sm border border-[rgba(96,165,250,0.3)]"
                   : "hover:text-white"
               }`}
             >
@@ -1870,7 +1878,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               }}
               className={`p-1.5 px-2.5 rounded-full flex items-center gap-1 transition-all ${
                 effectiveLightingPreset === "sunset"
-                  ? "bg-white/20 text-white font-medium"
+                  ? "bg-[rgba(59,130,246,0.2)] text-white font-medium shadow-sm border border-[rgba(96,165,250,0.3)]"
                   : "hover:text-white"
               }`}
             >
@@ -1885,7 +1893,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
               }}
               className={`p-1.5 px-2.5 rounded-full flex items-center gap-1 transition-all ${
                 effectiveLightingPreset === "night"
-                  ? "bg-white/20 text-white font-medium"
+                  ? "bg-[rgba(59,130,246,0.2)] text-white font-medium shadow-sm border border-[rgba(96,165,250,0.3)]"
                   : "hover:text-white"
               }`}
             >
@@ -1898,22 +1906,26 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
       {/* FLOATING SELECTED ROOM 3D DIMENSION CONTROLS */}
       {selectedRoom && selectedRoom.rect && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 p-2 px-4 rounded-2xl bg-[#12141A]/95 backdrop-blur-md border border-[#C48446]/40 shadow-2xl text-white pointer-events-auto">
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 p-2.5 px-4 rounded-2xl bg-[rgba(8,15,28,0.92)] backdrop-blur-[24px] border border-[#C48446]/40 shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_25px_rgba(196,132,70,0.15)] text-white pointer-events-auto"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="border-r border-white/10 pr-3">
-            <span className="text-[10px] font-mono text-[#C48446] block uppercase tracking-wider">
+            <span className="text-[10px] font-mono text-[#C48446] block uppercase tracking-wider font-semibold">
               Selected Space
             </span>
-            <span className="text-xs font-semibold block capitalize">
+            <span className="text-xs font-semibold block capitalize text-[#F5F5F5]">
               {selectedRoom.name || selectedRoom.type}
             </span>
-            <span className="text-[11px] text-[#9E9C98] font-mono">
+            <span className="text-[11px] text-[rgba(255,255,255,0.6)] font-mono">
               {Math.round(selectedRoom.rect.width)}&apos; × {Math.round(selectedRoom.rect.length)}&apos; ({Math.round(selectedRoom.rect.width * selectedRoom.rect.length)} sqft)
             </span>
           </div>
 
           {/* Width adjustment */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono text-[#9E9C98]">Width:</span>
+            <span className="text-[11px] font-mono text-[rgba(255,255,255,0.6)]">Width:</span>
             <button
               type="button"
               disabled={isEditingRoom}
@@ -1936,7 +1948,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
 
           {/* Length / Depth adjustment */}
           <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
-            <span className="text-[11px] font-mono text-[#9E9C98]">Depth:</span>
+            <span className="text-[11px] font-mono text-[rgba(255,255,255,0.6)]">Depth:</span>
             <button
               type="button"
               disabled={isEditingRoom}
@@ -1960,7 +1972,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
           <button
             type="button"
             onClick={() => onSelectRoom(null)}
-            className="text-[11px] text-[#9E9C98] hover:text-white ml-2 underline"
+            className="text-[11px] text-[rgba(255,255,255,0.5)] hover:text-white ml-2 underline cursor-pointer"
           >
             Deselect
           </button>
@@ -1968,8 +1980,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       )}
 
       {/* ORIENTATION COMPASS INDICATOR (BOTTOM RIGHT) */}
-      <div className="absolute bottom-6 right-6 z-10 flex items-center gap-2 p-2 px-3 rounded-full bg-[#12141A]/80 backdrop-blur-sm border border-white/10 text-xs font-mono text-[#9E9C98] pointer-events-none">
-        <Compass className="w-4 h-4 text-[#C48446]" />
+      <div className="absolute bottom-6 right-6 z-10 flex items-center gap-2 p-2 px-3.5 rounded-full bg-[rgba(8,15,28,0.85)] backdrop-blur-[20px] border border-[rgba(96,165,250,0.2)] text-xs font-mono text-[rgba(255,255,255,0.64)] pointer-events-none shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
+        <Compass className="w-4 h-4 text-[#60A5FA]" />
         <span>Road Facing: <strong className="text-white uppercase">{resolvedFacing}</strong></span>
       </div>
     </div>

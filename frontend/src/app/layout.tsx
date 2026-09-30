@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Inter, Cormorant_Garamond } from "next/font/google";
+import { Inter, Instrument_Serif, IBM_Plex_Mono } from "next/font/google";
+import "@designcodeio/threeui/style.css";
 import "./globals.css";
 import { ProjectProvider } from "@/context/ProjectContext";
 
@@ -9,10 +10,17 @@ const inter = Inter({
   display: "swap",
 });
 
-const cormorant = Cormorant_Garamond({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
   variable: "--font-serif",
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400"],
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -28,8 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${cormorant.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full flex flex-col bg-[#0A0B0E] text-[#F5F3EF] font-sans selection:bg-[#C48446]/30 selection:text-[#F7DCB9]" suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${instrumentSerif.variable} ${plexMono.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-[#030303] text-[#F5F5F5] font-sans selection:bg-[#8B5CF6]/30 selection:text-white" suppressHydrationWarning>
         <ProjectProvider>
           {children}
         </ProjectProvider>

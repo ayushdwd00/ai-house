@@ -5451,13 +5451,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // 2. PRESENTATION VIEW MODE (when mode === 'view')
   // -------------------------------------------------------------
   return (
-    <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#ECEEF2]">
+    <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#030303]">
       {/* Presentation Top Bar */}
       <div className="absolute top-4 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto">
           <button
             onClick={() => router.push(`/project/${layout.id}/plan`)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 text-xs font-mono tracking-wider shadow-lg transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#080F1C]/80 hover:bg-[#0D1526]/90 text-[#F5F5F5] border border-blue-500/20 backdrop-blur-md text-xs font-mono tracking-wider shadow-lg transition-all"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
             <span>PLAN</span>
@@ -5465,15 +5465,15 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
           {/* Floor Level Switcher */}
           {layout.floors && layout.floors.length > 1 && onSelectFloor && (
-            <div className="flex items-center p-0.5 rounded-full bg-[#12141A]/90 border border-white/10 shadow-lg text-[10px] font-mono text-[#9E9C98]">
+            <div className="flex items-center p-0.5 rounded-full bg-[#080F1C]/80 border border-blue-500/20 backdrop-blur-md shadow-lg text-[10px] font-mono text-[#9E9C98]">
               {layout.floors.map((fl, idx) => (
                 <button
                   key={fl.floor_number}
                   onClick={() => onSelectFloor(idx)}
                   className={`px-2.5 py-1 rounded-full transition-all ${
                     activeFloorIndex === idx
-                      ? "bg-[#C48446] text-[#0A0B0E] font-medium shadow-sm"
-                      : "hover:text-[#F5F3EF]"
+                      ? "bg-[#C48446] text-[#030303] font-medium shadow-sm"
+                      : "hover:text-[#F5F5F5]"
                   }`}
                 >
                   {fl.floor_name ? fl.floor_name.replace(" Floor", "").toUpperCase() : idx === 0 ? "GROUND" : idx === 1 ? "FIRST" : `L${fl.floor_number}`}
@@ -5488,7 +5488,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           <button
             onClick={handleExportPNG}
             disabled={isExporting}
-            className="p-2 rounded-full bg-[#12141A]/90 hover:bg-[#1A1D24] text-[#9E9C98] hover:text-[#F5F3EF] border border-white/10 shadow-lg transition-all disabled:opacity-50"
+            className="p-2 rounded-full bg-[#080F1C]/80 hover:bg-[#0D1526]/90 text-[#9E9C98] hover:text-[#F5F5F5] border border-blue-500/20 backdrop-blur-md shadow-lg transition-all disabled:opacity-50"
             title="Export Architectural Drawing (PNG)"
           >
             {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}

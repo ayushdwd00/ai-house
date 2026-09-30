@@ -82,29 +82,25 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div
-        className={`relative w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border overflow-hidden transition-colors ${
-          isDarkMode
-            ? "bg-[#1C1917] border-stone-800 text-stone-100"
-            : "bg-white border-stone-100 text-stone-900"
-        }`}
+        className="relative w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8)] border border-blue-500/20 bg-[#080D1A]/95 text-[#F5F5F5] overflow-hidden backdrop-blur-2xl transition-colors"
       >
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 p-2 rounded-full text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+          className="absolute top-6 right-6 p-2 rounded-full text-stone-400 hover:text-white hover:bg-white/10 transition-colors border border-white/5"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+          <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-cyan-400">
             <UploadCloud className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Upload Floor Plan</h2>
-            <p className="text-xs text-stone-500 dark:text-stone-400">
+            <h2 className="text-xl font-serif font-light tracking-tight text-[#F5F5F5]">Upload Floor Plan</h2>
+            <p className="text-xs text-[#9E9C98]">
               Scan blueprint, sketch, or image into interactive 2D & 3D
             </p>
           </div>
@@ -116,11 +112,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`mt-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-              isDarkMode
-                ? "border-stone-700 hover:border-amber-500/60 bg-stone-900/60 hover:bg-stone-900"
-                : "border-stone-300 hover:border-amber-600/70 bg-stone-50/70 hover:bg-amber-500/5"
-            }`}
+            className="mt-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all border-blue-500/30 hover:border-cyan-400/60 bg-[#0B101C]/80 hover:bg-[#101726]"
           >
             <input
               type="file"
@@ -130,16 +122,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               className="hidden"
             />
             <div
-              className={`w-12 h-12 rounded-full shadow-sm border flex items-center justify-center mx-auto mb-3 ${
-                isDarkMode ? "bg-stone-800 border-stone-700 text-stone-300" : "bg-white border-stone-200 text-stone-500"
-              }`}
+              className="w-12 h-12 rounded-full shadow-sm border border-blue-500/20 flex items-center justify-center mx-auto mb-3 bg-[#080D1A] text-cyan-400"
             >
               <ImageIcon className="w-6 h-6" />
             </div>
-            <p className="text-sm font-semibold">Drag & drop floor plan image here</p>
-            <p className="text-xs text-stone-400 mt-1">PNG, JPG, or WEBP up to 25MB</p>
-            <span className="inline-block mt-4 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full">
-              Or browse files
+            <p className="text-sm font-medium text-[#F5F5F5]">Drag & drop floor plan image here</p>
+            <p className="text-xs text-[#9E9C98] mt-1">PNG, JPG, or WEBP up to 25MB</p>
+            <span className="inline-block mt-4 text-xs font-mono tracking-wider text-cyan-400 bg-blue-500/10 border border-blue-500/20 px-3.5 py-1.5 rounded-full">
+              BROWSE FILES
             </span>
           </div>
         )}
@@ -179,22 +169,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   step={1}
                   value={widthFt}
                   onChange={(e) => setWidthFt(Number(e.target.value))}
-                  className={`w-28 px-3 py-2 text-sm font-bold rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                    isDarkMode
-                      ? "bg-stone-900 border-stone-700 text-stone-100"
-                      : "bg-white border-stone-300 text-stone-900"
-                  }`}
+                  className="w-28 px-3 py-2 text-sm font-mono font-bold rounded-xl border border-blue-500/30 bg-[#080D1A] text-[#F5F5F5] focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
                   required
                 />
-                <span className="text-xs text-stone-500 font-medium">feet wide</span>
+                <span className="text-xs font-mono text-[#9E9C98]">FEET WIDE</span>
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-stone-900 hover:bg-stone-800 dark:bg-amber-600 dark:hover:bg-amber-500 text-white font-medium text-sm transition-all shadow-md active:scale-[0.99]"
+              className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium text-sm transition-all shadow-lg shadow-blue-500/25 active:scale-[0.99]"
             >
-              <span>Convert to Interactive 2D & 3D</span>
+              <span>CONVERT TO INTERACTIVE 2D & 3D</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -203,9 +189,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         {/* Step 3: Processing */}
         {step === "processing" && (
           <div className="mt-8 py-10 text-center space-y-4">
-            <div className="w-12 h-12 border-3 border-amber-600/20 border-t-amber-600 rounded-full animate-spin mx-auto" />
-            <h3 className="text-sm font-semibold">Processing Floor Plan</h3>
-            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-xs mx-auto">{statusMessage}</p>
+            <div className="w-12 h-12 border-2 border-blue-600/30 border-t-cyan-400 rounded-full animate-spin mx-auto" />
+            <h3 className="text-sm font-serif font-light text-[#F5F5F5]">Processing Floor Plan</h3>
+            <p className="text-xs text-[#9E9C98] font-mono max-w-xs mx-auto">{statusMessage}</p>
           </div>
         )}
       </div>

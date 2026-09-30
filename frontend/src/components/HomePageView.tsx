@@ -2,6 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
+import { PredictiveArcCanvas } from "@designcodeio/threeui";
 import {
   Sparkles,
   ArrowRight,
@@ -12,96 +13,7 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import dynamic from "next/dynamic";
-
-const ArchitecturalHeroBackdrop: React.FC = () => {
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden select-none bg-[#0A0B0E]">
-      {/* 1. Deep Atmospheric Warm Radial Glows */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 45% at 50% 32%, rgba(196, 132, 70, 0.08) 0%, transparent 75%), radial-gradient(circle at 50% 85%, rgba(20, 24, 34, 0.4) 0%, transparent 60%)",
-        }}
-      />
-
-      {/* 2. Precision Architectural Drafting Grid Pattern */}
-      <svg
-        className="absolute inset-0 w-full h-full opacity-60"
-        xmlns="http://www.w3.org/2000/svg"
-        width="100%"
-        height="100%"
-      >
-        <defs>
-          {/* 64px Grid with hairline subdivisions */}
-          <pattern id="archSubGrid" width="16" height="16" patternUnits="userSpaceOnUse">
-            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="0.5" />
-          </pattern>
-          <pattern id="archMainGrid" width="64" height="64" patternUnits="userSpaceOnUse">
-            <rect width="64" height="64" fill="url(#archSubGrid)" />
-            <path d="M 64 0 L 0 0 0 64" fill="none" stroke="rgba(255, 255, 255, 0.04)" strokeWidth="0.8" />
-            {/* Corner crosshairs */}
-            <path
-              d="M -3 0 L 3 0 M 0 -3 L 0 3 M 61 0 L 67 0 M 64 -3 L 64 3"
-              fill="none"
-              stroke="rgba(196, 132, 70, 0.18)"
-              strokeWidth="0.8"
-            />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#archMainGrid)" />
-
-        {/* Faint Architectural Plan Line Geometry (Abstract Minimalist Blueprint) */}
-        <g stroke="rgba(255, 255, 255, 0.04)" strokeWidth="1" fill="none">
-          {/* Outer Boundary Envelope */}
-          <rect x="15%" y="18%" width="70%" height="64%" rx="2" strokeDasharray="6 4" stroke="rgba(196, 132, 70, 0.08)" />
-
-          {/* Central Spatial Pavilions */}
-          <rect x="22%" y="24%" width="28%" height="34%" stroke="rgba(255, 255, 255, 0.05)" />
-          <rect x="22.2%" y="24.3%" width="27.6%" height="33.4%" stroke="rgba(255, 255, 255, 0.025)" />
-
-          <rect x="52%" y="28%" width="26%" height="40%" stroke="rgba(255, 255, 255, 0.05)" />
-          <rect x="52.2%" y="28.3%" width="25.6%" height="39.4%" stroke="rgba(255, 255, 255, 0.025)" />
-
-          {/* Circulation Axis Lines */}
-          <line x1="12%" y1="52%" x2="88%" y2="52%" stroke="rgba(196, 132, 70, 0.09)" strokeDasharray="3 3" />
-          <line x1="50%" y1="12%" x2="50%" y2="88%" stroke="rgba(196, 132, 70, 0.09)" strokeDasharray="3 3" />
-
-          {/* Dimension Chains / Architectural Ticks */}
-          <line x1="22%" y1="20%" x2="50%" y2="20%" stroke="rgba(255, 255, 255, 0.08)" />
-          <line x1="22%" y1="18.5%" x2="22%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
-          <line x1="50%" y1="18.5%" x2="50%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
-
-          <line x1="52%" y1="20%" x2="78%" y2="20%" stroke="rgba(255, 255, 255, 0.08)" />
-          <line x1="52%" y1="18.5%" x2="52%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
-          <line x1="78%" y1="18.5%" x2="78%" y2="21.5%" stroke="rgba(255, 255, 255, 0.12)" />
-        </g>
-
-        {/* Delicate Blueprint Annotations */}
-        <g fill="rgba(255, 255, 255, 0.18)" fontSize="9" fontFamily="monospace" letterSpacing="0.15em">
-          <text x="23%" y="17%">MODULAR ZONE A // 42&apos;-0&quot;</text>
-          <text x="53%" y="17%">LIVING WING B // 36&apos;-0&quot;</text>
-          <text x="16%" y="80%">DATUM REF ±0.000M</text>
-          <text x="73%" y="80%">SOLAR AZIMUTH 142.5°</text>
-        </g>
-
-        {/* Minimalist Cardinal North Indicator (Top Right) */}
-        <g transform="translate(1380, 110)" stroke="rgba(196, 132, 70, 0.25)" fill="none" strokeWidth="0.8">
-          <circle cx="0" cy="0" r="18" stroke="rgba(255, 255, 255, 0.04)" />
-          <line x1="0" y1="-22" x2="0" y2="22" stroke="rgba(196, 132, 70, 0.35)" />
-          <line x1="-22" y1="0" x2="22" y2="0" stroke="rgba(255, 255, 255, 0.06)" />
-          <polygon points="0,-18 3.5,-6 -3.5,-6" fill="rgba(196, 132, 70, 0.4)" stroke="none" />
-          <text x="0" y="-26" textAnchor="middle" fill="rgba(196, 132, 70, 0.45)" fontSize="8" fontFamily="monospace">N</text>
-        </g>
-      </svg>
-
-      {/* 3. Soft Perimeter Vignette (Blends into header and next sections) */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0A0B0E] via-transparent to-[#0A0B0E] opacity-90" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0A0B0E] via-transparent to-[#0A0B0E] opacity-60" />
-    </div>
-  );
-};
+import { ArchitecturalHero3D } from "./ArchitecturalHero3D";
 
 interface HomePageViewProps {
   onStartDesign: () => void;
@@ -126,384 +38,595 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
   onOpenUpload,
   onSelectPreset,
 }) => {
+  const cardRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+
+  React.useEffect(() => {
+    let rafId: number | null = null;
+
+    const updateCardTransforms = () => {
+      const cards = cardRefs.current;
+      if (!cards || cards.length === 0) return;
+
+      const isDesktop = window.innerWidth >= 768;
+      const targetTop = isDesktop ? 104 : 88;
+      const windowH = window.innerHeight;
+
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        if (!card) continue;
+
+        // Calculate how much subsequent cards are covering card i
+        let stackDepth = 0;
+        for (let j = i + 1; j < cards.length; j++) {
+          const nextCard = cards[j];
+          if (!nextCard) continue;
+
+          const rect = nextCard.getBoundingClientRect();
+          // Trigger threshold: when nextCard starts entering viewport and approaching targetTop
+          const startY = windowH * 0.88;
+          const endY = targetTop;
+
+          if (rect.top < startY) {
+            const progress = Math.min(1, Math.max(0, (startY - rect.top) / (startY - endY)));
+            stackDepth += progress;
+          }
+        }
+
+        // Physical deck offsets:
+        // - translateY shifts the covered card down by ~22px per layer so its bottom tab peeks out
+        // - scale subtly steps down (1.0 -> 0.98 -> 0.96) so outer borders remain visible
+        // - brightness dims slightly (1.0 -> 0.85 -> 0.72) to visually recess older cards
+        const translateY = stackDepth * (isDesktop ? 22 : 16);
+        const scale = Math.max(0.91, 1 - stackDepth * 0.022);
+        const brightness = Math.max(0.55, 1 - stackDepth * 0.12);
+
+        card.style.transform = `translateY(${translateY}px) scale(${scale})`;
+        card.style.filter = `brightness(${brightness})`;
+        card.style.transformOrigin = "center top";
+      }
+    };
+
+    const handleScroll = () => {
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          updateCardTransforms();
+          rafId = null;
+        });
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+    updateCardTransforms();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
-    <div className="w-full min-h-screen bg-[#0A0B0E] text-[#F5F3EF] overflow-x-hidden selection:bg-[#C48446]/30">
-      {/* 1. CINEMATIC HERO SECTION */}
-      <section className="relative w-full h-screen flex flex-col justify-between overflow-hidden">
-        {/* Lightweight Static Architectural Hero Backdrop */}
-        <ArchitecturalHeroBackdrop />
+    <div className="relative isolate w-full min-h-screen bg-[#030303] text-[#F5F5F5] overflow-x-hidden selection:bg-[#2563EB]/40 selection:text-white">
+      {/* ────────────────────────────────────────────────────────
+          LAYER 0: EXACT THREEUI SIGNAL PARTICLES BACKGROUND
+          Fixed atmospheric canvas sitting behind all Home UI
+          ──────────────────────────────────────────────────────── */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <PredictiveArcCanvas
+          variant="signal-particles"
+          mode="dark"
+          speed={1.0}
+          hue={0}
+          saturation={1.0}
+          brightness={1.0}
+        />
+        {/* Soft Vignette Overlay to integrate with deep dark space */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(3,3,3,0.3)_45%,rgba(3,3,3,0.85)_100%)]" />
+      </div>
 
-        {/* Ambient Top Vignette & Subtle Atmospheric Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0B0E]/80 via-transparent to-[#0A0B0E] pointer-events-none z-10" />
+      {/* ────────────────────────────────────────────────────────
+          LAYER 1: ATMOSPHERIC BLUE / CYAN ENVIRONMENTAL LIGHTING
+          Large blurred radial lighting fields (40px - 140px)
+          ──────────────────────────────────────────────────────── */}
+      <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[55vw] h-[55vw] rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.12)_0%,transparent_70%)] blur-[120px]" />
+        <div className="absolute top-[25%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-[radial-gradient(circle,rgba(6,182,212,0.09)_0%,transparent_70%)] blur-[140px]" />
+        <div className="absolute top-[65%] left-[10%] w-[60vw] h-[60vw] rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.06)_0%,transparent_70%)] blur-[130px]" />
+      </div>
 
-        {/* Top Spacer for floating nav */}
-        <div className="w-full h-24 relative z-20" />
+      {/* ────────────────────────────────────────────────────────
+          LAYER 2: FOREGROUND CONTENT & STORYTELLING
+          ──────────────────────────────────────────────────────── */}
+      <div className="relative z-10">
 
-        {/* Main Hero Typography & Call-To-Action */}
-        <div className="relative z-20 max-w-5xl mx-auto px-6 md:px-12 text-center flex flex-col items-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-mono tracking-widest text-[#C48446] mb-6 uppercase"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#C48446] animate-pulse" />
-            Computational Architectural Atelier
-          </motion.div>
+        {/* ── 1. CINEMATIC HERO SECTION ── */}
+        <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden border-b border-white/5">
+          {/* Real-time Cinematic 3D Architectural Pavilion Canvas */}
+          <ArchitecturalHero3D />
 
-          <motion.h1
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-serif font-light tracking-tight text-[#F5F3EF] leading-[1.08] mb-6"
-          >
-            YOUR HOME. <br />
-            <span className="italic font-normal text-[#FAF8F5]">DESIGNED INTELLIGENTLY.</span>
-          </motion.h1>
+          {/* Top spacer for floating navbar */}
+          <div className="w-full h-24 sm:h-28 relative z-20 pointer-events-none" />
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-base sm:text-lg text-[#9E9C98] font-light max-w-xl mx-auto mb-10 leading-relaxed"
-          >
-            An avant-garde residential design platform synthesizing site physics,
-            natural illumination, and bespoke room programs into cinematic 3D models and verified blueprints.
-          </motion.p>
-
-          {/* Primary Action Group */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
-          >
-            <button
-              onClick={onStartDesign}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#F5F3EF] text-[#0A0B0E] hover:bg-[#E8E4DC] font-medium text-xs tracking-widest uppercase transition-all duration-300 shadow-2xl shadow-white/10 hover:shadow-white/20 flex items-center justify-center gap-2 group"
+          {/* Hero Content */}
+          <div className="relative z-20 max-w-5xl mx-auto px-6 md:px-12 text-center flex flex-col items-center my-auto pointer-events-auto">
+            {/* Monospace Architectural Badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
+              className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[rgba(8,15,28,0.7)] border border-[rgba(96,165,250,0.22)] text-[10px] sm:text-[11px] font-mono tracking-[0.24em] text-[#93C5FD] mb-6 uppercase shadow-[0_0_25px_rgba(37,99,235,0.18)] backdrop-blur-xl"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>CREATE YOUR HOME</span>
-              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-            </button>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] shadow-[0_0_8px_#06B6D4] animate-pulse" />
+              <span>COMPUTATIONAL ARCHITECTURAL ATELIER</span>
+            </motion.div>
 
-            <button
-              onClick={onOpenModelMode}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#12141A]/80 hover:bg-[#1A1D24] text-[#F5F3EF] border border-white/10 font-medium text-xs tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-2"
+            {/* Editorial Instrument Serif Headline */}
+            <motion.h1
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.85, delay: 0.1, ease: [0.23, 1, 0.32, 1] }}
+              className="text-5xl sm:text-7xl md:text-8xl lg:text-[7.2rem] font-serif font-light tracking-[-0.04em] text-[#F5F5F5] leading-[0.92] mb-7 drop-shadow-[0_10px_35px_rgba(0,0,0,0.7)]"
             >
-              <span>EXPLORE 3D MODEL</span>
-            </button>
-          </motion.div>
-        </div>
+              YOUR HOME. <br />
+              <span className="italic font-normal text-[#E0E7FF] drop-shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+                DESIGNED INTELLIGENTLY.
+              </span>
+            </motion.h1>
 
-        {/* Bottom Details & Quick Upload Trigger */}
-        <div className="relative z-20 w-full px-8 py-6 flex items-center justify-between text-[11px] font-mono text-[#6B6964]">
-          <div className="flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-[#C48446] animate-pulse" />
-            <span>ATELIER ARCHAI // RESIDENTIAL DESIGN CORE</span>
-          </div>
+            {/* Inter Body Statement */}
+            <motion.p
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
+              className="text-sm sm:text-base md:text-lg text-[rgba(255,255,255,0.64)] font-light max-w-2xl mx-auto mb-10 leading-relaxed drop-shadow-md"
+            >
+              An avant-garde residential studio synthesizing plot physics, daylight azimuths, and bespoke living
+              rituals into verified architectural blueprints and cinematic 3D models.
+            </motion.p>
 
-          <button
-            onClick={onOpenUpload}
-            className="flex items-center gap-2 text-[#9E9C98] hover:text-[#C48446] transition-colors"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>HAVE A SKETCH OR PLAN? UPLOAD TO 3D</span>
-          </button>
-        </div>
-      </section>
+            {/* Unified CTA Actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3, ease: [0.23, 1, 0.32, 1] }}
+              className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
+            >
+              <button
+                onClick={onStartDesign}
+                className="w-full sm:w-auto px-8 py-4 rounded-full btn-primary-blue font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 group cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>CREATE YOUR HOME</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              </button>
 
-      {/* 2. STORY SECTION: FROM IDEA TO ARCHITECTURE */}
-      <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0A0B0E]">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-3">
-              PHILOSOPHY // 01
-            </span>
-            <h2 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F3EF] leading-tight mb-6">
-              From idea to architecture.
-            </h2>
-            <p className="text-base text-[#9E9C98] font-light leading-relaxed mb-6">
-              Traditional home planning begins with static lines and abstract formulas.
-              We reverse the paradigm: your family’s daily rituals, daylight path, and land boundaries
-              generate a living architectural spatial model from the very first consultation question.
-            </p>
-            <div className="grid grid-cols-2 gap-6 pt-4 border-t border-white/10 text-xs font-mono text-[#9E9C98]">
-              <div>
-                <span className="text-2xl font-serif text-[#F5F3EF] block mb-1">Zero Overlaps</span>
-                <span>CP-SAT mathematical spatial topology guarantees valid geometry.</span>
-              </div>
-              <div>
-                <span className="text-2xl font-serif text-[#F5F3EF] block mb-1">Code Compliant</span>
-                <span>Automated boundary setbacks and egress clearances embedded.</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#12141A]">
-            <img
-              src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"
-              alt="Architectural Craftsmanship"
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-cover grayscale contrast-125 hover:scale-105 transition-transform duration-700"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B0E] via-transparent to-transparent" />
-            <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between text-xs font-mono text-[#F5F3EF]">
-              <span>RESIDENTIAL STUDY // LOT 42</span>
-              <span>SCANDINAVIAN MODERN</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. STORY SECTION: DESIGN EVERY DETAIL */}
-      <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0E1015]">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-20">
-            <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-3">
-              PRECISION // 02
-            </span>
-            <h2 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F3EF] mb-4">
-              Design every detail.
-            </h2>
-            <p className="text-sm sm:text-base text-[#9E9C98] font-light">
-              From window sill heights that catch the morning sun to en-suite privacy buffers and circulation spines.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-2xl bg-[#12141A]/90 border border-white/10 hover:border-[#C48446]/40 transition-colors">
-              <Compass className="w-6 h-6 text-[#C48446] mb-6" />
-              <h3 className="text-xl font-serif text-[#F5F3EF] mb-3">Solar Orientation</h3>
-              <p className="text-sm text-[#9E9C98] font-light leading-relaxed">
-                Rooms align with cardinal solar trajectories, keeping social spaces flooded with morning daylight and sleeping quarters sheltered.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-2xl bg-[#12141A]/90 border border-white/10 hover:border-[#C48446]/40 transition-colors">
-              <Layers className="w-6 h-6 text-[#C48446] mb-6" />
-              <h3 className="text-xl font-serif text-[#F5F3EF] mb-3">Acoustic Zoning</h3>
-              <p className="text-sm text-[#9E9C98] font-light leading-relaxed">
-                Bedrooms are buffered by dressing vestibules and en-suite bathrooms, isolating resting spaces from active living and culinary zones.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-2xl bg-[#12141A]/90 border border-white/10 hover:border-[#C48446]/40 transition-colors">
-              <ShieldCheck className="w-6 h-6 text-[#C48446] mb-6" />
-              <h3 className="text-xl font-serif text-[#F5F3EF] mb-3">Structural Integrity</h3>
-              <p className="text-sm text-[#9E9C98] font-light leading-relaxed">
-                Vertical staircase cores and plumbing stacks align across multi-story levels to streamline engineering and construction execution.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. STORY SECTION: AI-POWERED ARCHITECTURAL PLANNING */}
-      <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0A0B0E]">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#12141A] order-2 lg:order-1">
-            <img
-              src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop"
-              alt="Floor plan geometry"
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-cover contrast-110"
-            />
-            <div className="absolute inset-0 bg-[#0A0B0E]/30" />
-            <div className="absolute top-6 left-6 px-3 py-1.5 rounded-full bg-[#0A0B0E]/80 border border-white/10 text-[10px] font-mono text-[#C48446]">
-              TOPOLOGY SOLVER // SHAPELY + NETWORKX
-            </div>
-          </div>
-
-          <div className="order-1 lg:order-2">
-            <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-3">
-              INTELLIGENCE // 03
-            </span>
-            <h2 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F3EF] leading-tight mb-6">
-              AI-powered architectural planning.
-            </h2>
-            <p className="text-base text-[#9E9C98] font-light leading-relaxed mb-6">
-              Unlike generic generative models that fabricate hallucinatory images, our architectural engine solves real constraint systems:
-              graph adjacency, minimum clearance corridors, setback buffers, and door swing physics.
-            </p>
-            <ul className="space-y-3 text-sm text-[#9E9C98] font-light">
-              <li className="flex items-center gap-3">
-                <CheckCircle2 className="w-4 h-4 text-[#C48446]" />
-                <span>Deterministic constraint-satisfaction (Google OR-Tools CP-SAT)</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <CheckCircle2 className="w-4 h-4 text-[#C48446]" />
-                <span>Real-time mathematical room scoring and circulation analysis</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <CheckCircle2 className="w-4 h-4 text-[#C48446]" />
-                <span>Export-ready 2D blueprint vectors and Three.js 3D meshes</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. STORY SECTION: EXPLORE YOUR HOME IN 3D */}
-      <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0E1015]">
-        <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
-          <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-3">
-            IMMERSION // 04
-          </span>
-          <h2 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F3EF] mb-4">
-            Explore your home in 3D.
-          </h2>
-          <p className="text-base text-[#9E9C98] font-light max-w-xl mb-12">
-            Orbit your residence as an architectural dollhouse, inspect cutaway elevations floor by floor,
-            and study daylight through real architectural shadow maps.
-          </p>
-
-          <div className="w-full h-96 rounded-2xl border border-white/10 overflow-hidden relative group bg-[#12141A]">
-            <img
-              src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1600&auto=format&fit=crop"
-              alt="3D Architectural Dollhouse View"
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-            />
-            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
               <button
                 onClick={onOpenModelMode}
-                className="px-8 py-3.5 rounded-full bg-[#F5F3EF] text-[#0A0B0E] font-medium text-xs tracking-widest uppercase hover:bg-white transition-all shadow-2xl flex items-center gap-2"
+                className="w-full sm:w-auto px-8 py-4 rounded-full btn-secondary-glass font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_25px_rgba(6,182,212,0.1)]"
               >
-                <Eye className="w-4 h-4" />
-                <span>LAUNCH 3D VIEWER</span>
+                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+                <span>EXPLORE 3D MODEL</span>
               </button>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      </section>
 
-      {/* 6. STORY SECTION: CURATED ARCHITECTURAL TYPOLOGIES */}
-      <section className="relative w-full py-32 px-6 md:px-16 border-t border-white/5 bg-[#0A0B0E]">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-16 gap-4">
-            <div>
-              <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-3">
-                TYPOLOGIES // 05
-              </span>
-              <h2 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F3EF]">
-                Curated architectural designs.
-              </h2>
+          {/* Hero Bottom Metadata Row */}
+          <div className="relative z-20 w-full px-6 sm:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] sm:text-[11px] font-mono text-[rgba(255,255,255,0.38)] border-t border-white/5 bg-[rgba(3,3,3,0.4)] backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <span className="w-2 h-2 rounded-full bg-[linear-gradient(135deg,#2563EB,#06B6D4)] shadow-[0_0_8px_#06B6D4] animate-pulse" />
+              <span>AI HOUSE // RESIDENTIAL SYNTHESIS CORE</span>
             </div>
+
             <button
-              onClick={onStartDesign}
-              className="text-xs font-mono tracking-widest text-[#C48446] hover:text-[#F5F3EF] transition-colors flex items-center gap-2 group"
+              onClick={onOpenUpload}
+              className="flex items-center gap-2 text-[rgba(255,255,255,0.64)] hover:text-[#60A5FA] transition-colors cursor-pointer group"
             >
-              <span>CREATE BESPOKE HOME</span>
-              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              <Upload className="w-3.5 h-3.5 text-[#60A5FA] transition-transform group-hover:-translate-y-0.5" />
+              <span>HAVE A SKETCH OR PLAN? UPLOAD TO 3D</span>
             </button>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                title: "Nordic Courtyard Residence",
-                size: "40' × 60'",
-                area: "2,400 SQ FT",
-                img: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop",
-                intake: {
-                  title: "Nordic Courtyard Residence",
-                  plot_width: 40,
-                  plot_length: 60,
-                  num_floors: 2,
-                  bedrooms: 3,
-                  bathrooms: 2,
-                  style: "Modern Scandinavian",
-                },
-              },
-              {
-                title: "Contemporary Glass Pavilion",
-                size: "48' × 54'",
-                area: "1,950 SQ FT",
-                img: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=800&auto=format&fit=crop",
-                intake: {
-                  title: "Contemporary Glass Pavilion",
-                  plot_width: 48,
-                  plot_length: 54,
-                  num_floors: 1,
-                  bedrooms: 3,
-                  bathrooms: 2,
-                  style: "Modern Contemporary",
-                },
-              },
-              {
-                title: "The Cedar Cantilever Villa",
-                size: "45' × 65'",
-                area: "3,100 SQ FT",
-                img: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=800&auto=format&fit=crop",
-                intake: {
-                  title: "The Cedar Cantilever Villa",
-                  plot_width: 45,
-                  plot_length: 65,
-                  num_floors: 2,
-                  bedrooms: 4,
-                  bathrooms: 3,
-                  style: "Minimalist Modern",
-                },
-              },
-            ].map((p, idx) => (
-              <div
-                key={idx}
-                onClick={() => onSelectPreset(p.intake)}
-                className="group cursor-pointer flex flex-col"
-              >
-                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-4 border border-white/10 bg-[#12141A]">
-                  <img
-                    src={p.img}
-                    alt={p.title}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
-                    <span className="text-xs font-mono tracking-widest text-[#F5F3EF]">
-                      LOAD ARCHITECTURAL MODEL →
-                    </span>
-                  </div>
-                </div>
-                <h3 className="text-lg font-serif text-[#F5F3EF] mb-1 group-hover:text-[#C48446] transition-colors">
-                  {p.title}
-                </h3>
-                <span className="text-xs font-mono text-[#9E9C98]">
-                  {p.size} · {p.area}
+        {/* ── 2. STACKING CARD STORYTELLING SECTION (REFERENCE 3, PHASE 10) ──
+            Real physical stacking deck using sticky cards in a tall container.
+            As user scrolls: Card 1 sticks -> Card 2 covers Card 1 -> Card 3 covers Card 2, etc.
+            Later cards sit above earlier cards with physical depth and shadows.
+            ──────────────────────────────────────────────────────── */}
+        <section className="relative w-full py-24 px-4 sm:px-8 md:px-16">
+          {/* Section Section Header */}
+          <div className="max-w-4xl mx-auto text-center mb-16">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(37,99,235,0.1)] border border-[rgba(96,165,250,0.2)] text-[10px] font-mono tracking-[0.24em] text-[#93C5FD] uppercase mb-4">
+              ARCHITECTURAL JOURNEY
+            </span>
+            <h2 className="text-3xl sm:text-5xl md:text-6xl font-serif font-light text-[#F5F5F5] leading-tight">
+              From ritual to built structure.
+            </h2>
+            <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light mt-3 max-w-xl mx-auto">
+              Scroll through the architectural intelligence deck powering every residence.
+            </p>
+          </div>
+
+          {/* Stacking Deck Container */}
+          <div className="relative max-w-6xl mx-auto pb-[32vh]">
+
+            {/* ══ CARD 1: PHILOSOPHY // 01 ══ */}
+            <div
+              ref={(el) => { cardRefs.current[0] = el; }}
+              className="sticky top-[92px] md:top-[104px] z-10 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.22)] shadow-[0_30px_90px_rgba(0,0,0,0.85),0_0_40px_rgba(37,99,235,0.08)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#60A5FA] uppercase font-semibold">
+                  PHILOSOPHY // 01
+                </span>
+                <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
+                  DECK ITEM 1 OF 5
                 </span>
               </div>
-            ))}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-14 items-center my-auto">
+                <div>
+                  <h3 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F5F5] leading-tight mb-5">
+                    From idea to architecture.
+                  </h3>
+                  <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light leading-relaxed mb-6">
+                    Traditional residential planning begins with static drafts and disconnected spreadsheets.
+                    We reverse the workflow: your family’s spatial rituals, daylight requirements, and site constraints
+                    synthesize a verified architectural model from the initial brief.
+                  </p>
+                  <div className="grid grid-cols-2 gap-6 pt-5 border-t border-white/10 text-xs font-mono text-[rgba(255,255,255,0.64)]">
+                    <div>
+                      <span className="text-2xl font-serif text-[#F5F5F5] block mb-1">Zero Overlaps</span>
+                      <span className="text-[11px] leading-relaxed block text-[rgba(255,255,255,0.48)]">
+                        CP-SAT mathematical spatial topology guarantees valid geometry.
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-2xl font-serif text-[#F5F5F5] block mb-1">Code Compliant</span>
+                      <span className="text-[11px] leading-relaxed block text-[rgba(255,255,255,0.48)]">
+                        Automated setback buffers and egress clearances embedded.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl">
+                  <img
+                    src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"
+                    alt="Architectural Craftsmanship"
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover grayscale contrast-125 hover:scale-105 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0A0E1A] via-transparent to-transparent" />
+                  <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between text-xs font-mono text-[#F5F5F5]">
+                    <span className="text-[#93C5FD]">RESIDENTIAL STUDY // LOT 42</span>
+                    <span className="text-[rgba(255,255,255,0.5)]">SCANDINAVIAN MODERN</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
+                <span className="text-[#60A5FA] font-semibold">01 // PHILOSOPHY</span>
+                <span className="text-[rgba(255,255,255,0.45)]">DATUM REF ±0.000M</span>
+              </div>
+            </div>
+
+            {/* ══ CARD 2: PRECISION // 02 ══ */}
+            <div
+              ref={(el) => { cardRefs.current[1] = el; }}
+              className="sticky top-[92px] md:top-[104px] z-20 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.24)] shadow-[0_35px_100px_rgba(0,0,0,0.9),0_-15px_40px_rgba(0,0,0,0.6)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#38BDF8] uppercase font-semibold">
+                  PRECISION // 02
+                </span>
+                <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
+                  DECK ITEM 2 OF 5
+                </span>
+              </div>
+
+              <div className="my-auto">
+                <div className="max-w-2xl mb-10">
+                  <h3 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F5F5] mb-3">
+                    Design every detail.
+                  </h3>
+                  <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light leading-relaxed">
+                    From solar sill heights that harvest morning radiance to en-suite acoustic buffers and vertical engineering shafts.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="p-6 sm:p-8 rounded-2xl bg-[rgba(12,20,36,0.7)] border border-white/10 hover:border-[#38BDF8]/40 transition-colors">
+                    <Compass className="w-6 h-6 text-[#38BDF8] mb-5" />
+                    <h4 className="text-xl font-serif text-[#F5F5F5] mb-2">Solar Orientation</h4>
+                    <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light leading-relaxed">
+                      Living spaces align with cardinal solar trajectories, flooding gathering rooms with natural daylight while buffering bedrooms.
+                    </p>
+                  </div>
+
+                  <div className="p-6 sm:p-8 rounded-2xl bg-[rgba(12,20,36,0.7)] border border-white/10 hover:border-[#38BDF8]/40 transition-colors">
+                    <Layers className="w-6 h-6 text-[#38BDF8] mb-5" />
+                    <h4 className="text-xl font-serif text-[#F5F5F5] mb-2">Acoustic Zoning</h4>
+                    <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light leading-relaxed">
+                      Resting suites are buffered by dressing vestibules and bathrooms, insulating quiet quarters from culinary and social zones.
+                    </p>
+                  </div>
+
+                  <div className="p-6 sm:p-8 rounded-2xl bg-[rgba(12,20,36,0.7)] border border-white/10 hover:border-[#38BDF8]/40 transition-colors">
+                    <ShieldCheck className="w-6 h-6 text-[#38BDF8] mb-5" />
+                    <h4 className="text-xl font-serif text-[#F5F5F5] mb-2">Structural Integrity</h4>
+                    <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light leading-relaxed">
+                      Vertical structural columns and plumbing chases align across floor levels to guarantee buildability and cost optimization.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
+                <span className="text-[#38BDF8] font-semibold">02 // PRECISION</span>
+                <span className="text-[rgba(255,255,255,0.45)]">SOLAR HARMONY</span>
+              </div>
+            </div>
+
+            {/* ══ CARD 3: INTELLIGENCE // 03 ══ */}
+            <div
+              ref={(el) => { cardRefs.current[2] = el; }}
+              className="sticky top-[92px] md:top-[104px] z-30 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.26)] shadow-[0_40px_110px_rgba(0,0,0,0.92),0_-15px_40px_rgba(0,0,0,0.65)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#06B6D4] uppercase font-semibold">
+                  INTELLIGENCE // 03
+                </span>
+                <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
+                  DECK ITEM 3 OF 5
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-14 items-center my-auto">
+                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl order-2 lg:order-1">
+                  <img
+                    src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop"
+                    alt="Floor plan geometry"
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover contrast-115"
+                  />
+                  <div className="absolute inset-0 bg-[#030303]/35" />
+                  <div className="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-[#080E1A]/90 border border-white/10 text-[10px] font-mono text-[#06B6D4]">
+                    TOPOLOGY SOLVER // SHAPELY + NETWORKX
+                  </div>
+                </div>
+
+                <div className="order-1 lg:order-2">
+                  <h3 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F5F5] leading-tight mb-5">
+                    AI-powered architectural planning.
+                  </h3>
+                  <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light leading-relaxed mb-6">
+                    Unlike standard generative models that fabricate hallucinatory images, our architectural engine solves authentic structural constraint systems:
+                    graph adjacency, corridor clearances, boundary setbacks, and door physics.
+                  </p>
+                  <ul className="space-y-3.5 text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light">
+                    <li className="flex items-center gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-[#06B6D4] shrink-0" />
+                      <span>Deterministic constraint-satisfaction (Google OR-Tools CP-SAT)</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-[#06B6D4] shrink-0" />
+                      <span>Real-time mathematical room scoring and circulation analysis</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-[#06B6D4] shrink-0" />
+                      <span>Export-ready 2D blueprint vectors and Three.js 3D meshes</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
+                <span className="text-[#06B6D4] font-semibold">03 // INTELLIGENCE</span>
+                <span className="text-[rgba(255,255,255,0.45)]">CP-SAT SOLVER</span>
+              </div>
+            </div>
+
+            {/* ══ CARD 4: IMMERSION // 04 ══ */}
+            <div
+              ref={(el) => { cardRefs.current[3] = el; }}
+              className="sticky top-[92px] md:top-[104px] z-40 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.28)] shadow-[0_45px_120px_rgba(0,0,0,0.95),0_-15px_40px_rgba(0,0,0,0.7)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden will-change-transform"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#60A5FA] uppercase font-semibold">
+                  IMMERSION // 04
+                </span>
+                <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
+                  DECK ITEM 4 OF 5
+                </span>
+              </div>
+
+              <div className="my-auto flex flex-col items-center text-center">
+                <h3 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F5F5] mb-3">
+                  Explore your home in 3D.
+                </h3>
+                <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light max-w-xl mb-8">
+                  Orbit your residence as an architectural dollhouse, inspect cutaway elevations floor by floor,
+                  and study daylight through real shadow calculations.
+                </p>
+
+                <div className="w-full max-w-4xl h-72 sm:h-96 rounded-2xl border border-white/10 overflow-hidden relative group bg-[#05070B] shadow-2xl">
+                  <img
+                    src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1600&auto=format&fit=crop"
+                    alt="3D Architectural Dollhouse View"
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                    <button
+                      onClick={onOpenModelMode}
+                      className="px-8 py-3.5 rounded-full btn-primary-blue font-medium text-xs tracking-widest uppercase flex items-center gap-2 cursor-pointer shadow-2xl"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>LAUNCH 3D VIEWER</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
+                <span className="text-[#60A5FA] font-semibold">04 // IMMERSION</span>
+                <span className="text-[rgba(255,255,255,0.45)]">3D DOLLHOUSE</span>
+              </div>
+            </div>
+
+            {/* ══ CARD 5: TYPOLOGIES // 05 ══ */}
+            <div
+              ref={(el) => { cardRefs.current[4] = el; }}
+              className="sticky top-[92px] md:top-[104px] z-50 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#070D1A] border border-[rgba(96,165,250,0.30)] shadow-[0_50px_130px_rgba(0,0,0,0.98),0_-15px_40px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between mb-0 overflow-hidden will-change-transform"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+                <span className="text-xs font-mono tracking-[0.22em] text-[#93C5FD] uppercase font-semibold">
+                  TYPOLOGIES // 05
+                </span>
+                <span className="text-[10px] font-mono text-[rgba(255,255,255,0.38)] tracking-widest">
+                  DECK ITEM 5 OF 5
+                </span>
+              </div>
+
+              <div className="my-auto">
+                <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-8 gap-4">
+                  <div>
+                    <h3 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F5F5] mb-2">
+                      Curated architectural typologies.
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.64)] font-light">
+                      Click any typology to load its architectural solver parameters instantly.
+                    </p>
+                  </div>
+                  <button
+                    onClick={onStartDesign}
+                    className="text-xs font-mono tracking-widest text-[#60A5FA] hover:text-[#FFFFFF] transition-colors flex items-center gap-2 group cursor-pointer"
+                  >
+                    <span>CREATE BESPOKE HOME</span>
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {[
+                    {
+                      title: "Nordic Courtyard Residence",
+                      size: "40' × 60'",
+                      area: "2,400 SQ FT",
+                      img: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop",
+                      intake: {
+                        title: "Nordic Courtyard Residence",
+                        plot_width: 40,
+                        plot_length: 60,
+                        num_floors: 2,
+                        bedrooms: 3,
+                        bathrooms: 2,
+                        style: "Modern Scandinavian",
+                      },
+                    },
+                    {
+                      title: "Contemporary Glass Pavilion",
+                      size: "48' × 54'",
+                      area: "1,950 SQ FT",
+                      img: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=800&auto=format&fit=crop",
+                      intake: {
+                        title: "Contemporary Glass Pavilion",
+                        plot_width: 48,
+                        plot_length: 54,
+                        num_floors: 1,
+                        bedrooms: 3,
+                        bathrooms: 2,
+                        style: "Modern Contemporary",
+                      },
+                    },
+                    {
+                      title: "The Cedar Cantilever Villa",
+                      size: "45' × 65'",
+                      area: "3,100 SQ FT",
+                      img: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=800&auto=format&fit=crop",
+                      intake: {
+                        title: "The Cedar Cantilever Villa",
+                        plot_width: 45,
+                        plot_length: 65,
+                        num_floors: 2,
+                        bedrooms: 4,
+                        bathrooms: 3,
+                        style: "Minimalist Modern",
+                      },
+                    },
+                  ].map((p, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => onSelectPreset(p.intake)}
+                      className="group cursor-pointer flex flex-col p-3 rounded-2xl bg-[rgba(12,20,36,0.6)] border border-white/10 hover:border-[#60A5FA]/40 transition-all hover:-translate-y-1"
+                    >
+                      <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3 border border-white/8 bg-[#05070B]">
+                        <img
+                          src={p.img}
+                          alt={p.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                          <span className="text-[10px] font-mono tracking-widest text-[#F5F5F5]">
+                            LOAD MODEL →
+                          </span>
+                        </div>
+                      </div>
+                      <h4 className="text-base font-serif text-[#F5F5F5] mb-1 group-hover:text-[#60A5FA] transition-colors">
+                        {p.title}
+                      </h4>
+                      <span className="text-xs font-mono text-[rgba(255,255,255,0.62)]">
+                        {p.size} · {p.area}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
+                <span className="text-[#93C5FD] font-semibold">05 // TYPOLOGIES</span>
+                <span className="text-[rgba(255,255,255,0.45)]">DECK COMPLETE · 5 OF 5</span>
+              </div>
+            </div>
+
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 7. FINAL CALL-TO-ACTION */}
-      <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-gradient-to-b from-[#0A0B0E] to-[#12141A] text-center">
-        <div className="max-w-3xl mx-auto flex flex-col items-center">
-          <span className="text-xs font-mono tracking-widest text-[#C48446] uppercase block mb-4">
-            BEGIN CONSULTATION
-          </span>
-          <h2 className="text-4xl sm:text-6xl font-serif font-light text-[#F5F3EF] mb-6">
-            Ready to design your residence?
-          </h2>
-          <p className="text-base text-[#9E9C98] font-light max-w-lg mb-10">
-            Start the step-by-step architectural consultation and experience your future home generated in minutes.
-          </p>
+        {/* ── 3. FINAL CALL-TO-ACTION SECTION ── */}
+        <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-[linear-gradient(180deg,#030303_0%,#080E1A_100%)] text-center overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.12)_0%,transparent_65%)]" />
 
-          <button
-            onClick={onStartDesign}
-            className="px-10 py-4 rounded-full bg-[#C48446] text-[#0A0B0E] hover:bg-[#D49354] font-medium text-xs tracking-widest uppercase transition-all duration-300 shadow-2xl shadow-[#C48446]/25 flex items-center gap-2 group"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>CREATE YOUR HOME</span>
-            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-          </button>
-        </div>
-      </section>
+          <div className="relative z-10 max-w-3xl mx-auto flex flex-col items-center">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(37,99,235,0.12)] border border-[rgba(96,165,250,0.22)] text-[10px] font-mono tracking-[0.24em] text-[#93C5FD] uppercase mb-5">
+              BEGIN CONSULTATION
+            </span>
+
+            <h2 className="text-4xl sm:text-6xl md:text-7xl font-serif font-light text-[#F5F5F5] mb-6 tracking-tight leading-tight">
+              Ready to design your residence?
+            </h2>
+
+            <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light max-w-lg mb-10 leading-relaxed">
+              Start the step-by-step architectural consultation and experience your future home generated in minutes.
+            </p>
+
+            <button
+              onClick={onStartDesign}
+              className="px-10 py-4.5 rounded-full btn-primary-blue font-medium text-xs tracking-widest uppercase flex items-center gap-2 group cursor-pointer shadow-[0_15px_40px_rgba(37,99,235,0.35)]"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>CREATE YOUR HOME</span>
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+            </button>
+          </div>
+        </section>
+
+      </div>
     </div>
   );
 };

@@ -5,8 +5,6 @@ import { Sparkles, ArrowRight, Loader2, MessageSquare, X, ChevronDown, ChevronUp
 
 // ============================================================
 // QUICK EDIT SUGGESTIONS
-// Context-aware chips shown when nothing is selected and
-// when a specific room is selected.
 // ============================================================
 const GLOBAL_SUGGESTIONS = [
   "Make the master bedroom bigger",
@@ -53,20 +51,16 @@ function getRoomSuggestions(roomName: string): string[] {
   ];
 }
 
-// ============================================================
-// PROPS
-// ============================================================
 interface FloatingAICommandBarProps {
   onApplyInstruction: (instruction: string) => Promise<void>;
   isLoading: boolean;
   context: "plan" | "model";
   selectedRoomName?: string;
-  /** Show contextual toolbar for selected room */
   selectedRoomId?: string | null;
 }
 
 // ============================================================
-// COMPONENT
+// AI ARCHITECTURAL INSTRUMENT
 // ============================================================
 export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
   onApplyInstruction,
@@ -106,15 +100,16 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
 
   const placeholder = selectedRoomName
     ? `Edit ${selectedRoomName}… (e.g. "Make it bigger")`
-    : "What would you like to change?";
+    : "Describe an architectural refinement…";
+
   const positionClass =
     context === "model"
       ? "bottom-[max(1.5rem,env(safe-area-inset-bottom))] max-[640px]:bottom-[max(4rem,calc(env(safe-area-inset-bottom)+2.5rem))] left-[max(1rem,env(safe-area-inset-left))]"
-      : "top-[max(6rem,calc(env(safe-area-inset-top)+5rem))] left-[max(1rem,env(safe-area-inset-left))]";
+      : "top-[max(5.5rem,calc(env(safe-area-inset-top)+4.8rem))] left-[max(1rem,env(safe-area-inset-left))]";
 
   return (
     <div
-      className={`fixed ${positionClass} z-40 w-[min(20rem,calc(100vw-2rem))] max-h-[calc(100dvh-9rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] pointer-events-auto`}
+      className={`fixed ${positionClass} z-40 w-[min(21rem,calc(100vw-2rem))] max-h-[calc(100dvh-9rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] pointer-events-auto`}
     >
       {!isExpanded ? (
         <button
@@ -122,89 +117,95 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
           onClick={() => setIsExpanded(true)}
           aria-label="Open AI Architect"
           aria-expanded={false}
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-[#0F1117]/95 px-3.5 py-2.5 text-[#E69F58] shadow-2xl shadow-black/50 backdrop-blur-xl transition-colors hover:bg-[#1A1C22]"
+          className="flex items-center gap-2.5 rounded-full border border-[rgba(96,165,250,0.22)] bg-[rgba(8,14,26,0.92)] px-4 py-2.5 text-[#93C5FD] shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(6,182,212,0.18)] backdrop-blur-2xl transition-all hover:bg-[rgba(12,20,38,0.96)] hover:border-[rgba(96,165,250,0.4)] hover:-translate-y-0.5"
         >
-          <Sparkles className="h-4 w-4" />
-          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider">AI Architect</span>
-          <ChevronDown className="h-3.5 w-3.5" />
+          <div className="w-2 h-2 rounded-full bg-[linear-gradient(135deg,#3B82F6,#06B6D4)] shadow-[0_0_8px_#06B6D4] animate-pulse" />
+          <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.2em] text-[#F5F5F5]">
+            AI Architect
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 text-[#93C5FD]" />
         </button>
       ) : (
         <div
-          className={`max-h-full overflow-y-auto bg-[#0F1117]/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 transition-all duration-200 ${
+          className={`max-h-full overflow-y-auto bg-[rgba(8,14,26,0.94)] backdrop-blur-2xl rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.6),0_0_30px_rgba(37,99,235,0.15)] transition-all duration-200 ${
             isFocused
-              ? "border border-[#C48446]/30 ring-1 ring-[#C48446]/10"
-              : "border border-white/8"
+              ? "border border-[rgba(96,165,250,0.4)] ring-1 ring-[rgba(96,165,250,0.2)]"
+              : "border border-[rgba(96,165,250,0.18)]"
           }`}
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
-            <div className="flex items-center gap-1.5 text-[#C48446]">
-              <Sparkles className="h-3 w-3" />
-              <span className="text-[10px] font-mono uppercase tracking-widest">AI Architect</span>
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-white/10 px-3.5 py-2.5 bg-[rgba(12,20,38,0.5)]">
+            <div className="flex items-center gap-2 text-[#93C5FD]">
+              <Sparkles className="h-3.5 w-3.5 text-[#38BDF8]" />
+              <span className="text-[10px] font-mono font-medium uppercase tracking-[0.2em] text-[#F5F5F5]">
+                AI Architectural Instrument
+              </span>
             </div>
             <button
               type="button"
               onClick={() => setIsExpanded(false)}
               aria-label="Collapse AI Architect"
               aria-expanded={true}
-              className="rounded-md p-1 text-[#9E9C98] transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-md p-1 text-[rgba(255,255,255,0.5)] transition-colors hover:bg-white/10 hover:text-white"
             >
               <ChevronUp className="h-4 w-4" />
             </button>
           </div>
-        {/* ── Suggestion chips ── */}
-          <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2.5 pb-1.5">
+
+          {/* Suggestion Chips */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 pt-3 pb-2">
             {suggestions.map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => handleSuggestion(s)}
-                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-[#9E9C98] hover:text-[#F5F3EF] text-[10px] font-mono transition-colors whitespace-nowrap max-w-full truncate"
+                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-[rgba(59,130,246,0.15)] border border-white/8 hover:border-[rgba(96,165,250,0.3)] text-[rgba(255,255,255,0.64)] hover:text-[#FFFFFF] text-[10px] font-mono transition-all whitespace-nowrap max-w-full truncate"
               >
                 {s}
               </button>
             ))}
           </div>
 
-        {/* ── Input row ── */}
-          <form onSubmit={handleSubmit} className="flex items-center gap-2 px-3 pb-2.5">
-          <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/30 border border-white/5 focus-within:border-white/15 transition-colors">
-            <MessageSquare className="w-3 h-3 text-[#6B6964] shrink-0" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={instruction}
-              onChange={(e) => setInstruction(e.target.value)}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              disabled={isLoading}
-              placeholder={placeholder}
-              className="w-full bg-transparent text-[11px] text-[#F5F3EF] placeholder-[#4E4C49] font-mono focus:outline-none"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {instruction && (
-              <button
-                type="button"
-                onClick={() => setInstruction("")}
-                className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[#6B6964] hover:text-[#9E9C98] shrink-0"
-                aria-label="Clear"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            )}
-          </div>
+          {/* Input Form */}
+          <form onSubmit={handleSubmit} className="flex items-center gap-2 px-3 pb-3 pt-1">
+            <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/8 focus-within:border-[rgba(96,165,250,0.4)] transition-colors">
+              <MessageSquare className="w-3.5 h-3.5 text-[rgba(96,165,250,0.6)] shrink-0" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                disabled={isLoading}
+                placeholder={placeholder}
+                className="w-full bg-transparent text-[11px] text-[#F5F5F5] placeholder-[rgba(255,255,255,0.3)] font-mono focus:outline-none"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {instruction && (
+                <button
+                  type="button"
+                  onClick={() => setInstruction("")}
+                  className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[rgba(255,255,255,0.5)] hover:text-white shrink-0"
+                  aria-label="Clear"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              )}
+            </div>
 
-          <button
-            type="submit"
-            disabled={!instruction.trim() || isLoading}
-            className="px-3.5 py-2 rounded-xl bg-[#C48446] hover:bg-[#D49354] disabled:opacity-30 disabled:cursor-not-allowed text-[#0A0B0E] text-[10px] font-mono font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-[#C48446]/20 active:scale-95 shrink-0"
-          >
-            {isLoading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <ArrowRight className="w-3.5 h-3.5" />
-            )}
-          </button>
+            <button
+              type="submit"
+              disabled={!instruction.trim() || isLoading}
+              className="px-3.5 py-2 rounded-xl btn-primary-blue disabled:opacity-30 disabled:cursor-not-allowed text-white text-[10px] font-mono font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+            >
+              {isLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ArrowRight className="w-3.5 h-3.5" />
+              )}
+            </button>
           </form>
         </div>
       )}

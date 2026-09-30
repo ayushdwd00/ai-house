@@ -57,6 +57,12 @@ export default function HomePage() {
       setIsCreateChoiceOpen(true);
     } else if (view === "projects") {
       setIsProjectsOpen(true);
+    } else if (view === "plan" || view === "model" || view === "structure" || view === "estimate") {
+      if (projectId) {
+        router.push(`/project/${projectId}/${view}`);
+      } else {
+        router.push(`/${view}`);
+      }
     }
   };
 

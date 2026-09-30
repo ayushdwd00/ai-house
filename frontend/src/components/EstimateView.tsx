@@ -594,29 +594,29 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
   }, [layout, grandTotalExpected, ratePerSqft, structuralQuantities.count]);
 
   return (
-    <div className="w-full h-full overflow-y-auto bg-[#0A0B0E] p-4 sm:p-8 lg:p-12 text-[#F5F3EF]">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="w-full h-full overflow-y-auto bg-[#030303] p-4 sm:p-8 lg:p-12 text-[#F5F5F5]">
+      <div className="max-w-6xl mx-auto space-y-10">
         {/* 1. HEADER & INTERACTIVE SPECIFICATION SELECTORS */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-white/10">
           <div>
-            <div className="flex items-center gap-2 mb-2 text-[#C48446] text-xs font-mono tracking-widest uppercase font-semibold">
-              <Building className="w-4 h-4" />
-              <span>PRELIMINARY INDIAN RESIDENTIAL ESTIMATION</span>
+            <div className="flex items-center gap-2 mb-3 text-[#60A5FA] text-xs font-mono tracking-[0.24em] uppercase font-semibold">
+              <Building className="w-4 h-4 text-[#06B6D4]" />
+              <span>ARCHITECTURAL COST INTELLIGENCE // QUANTITY SURVEY</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-medium text-[#F5F3EF]">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-[#F5F5F5] tracking-tight">
               {layout.title || "Residence Construction Budget"}
             </h1>
-            <p className="text-xs sm:text-sm text-[#9E9C98] font-light mt-1">
-              Quantity takeoff derived from architectural geometry &amp; Indian benchmark rates (INR ₹).
+            <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.6)] font-light mt-2 max-w-xl">
+              Deterministic quantity takeoff derived from geometric BIM envelopes and standard Indian construction benchmarks (INR ₹).
             </p>
           </div>
 
           {/* Interactive Quality & Wall Spec Selectors */}
           <div className="flex flex-wrap items-center gap-3">
             {/* Quality Tier Selector */}
-            <div className="p-1 rounded-2xl bg-[#12141A] border border-white/10 flex items-center text-xs font-mono">
-              <span className="px-2.5 text-[10px] text-[#8A8883] uppercase flex items-center gap-1">
-                <Sliders className="w-3 h-3 text-[#C48446]" /> QUALITY:
+            <div className="p-1 rounded-2xl bg-[rgba(8,15,28,0.88)] border border-[rgba(96,165,250,0.2)] backdrop-blur-xl flex items-center text-xs font-mono shadow-md">
+              <span className="px-2.5 text-[10px] text-[rgba(255,255,255,0.45)] uppercase flex items-center gap-1">
+                <Sliders className="w-3 h-3 text-[#60A5FA]" /> QUALITY:
               </span>
               {(["ECONOMY", "STANDARD", "PREMIUM"] as const).map((tier) => (
                 <button
@@ -624,8 +624,8 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
                   onClick={() => setQualityTier(tier)}
                   className={`px-3 py-1.5 rounded-xl transition-all ${
                     qualityTier === tier
-                      ? "bg-[#C48446] text-[#0A0B0E] font-semibold shadow-md"
-                      : "text-[#9E9C98] hover:text-[#F5F3EF]"
+                      ? "bg-[linear-gradient(135deg,#2563EB,#06B6D4)] text-white font-semibold shadow-sm"
+                      : "text-[rgba(255,255,255,0.6)] hover:text-white"
                   }`}
                 >
                   {tier}
@@ -634,14 +634,14 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
             </div>
 
             {/* Wall Thickness Selector */}
-            <div className="p-1 rounded-2xl bg-[#12141A] border border-white/10 flex items-center text-xs font-mono">
-              <span className="px-2.5 text-[10px] text-[#8A8883] uppercase">WALL SPEC:</span>
+            <div className="p-1 rounded-2xl bg-[rgba(8,15,28,0.88)] border border-[rgba(96,165,250,0.2)] backdrop-blur-xl flex items-center text-xs font-mono shadow-md">
+              <span className="px-2.5 text-[10px] text-[rgba(255,255,255,0.45)] uppercase">WALL:</span>
               <button
                 onClick={() => setWallSpec("9_INCH")}
                 className={`px-2.5 py-1.5 rounded-xl transition-all ${
                   wallSpec === "9_INCH"
-                    ? "bg-[#F5F3EF] text-[#0A0B0E] font-semibold"
-                    : "text-[#9E9C98] hover:text-[#F5F3EF]"
+                    ? "bg-white/15 text-white font-semibold border border-white/10"
+                    : "text-[rgba(255,255,255,0.6)] hover:text-white"
                 }`}
                 title="9-inch standard brick masonry (230 mm)"
               >
@@ -651,8 +651,8 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
                 onClick={() => setWallSpec("4.5_INCH")}
                 className={`px-2.5 py-1.5 rounded-xl transition-all ${
                   wallSpec === "4.5_INCH"
-                    ? "bg-[#F5F3EF] text-[#0A0B0E] font-semibold"
-                    : "text-[#9E9C98] hover:text-[#F5F3EF]"
+                    ? "bg-white/15 text-white font-semibold border border-white/10"
+                    : "text-[rgba(255,255,255,0.6)] hover:text-white"
                 }`}
                 title="4.5-inch partition wall (115 mm)"
               >
@@ -663,71 +663,71 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
         </div>
 
         {/* 2. COST SUMMARY: LOW / EXPECTED / HIGH RANGES & KEY METRICS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Low Estimate */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-[#12141A]/90 border border-white/5 space-y-2">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-[#8A8883] block">
-              LOW ESTIMATE
+          <div className="p-6 sm:p-7 rounded-3xl bg-[rgba(8,14,26,0.88)] border border-white/8 backdrop-blur-2xl shadow-xl space-y-3">
+            <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-[rgba(255,255,255,0.45)] block">
+              CONSERVATIVE BASE
             </span>
-            <div className="text-2xl sm:text-3xl font-serif text-[#F5F3EF] font-medium">
+            <div className="text-3xl sm:text-4xl font-serif text-[#F5F5F5] font-light">
               {formatINR(costLow)}
             </div>
-            <span className="text-xs font-mono text-[#8A8883] block">
+            <span className="text-xs font-mono text-[#93C5FD] block">
               {formatINR(Math.round(costLow / Math.max(100, builtUpArea)))} / SQ FT
             </span>
-            <p className="text-[11px] text-[#8A8883] font-light leading-relaxed pt-1 border-t border-white/5">
+            <p className="text-[11px] text-[rgba(255,255,255,0.48)] font-light leading-relaxed pt-2 border-t border-white/5">
               Direct sub-contractor procurement and strict material cost controls.
             </p>
           </div>
 
           {/* Expected Estimate (Primary Card) */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#1A1E27] to-[#12141A] border-2 border-[#C48446]/50 shadow-2xl relative space-y-2">
+          <div className="p-6 sm:p-7 rounded-3xl bg-[rgba(10,18,34,0.95)] border-2 border-[rgba(96,165,250,0.4)] shadow-[0_25px_70px_rgba(0,0,0,0.6),0_0_35px_rgba(37,99,235,0.2)] backdrop-blur-2xl relative space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-[#C48446] font-semibold">
-                EXPECTED ESTIMATE (BENCHMARK)
+              <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-[#60A5FA] font-semibold">
+                ARCHITECTURAL BENCHMARK
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-[#C48446]/15 text-[#C48446] text-[10px] font-mono font-bold">
+              <span className="px-2.5 py-0.5 rounded-full bg-[rgba(59,130,246,0.2)] text-[#93C5FD] text-[10px] font-mono font-semibold border border-[rgba(96,165,250,0.3)]">
                 RECOMMENDED
               </span>
             </div>
-            <div className="text-3xl sm:text-4xl font-serif text-[#F5F3EF] font-semibold tracking-tight">
+            <div className="text-4xl sm:text-5xl font-serif text-[#F5F5F5] font-light tracking-tight">
               {formatINR(grandTotalExpected)}
             </div>
-            <div className="flex items-center justify-between text-xs font-mono text-[#C48446]">
+            <div className="flex items-center justify-between text-xs font-mono text-[#38BDF8]">
               <span>{formatINR(ratePerSqft)} / SQ FT</span>
-              <span className="text-[#9E9C98]">{builtUpArea.toLocaleString()} SQ FT BUA</span>
+              <span className="text-[rgba(255,255,255,0.6)]">{builtUpArea.toLocaleString()} SQ FT BUA</span>
             </div>
-            <p className="text-[11px] text-[#9E9C98] font-light leading-relaxed pt-2 border-t border-white/10">
-              Complete turnkey estimate including materials, labor, formwork, finishes, and 5% contingency.
+            <p className="text-[11px] text-[rgba(255,255,255,0.55)] font-light leading-relaxed pt-3 border-t border-white/10">
+              Complete turnkey estimate including reinforced concrete structure, masonry, finishes, MEP, and 5% contingency.
             </p>
           </div>
 
           {/* High Estimate */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-[#12141A]/90 border border-white/5 space-y-2">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-[#8A8883] block">
-              HIGH ESTIMATE
+          <div className="p-6 sm:p-7 rounded-3xl bg-[rgba(8,14,26,0.88)] border border-white/8 backdrop-blur-2xl shadow-xl space-y-3">
+            <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-[rgba(255,255,255,0.45)] block">
+              PREMIUM FINISH CEILING
             </span>
-            <div className="text-2xl sm:text-3xl font-serif text-[#F5F3EF] font-medium">
+            <div className="text-3xl sm:text-4xl font-serif text-[#F5F5F5] font-light">
               {formatINR(costHigh)}
             </div>
-            <span className="text-xs font-mono text-[#8A8883] block">
+            <span className="text-xs font-mono text-[#93C5FD] block">
               {formatINR(Math.round(costHigh / Math.max(100, builtUpArea)))} / SQ FT
             </span>
-            <p className="text-[11px] text-[#8A8883] font-light leading-relaxed pt-1 border-t border-white/5">
-              Turnkey premium contractors, difficult site soil conditions, or elevated finish tiers.
+            <p className="text-[11px] text-[rgba(255,255,255,0.48)] font-light leading-relaxed pt-2 border-t border-white/5">
+              Turnkey bespoke contractors, custom millwork, elevated Italian marble finishes or difficult site strata.
             </p>
           </div>
         </div>
 
         {/* Project Summary Metrics Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-[#12141A]/60 border border-white/5 text-xs font-mono">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 rounded-2xl bg-[rgba(8,15,28,0.7)] border border-white/8 backdrop-blur-xl text-xs font-mono">
           <div>
-            <span className="text-[10px] text-[#8A8883] uppercase block">BUILT-UP AREA</span>
-            <span className="text-sm font-semibold text-[#F5F3EF]">{builtUpArea.toLocaleString()} SQ FT</span>
+            <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">BUILT-UP AREA</span>
+            <span className="text-sm font-semibold text-[#F5F5F5]">{builtUpArea.toLocaleString()} SQ FT</span>
           </div>
           <div>
-            <span className="text-[10px] text-[#8A8883] uppercase block">CARPET AREA</span>
-            <span className="text-sm font-semibold text-[#F5F3EF]">{carpetArea.toLocaleString()} SQ FT</span>
+            <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">CARPET AREA</span>
+            <span className="text-sm font-semibold text-[#F5F5F5]">{carpetArea.toLocaleString()} SQ FT</span>
           </div>
           <div>
             <span className="text-[10px] text-[#8A8883] uppercase block">FLOORS &amp; WALLS</span>
@@ -744,22 +744,22 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
         </div>
 
         {/* 3. AI CONSTRUCTION & VALUE-ENGINEERING ADVISOR */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#151922] to-[#12141A] border border-blue-500/20 shadow-2xl space-y-4">
+        <div className="p-6 sm:p-8 rounded-3xl bg-[rgba(8,14,26,0.92)] border border-[rgba(96,165,250,0.22)] backdrop-blur-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_30px_rgba(37,99,235,0.1)] space-y-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[rgba(37,99,235,0.18)] border border-[rgba(96,165,250,0.35)] flex items-center justify-center text-[#60A5FA]">
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-lg font-serif text-[#F5F3EF]">AI Construction &amp; Value Advisor</h3>
-                <span className="text-[11px] text-[#9E9C98] font-light">
-                  Powered by Groq analysis of calculated quantities &amp; layout topology
+                <h3 className="text-lg font-serif text-[#F5F5F5]">AI Construction &amp; Value Advisor</h3>
+                <span className="text-[11px] text-[rgba(255,255,255,0.55)] font-light">
+                  Powered by analytical evaluation of calculated quantities &amp; layout topology
                 </span>
               </div>
             </div>
 
             {isLoadingAdvisor && (
-              <div className="flex items-center gap-2 text-xs font-mono text-blue-400">
+              <div className="flex items-center gap-2 text-xs font-mono text-[#60A5FA]">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>Analyzing Geometry...</span>
               </div>
@@ -768,18 +768,18 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
 
           {aiAdvisor && (
             <>
-              <p className="text-xs sm:text-sm text-[#A0A5B5] leading-relaxed bg-[#0A0B0E]/60 p-4 rounded-2xl border border-white/5">
+              <p className="text-xs sm:text-sm text-[rgba(255,255,255,0.7)] leading-relaxed bg-[rgba(6,10,20,0.6)] p-4 sm:p-5 rounded-2xl border border-white/8">
                 {aiAdvisor.summary}
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 {aiAdvisor.recommendations.map((rec, idx) => (
                   <div
                     key={`rec-${idx}`}
-                    className="p-4 rounded-2xl bg-[#0A0B0E]/80 border border-white/5 space-y-2 text-xs"
+                    className="p-4 sm:p-5 rounded-2xl bg-[rgba(10,16,30,0.7)] border border-white/8 space-y-2 text-xs"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-serif font-medium text-sm text-[#F5F3EF]">
+                      <span className="font-serif font-light text-base text-[#F5F5F5]">
                         {rec.title}
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -789,21 +789,21 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
                               ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                               : rec.impact === "MEDIUM"
                               ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                              : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                              : "bg-blue-500/15 text-[#93C5FD] border border-blue-500/30"
                           }`}
                         >
                           {rec.impact} IMPACT
                         </span>
-                        <span className="px-1.5 py-0.5 rounded bg-white/5 text-[9px] font-mono text-[#8A8883]">
+                        <span className="px-1.5 py-0.5 rounded bg-white/5 text-[9px] font-mono text-[rgba(255,255,255,0.45)]">
                           {rec.category}
                         </span>
                       </div>
                     </div>
-                    <p className="text-[11px] text-[#9E9C98] leading-relaxed font-light">
+                    <p className="text-[11px] text-[rgba(255,255,255,0.6)] leading-relaxed font-light">
                       {rec.reason}
                     </p>
                     {rec.estimated_impact && (
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#C48446] pt-1">
+                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#38BDF8] pt-1">
                         <TrendingDown className="w-3 h-3" />
                         <span>{rec.estimated_impact}</span>
                       </div>
@@ -816,62 +816,62 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
         </div>
 
         {/* 4. PRELIMINARY STRUCTURAL COLUMN & FRAME SCHEDULE */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-[#12141A] border border-[#C48446]/30 shadow-2xl space-y-5">
+        <div className="p-6 sm:p-8 rounded-3xl bg-[rgba(8,14,26,0.92)] border border-[rgba(96,165,250,0.22)] backdrop-blur-[24px] shadow-2xl space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#C48446]/15 border border-[#C48446]/30 flex items-center justify-center text-[#C48446]">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(37,99,235,0.18)] border border-[rgba(96,165,250,0.35)] flex items-center justify-center text-[#60A5FA]">
                 <Box className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-xl font-serif text-[#F5F3EF]">
+                <h3 className="text-xl font-serif font-light text-[#F5F5F5]">
                   Preliminary Column &amp; Structural Frame Schedule
                 </h3>
-                <span className="text-xs text-[#9E9C98] font-light">
+                <span className="text-xs text-[rgba(255,255,255,0.55)] font-light">
                   Deterministic RCC column takeoff integrated with 2D/3D structure
                 </span>
               </div>
             </div>
-            <span className="self-start sm:self-auto px-3 py-1 rounded-full bg-[#C48446]/10 border border-[#C48446]/20 text-[10px] font-mono text-[#C48446] uppercase tracking-wider font-semibold">
+            <span className="self-start sm:self-auto px-3 py-1 rounded-full bg-[rgba(59,130,246,0.18)] border border-[rgba(96,165,250,0.3)] text-[10px] font-mono text-[#93C5FD] uppercase tracking-wider font-semibold">
               PRELIMINARY ALLOWANCE
             </span>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
-            <div className="p-3.5 rounded-2xl bg-[#0A0B0E]/60 border border-white/5">
-              <span className="text-[10px] text-[#8A8883] block mb-1">PLANNED COLUMNS</span>
-              <span className="text-2xl font-serif text-[#F5F3EF] font-medium block">
+            <div className="p-3.5 rounded-2xl bg-[rgba(6,10,20,0.6)] border border-white/6">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] block mb-1">PLANNED COLUMNS</span>
+              <span className="text-2xl font-serif text-[#F5F5F5] font-light block">
                 {structuralQuantities.count}
               </span>
-              <span className="text-[10px] text-[#C48446]">RCC 9&quot;×9&quot; / 9&quot;×12&quot; candidates</span>
+              <span className="text-[10px] text-[#60A5FA]">RCC 9&quot;×9&quot; / 9&quot;×12&quot; candidates</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#0A0B0E]/60 border border-white/5">
-              <span className="text-[10px] text-[#8A8883] block mb-1">COLUMN CONCRETE</span>
-              <span className="text-2xl font-serif text-[#F5F3EF] font-medium block">
-                {structuralQuantities.concCuft} <span className="text-xs font-mono text-[#9E9C98]">CU FT</span>
+            <div className="p-3.5 rounded-2xl bg-[rgba(6,10,20,0.6)] border border-white/6">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] block mb-1">COLUMN CONCRETE</span>
+              <span className="text-2xl font-serif text-[#F5F5F5] font-light block">
+                {structuralQuantities.concCuft} <span className="text-xs font-mono text-[rgba(255,255,255,0.5)]">CU FT</span>
               </span>
-              <span className="text-[10px] text-[#8A8883]">{structuralQuantities.concCum} m³ volume</span>
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)]">{structuralQuantities.concCum} m³ volume</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#0A0B0E]/60 border border-white/5">
-              <span className="text-[10px] text-[#8A8883] block mb-1">REBAR ALLOWANCE</span>
-              <span className="text-2xl font-serif text-[#F5F3EF] font-medium block">
-                ~{structuralQuantities.rebarKg.toLocaleString()} <span className="text-xs font-mono text-[#9E9C98]">KG</span>
+            <div className="p-3.5 rounded-2xl bg-[rgba(6,10,20,0.6)] border border-white/6">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] block mb-1">REBAR ALLOWANCE</span>
+              <span className="text-2xl font-serif text-[#F5F5F5] font-light block">
+                ~{structuralQuantities.rebarKg.toLocaleString()} <span className="text-xs font-mono text-[rgba(255,255,255,0.5)]">KG</span>
               </span>
-              <span className="text-[10px] text-[#8A8883]">~150 kg/m³ residential allowance</span>
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)]">~150 kg/m³ residential allowance</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#0A0B0E]/60 border border-white/5">
-              <span className="text-[10px] text-[#8A8883] block mb-1">COLUMN COST ALLOWANCE</span>
-              <span className="text-2xl font-serif text-[#C48446] font-medium block">
+            <div className="p-3.5 rounded-2xl bg-[rgba(6,10,20,0.6)] border border-white/6">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] block mb-1">COLUMN COST ALLOWANCE</span>
+              <span className="text-2xl font-serif text-[#38BDF8] font-light block">
                 {formatINR(structuralQuantities.costAllowance)}
               </span>
-              <span className="text-[10px] text-[#8A8883]">Concrete, rebar &amp; forms</span>
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)]">Concrete, rebar &amp; forms</span>
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-2.5 text-xs text-[#9E9C98] font-light leading-relaxed">
-            <Shield className="w-4 h-4 text-[#C48446] shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-2xl bg-[rgba(37,99,235,0.08)] border border-[rgba(96,165,250,0.2)] flex items-start gap-2.5 text-xs text-[rgba(255,255,255,0.6)] font-light leading-relaxed">
+            <Shield className="w-4 h-4 text-[#60A5FA] shrink-0 mt-0.5" />
             <span>{structuralQuantities.disclaimer}</span>
           </div>
         </div>
@@ -879,10 +879,10 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
         {/* 5. ITEMIZED CONSTRUCTION CATEGORIES (A to G) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-serif text-[#F5F3EF]">
+            <h3 className="text-2xl font-serif font-light text-[#F5F5F5]">
               Detailed Itemized Construction Breakdown
             </h3>
-            <span className="text-xs font-mono text-[#9E9C98]">
+            <span className="text-xs font-mono text-[rgba(255,255,255,0.5)]">
               All figures in Indian Rupees (₹ INR)
             </span>
           </div>
@@ -892,35 +892,35 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
             return (
               <div
                 key={cat.id}
-                className="rounded-3xl bg-[#12141A] border border-white/10 overflow-hidden transition-colors"
+                className="rounded-3xl bg-[rgba(8,14,26,0.88)] border border-white/8 backdrop-blur-2xl overflow-hidden transition-colors"
               >
                 {/* Category Header Bar */}
                 <button
                   onClick={() => toggleCategory(cat.id)}
-                  className="w-full p-4 sm:p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors text-left"
+                  className="w-full p-4 sm:p-5 flex items-center justify-between hover:bg-white/[0.03] transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-[#C48446]/10 border border-[#C48446]/30 flex items-center justify-center text-[#C48446] font-mono font-bold text-xs">
+                    <div className="w-8 h-8 rounded-xl bg-[rgba(37,99,235,0.18)] border border-[rgba(96,165,250,0.3)] flex items-center justify-center text-[#93C5FD] font-mono font-bold text-xs">
                       {cat.code}
                     </div>
                     <div>
-                      <h4 className="text-base font-serif font-medium text-[#F5F3EF]">
+                      <h4 className="text-base font-serif font-light text-[#F5F5F5]">
                         {cat.title}
                       </h4>
-                      <span className="text-[10px] font-mono text-[#8A8883]">
+                      <span className="text-[10px] font-mono text-[rgba(255,255,255,0.45)]">
                         {cat.items.length} itemized lines
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <span className="text-base sm:text-lg font-mono font-semibold text-[#F5F3EF]">
+                    <span className="text-base sm:text-lg font-mono font-semibold text-[#F5F5F5]">
                       {formatINR(cat.subtotal)}
                     </span>
                     {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-[#9E9C98]" />
+                      <ChevronUp className="w-4 h-4 text-[rgba(255,255,255,0.5)]" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-[#9E9C98]" />
+                      <ChevronDown className="w-4 h-4 text-[rgba(255,255,255,0.5)]" />
                     )}
                   </div>
                 </button>
@@ -930,7 +930,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
                   <div className="border-t border-white/5 overflow-x-auto">
                     <table className="w-full text-xs font-mono text-left">
                       <thead>
-                        <tr className="border-b border-white/5 bg-[#0A0B0E]/40 text-[10px] text-[#8A8883] uppercase tracking-wider">
+                        <tr className="border-b border-white/5 bg-[rgba(6,10,20,0.5)] text-[10px] text-[rgba(255,255,255,0.45)] uppercase tracking-wider">
                           <th className="py-2.5 px-4 font-normal">Item Description</th>
                           <th className="py-2.5 px-4 font-normal text-right">Quantity</th>
                           <th className="py-2.5 px-4 font-normal text-right">Unit</th>
@@ -942,32 +942,32 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
                         {cat.items.map((item, iIdx) => (
                           <tr
                             key={`cat-item-${iIdx}`}
-                            className="hover:bg-white/[0.01] transition-colors"
+                            className="hover:bg-white/[0.02] transition-colors"
                           >
-                            <td className="py-3 px-4 font-serif text-sm text-[#F5F3EF]">
+                            <td className="py-3 px-4 font-sans text-xs text-[#F5F5F5]">
                               {item.name}
                             </td>
-                            <td className="py-3 px-4 text-right text-[#9E9C98]">
+                            <td className="py-3 px-4 text-right text-[rgba(255,255,255,0.65)]">
                               {item.qty.toLocaleString()}
                             </td>
-                            <td className="py-3 px-4 text-right text-[#8A8883]">
+                            <td className="py-3 px-4 text-right text-[rgba(255,255,255,0.45)]">
                               {item.unit}
                             </td>
-                            <td className="py-3 px-4 text-right text-[#9E9C98]">
+                            <td className="py-3 px-4 text-right text-[rgba(255,255,255,0.65)]">
                               ₹{item.rate.toLocaleString()}
                             </td>
-                            <td className="py-3 px-4 text-right font-medium text-[#F5F3EF]">
+                            <td className="py-3 px-4 text-right font-medium text-[#F5F5F5]">
                               {formatINR(item.amount)}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr className="bg-[#0A0B0E]/60 border-t border-white/10 font-semibold text-xs">
-                          <td colSpan={4} className="py-3 px-4 text-right text-[#8A8883] uppercase">
+                        <tr className="bg-[rgba(6,10,20,0.7)] border-t border-white/10 font-semibold text-xs">
+                          <td colSpan={4} className="py-3 px-4 text-right text-[rgba(255,255,255,0.5)] uppercase">
                             Subtotal {cat.title}:
                           </td>
-                          <td className="py-3 px-4 text-right text-[#C48446]">
+                          <td className="py-3 px-4 text-right text-[#38BDF8]">
                             {formatINR(cat.subtotal)}
                           </td>
                         </tr>

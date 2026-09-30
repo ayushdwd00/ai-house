@@ -422,19 +422,19 @@ export const StructureView: React.FC<StructureViewProps> = ({
   ]);
 
   return (
-    <div className="relative w-full h-full flex flex-col md:flex-row overflow-hidden bg-[#F8FAFC] text-[#0F172A] select-none">
+    <div className="relative w-full h-full flex flex-col md:flex-row overflow-hidden bg-[#030303] text-[#F5F5F5] select-none">
       {/* 1. TOP DRAFTING CONTROLS TOOLBAR */}
       <div className="fixed top-16 sm:top-20 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain">
         {/* Left: View Mode Toggle & Floor Selector */}
-        <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg shadow-slate-900/5 text-xs font-mono">
+        <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-[rgba(8,15,28,0.88)] backdrop-blur-[24px] border border-[rgba(96,165,250,0.2)] shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(37,99,235,0.1)] text-xs font-mono text-[rgba(255,255,255,0.64)]">
           {/* 2D / 3D Switch */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl">
+          <div className="flex items-center bg-black/40 p-0.5 rounded-xl border border-white/5">
             <button
               onClick={() => setViewMode("2d")}
               className={`px-3 py-1 rounded-lg text-[11px] font-semibold tracking-wider transition-all ${
                 viewMode === "2d"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-[linear-gradient(135deg,#2563EB,#06B6D4)] text-white shadow-sm"
+                  : "text-[rgba(255,255,255,0.6)] hover:text-white"
               }`}
             >
               2D PLAN
@@ -443,15 +443,15 @@ export const StructureView: React.FC<StructureViewProps> = ({
               onClick={() => setViewMode("3d")}
               className={`px-3 py-1 rounded-lg text-[11px] font-semibold tracking-wider transition-all ${
                 viewMode === "3d"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-[linear-gradient(135deg,#2563EB,#06B6D4)] text-white shadow-sm"
+                  : "text-[rgba(255,255,255,0.6)] hover:text-white"
               }`}
             >
               3D STRUCTURE
             </button>
           </div>
 
-          <div className="h-4 w-px bg-slate-200" />
+          <div className="h-4 w-px bg-white/10" />
 
           {/* Floor Switcher */}
           {totalFloors > 1 && (
@@ -465,8 +465,8 @@ export const StructureView: React.FC<StructureViewProps> = ({
                   }}
                   className={`px-2.5 py-1 rounded-lg text-[10.5px] font-medium transition-colors ${
                     !isAllFloors && activeFloorIndex === idx
-                      ? "bg-blue-600 text-white font-semibold"
-                      : "text-slate-600 hover:bg-slate-100"
+                      ? "bg-[#3B82F6] text-white font-semibold shadow-sm"
+                      : "text-[rgba(255,255,255,0.6)] hover:bg-white/5 hover:text-white"
                   }`}
                 >
                   {idx === 0 ? "GROUND" : `LVL ${idx + 1}`}
@@ -477,8 +477,8 @@ export const StructureView: React.FC<StructureViewProps> = ({
                 onClick={() => setIsAllFloors(true)}
                 className={`px-2.5 py-1 rounded-lg text-[10.5px] font-medium transition-colors ${
                   isAllFloors
-                    ? "bg-blue-600 text-white font-semibold"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-[#3B82F6] text-white font-semibold shadow-sm"
+                    : "text-[rgba(255,255,255,0.6)] hover:bg-white/5 hover:text-white"
                 }`}
                 title="View column alignment across all floors"
               >
@@ -488,14 +488,14 @@ export const StructureView: React.FC<StructureViewProps> = ({
           )}
         </div>
 
-        {/* Right: Structural Visibility Controls (Rule 15) */}
-        <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-lg shadow-slate-900/5 text-[10.5px] font-mono">
+        {/* Right: Structural Visibility Controls */}
+        <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1 p-1.5 rounded-2xl bg-[rgba(8,15,28,0.88)] backdrop-blur-[24px] border border-[rgba(96,165,250,0.2)] shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(37,99,235,0.1)] text-[10.5px] font-mono text-[rgba(255,255,255,0.64)]">
           <button
             onClick={() => setShowArchitecture((v) => !v)}
             className={`px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 ${
               showArchitecture
-                ? "bg-slate-900 text-white font-medium"
-                : "text-slate-400 hover:text-slate-700 bg-slate-50"
+                ? "bg-white/10 text-white font-medium border border-white/10"
+                : "text-[rgba(255,255,255,0.4)] hover:text-white hover:bg-white/5"
             }`}
             title="Toggle Rooms, Walls & Openings"
           >
@@ -507,8 +507,8 @@ export const StructureView: React.FC<StructureViewProps> = ({
             onClick={() => setShowStructure((v) => !v)}
             className={`px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 ${
               showStructure
-                ? "bg-blue-600 text-white font-medium"
-                : "text-slate-400 hover:text-slate-700 bg-slate-50"
+                ? "bg-[linear-gradient(135deg,#2563EB,#06B6D4)] text-white font-medium shadow-sm"
+                : "text-[rgba(255,255,255,0.4)] hover:text-white hover:bg-white/5"
             }`}
             title="Toggle Structural System"
           >
@@ -519,7 +519,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
           <button
             onClick={() => setShowColumns((v) => !v)}
             className={`px-2 py-1 rounded-lg transition-colors ${
-              showColumns ? "text-blue-700 bg-blue-50 font-semibold" : "text-slate-400"
+              showColumns ? "text-[#93C5FD] bg-[rgba(59,130,246,0.2)] font-semibold border border-[rgba(96,165,250,0.3)]" : "text-[rgba(255,255,255,0.4)] hover:text-white"
             }`}
             title="Toggle Pillars / Columns"
           >
@@ -529,7 +529,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
           <button
             onClick={() => setShowBeams((v) => !v)}
             className={`px-2 py-1 rounded-lg transition-colors ${
-              showBeams ? "text-sky-700 bg-sky-50 font-semibold" : "text-slate-400"
+              showBeams ? "text-[#38BDF8] bg-[rgba(6,182,212,0.18)] font-semibold border border-[rgba(6,182,212,0.3)]" : "text-[rgba(255,255,255,0.4)] hover:text-white"
             }`}
             title="Toggle Preliminary Beams"
           >
@@ -539,7 +539,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
           <button
             onClick={() => setShowGrid((v) => !v)}
             className={`px-2 py-1 rounded-lg transition-colors ${
-              showGrid ? "text-rose-700 bg-rose-50 font-semibold" : "text-slate-400"
+              showGrid ? "text-[#F472B6] bg-[rgba(244,114,182,0.18)] font-semibold border border-[rgba(244,114,182,0.3)]" : "text-[rgba(255,255,255,0.4)] hover:text-white"
             }`}
             title="Toggle Structural Grid"
           >
@@ -549,19 +549,19 @@ export const StructureView: React.FC<StructureViewProps> = ({
           <button
             onClick={() => setShowDimensions((v) => !v)}
             className={`px-2 py-1 rounded-lg transition-colors ${
-              showDimensions ? "text-slate-900 bg-slate-100 font-semibold" : "text-slate-400"
+              showDimensions ? "text-[#F5F5F5] bg-white/10 font-semibold border border-white/10" : "text-[rgba(255,255,255,0.4)] hover:text-white"
             }`}
             title="Toggle Dimensions"
           >
             DIMS
           </button>
 
-          <div className="h-4 w-px bg-slate-200 mx-0.5" />
+          <div className="h-4 w-px bg-white/10 mx-0.5" />
 
           {/* Export PNG */}
           <button
             onClick={handleExportDrawing}
-            className="p-1 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            className="p-1 rounded-lg text-[rgba(255,255,255,0.6)] hover:text-[#60A5FA] hover:bg-white/10 transition-colors"
             title="Export High-Res Structural Drawing"
           >
             <Download className="w-3.5 h-3.5" />
@@ -1053,115 +1053,115 @@ export const StructureView: React.FC<StructureViewProps> = ({
         )}
 
         {/* Bottom Zoom & Reset Canvas Controls */}
-        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 p-1 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200 shadow-md">
+        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 p-1 bg-[rgba(8,15,28,0.88)] backdrop-blur-[20px] rounded-xl border border-[rgba(96,165,250,0.2)] shadow-xl text-[rgba(255,255,255,0.7)]">
           <button
             onClick={() => setZoom((z) => Math.min(3.5, z * 1.2))}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-white/10 transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-4 h-4" />
+            <ZoomIn className="w-4 h-4 text-[#93C5FD]" />
           </button>
           <button
             onClick={() => setZoom((z) => Math.max(0.4, z * 0.83))}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-white/10 transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="w-4 h-4 text-[#93C5FD]" />
           </button>
           <button
             onClick={handleResetView}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-white/10 transition-colors"
             title="Reset View"
           >
-            <Maximize2 className="w-4 h-4" />
+            <Maximize2 className="w-4 h-4 text-[#93C5FD]" />
           </button>
-          <div className="px-2 text-[10px] font-mono text-slate-500">{Math.round(zoom * 100)}%</div>
+          <div className="px-2 text-[10px] font-mono text-[rgba(255,255,255,0.5)]">{Math.round(zoom * 100)}%</div>
         </div>
       </div>
 
-      {/* 3. STRUCTURE INFORMATION & COLUMN INSPECTION PANEL (Rules 10, 11, 19) */}
-      <aside className="w-full md:w-80 lg:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto max-h-[45vh] md:max-h-full shadow-lg z-20">
+      {/* 3. STRUCTURE INFORMATION & COLUMN INSPECTION PANEL */}
+      <aside className="w-full md:w-80 lg:w-96 bg-[rgba(8,14,26,0.95)] border-t md:border-t-0 md:border-l border-[rgba(96,165,250,0.18)] backdrop-blur-[24px] p-4 sm:p-5 flex flex-col justify-between overflow-y-auto max-h-[45vh] md:max-h-full shadow-2xl z-20 text-[#F5F5F5]">
         <div className="space-y-4">
           {/* Panel Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <div>
-              <span className="text-[10px] font-mono text-blue-600 font-semibold tracking-widest uppercase">
+              <span className="text-[10px] font-mono text-[#60A5FA] font-semibold tracking-widest uppercase">
                 TECHNICAL ARCHITECTURE
               </span>
-              <h2 className="text-sm font-semibold tracking-wide text-slate-900">STRUCTURAL OVERVIEW</h2>
+              <h2 className="text-sm font-semibold tracking-wide text-[#F5F5F5]">STRUCTURAL OVERVIEW</h2>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[10.5px] font-mono font-medium">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[rgba(59,130,246,0.15)] border border-[rgba(96,165,250,0.3)] text-[#93C5FD] text-[10.5px] font-mono font-medium">
               <Columns className="w-3 h-3" />
               <span>{columns.length} COLS</span>
             </div>
           </div>
 
-          {/* Key Engineering Metric Grid (Rule 10) */}
+          {/* Key Engineering Metric Grid */}
           <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase block">Structural System</span>
-              <span className="font-semibold text-slate-900">{layout.structural_system || "RCC Frame"}</span>
+            <div className="p-2.5 rounded-xl bg-[rgba(12,20,38,0.7)] border border-white/8">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">Structural System</span>
+              <span className="font-semibold text-[#F5F5F5]">{layout.structural_system || "RCC Frame"}</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase block">Stories / Floors</span>
-              <span className="font-semibold text-slate-900">
+            <div className="p-2.5 rounded-xl bg-[rgba(12,20,38,0.7)] border border-white/8">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">Stories / Floors</span>
+              <span className="font-semibold text-[#F5F5F5]">
                 {totalFloors === 1 ? "G (Single Story)" : `G+${totalFloors - 1}`}
               </span>
             </div>
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase block">Column Size</span>
-              <span className="font-semibold text-slate-900">
+            <div className="p-2.5 rounded-xl bg-[rgba(12,20,38,0.7)] border border-white/8">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">Column Size</span>
+              <span className="font-semibold text-[#F5F5F5]">
                 {totalFloors > 1 ? "300 × 450 mm" : "230 × 300 mm"}
               </span>
             </div>
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase block">Wall Thickness</span>
-              <span className="font-semibold text-slate-900">230 mm (9&quot;)</span>
+            <div className="p-2.5 rounded-xl bg-[rgba(12,20,38,0.7)] border border-white/8">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">Wall Thickness</span>
+              <span className="font-semibold text-[#F5F5F5]">230 mm (9&quot;)</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase block">Floor-to-Floor</span>
-              <span className="font-semibold text-slate-900">3.0 m (10.0 ft)</span>
+            <div className="p-2.5 rounded-xl bg-[rgba(12,20,38,0.7)] border border-white/8">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">Floor-to-Floor</span>
+              <span className="font-semibold text-[#F5F5F5]">3.0 m (10.0 ft)</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase block">Max Prelim Span</span>
-              <span className="font-semibold text-slate-900">{maxSpanFt.toFixed(1)} ft</span>
+            <div className="p-2.5 rounded-xl bg-[rgba(12,20,38,0.7)] border border-white/8">
+              <span className="text-[10px] text-[rgba(255,255,255,0.45)] uppercase block">Max Prelim Span</span>
+              <span className="font-semibold text-[#F5F5F5]">{maxSpanFt.toFixed(1)} ft</span>
             </div>
           </div>
 
-          {/* Selected Column Detail Inspector (Rule 11) */}
+          {/* Selected Column Detail Inspector */}
           {selectedColumn ? (
-            <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2 text-xs">
+            <div className="p-3.5 rounded-xl bg-[rgba(37,99,235,0.14)] border border-[rgba(96,165,250,0.35)] space-y-2 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                <span className="font-mono text-[11px] font-bold text-[#93C5FD] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#06B6D4] shadow-[0_0_8px_#06B6D4] animate-pulse" />
                   COLUMN {selectedColumn.column_id}
                 </span>
-                <span className="text-[9.5px] font-mono px-2 py-0.5 rounded-full bg-blue-200 text-blue-900 font-semibold">
+                <span className="text-[9.5px] font-mono px-2 py-0.5 rounded-full bg-[rgba(96,165,250,0.2)] text-[#BFDBFE] font-semibold border border-[rgba(96,165,250,0.3)]">
                   PRELIMINARY
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5 text-[11px] text-slate-700 font-mono">
+              <div className="grid grid-cols-2 gap-1.5 text-[11px] text-[rgba(255,255,255,0.7)] font-mono">
                 <div>
-                  <span className="text-slate-500 text-[10px]">Approximate Size:</span>
-                  <div className="font-semibold text-slate-900">
+                  <span className="text-[rgba(255,255,255,0.45)] text-[10px]">Approximate Size:</span>
+                  <div className="font-semibold text-[#F5F5F5]">
                     {totalFloors > 1 ? "300 × 450 mm (9×12 in)" : "230 × 300 mm (9×9 in)"}
                   </div>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px]">Floors Served:</span>
-                  <div className="font-semibold text-slate-900">
+                  <span className="text-[rgba(255,255,255,0.45)] text-[10px]">Floors Served:</span>
+                  <div className="font-semibold text-[#F5F5F5]">
                     {(selectedColumn.floors?.length ?? 0) > 1 ? "Ground + Upper" : "Ground Floor"}
                   </div>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px]">Position (X / Y):</span>
-                  <div className="font-semibold text-slate-900">
+                  <span className="text-[rgba(255,255,255,0.45)] text-[10px]">Position (X / Y):</span>
+                  <div className="font-semibold text-[#F5F5F5]">
                     {selectedColumn.x.toFixed(1)}&apos; / {selectedColumn.y.toFixed(1)}&apos;
                   </div>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px]">Vertical Alignment:</span>
-                  <div className="font-semibold text-emerald-700 flex items-center gap-1">
+                  <span className="text-[rgba(255,255,255,0.45)] text-[10px]">Vertical Alignment:</span>
+                  <div className="font-semibold text-emerald-400 flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" />
                     Continuous
                   </div>
@@ -1169,24 +1169,24 @@ export const StructureView: React.FC<StructureViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 flex items-center gap-2 font-mono">
-              <Info className="w-4 h-4 text-slate-400 shrink-0" />
+            <div className="p-3 rounded-xl bg-[rgba(12,20,38,0.6)] border border-white/8 text-[11px] text-[rgba(255,255,255,0.5)] flex items-center gap-2 font-mono">
+              <Info className="w-4 h-4 text-[#60A5FA] shrink-0" />
               <span>Click any column (C01, C02...) to inspect geometric size and load path.</span>
             </div>
           )}
 
-          {/* Validation Checks & Alignment Flags (Rules 9 & 13) */}
+          {/* Validation Checks & Alignment Flags */}
           <div className="space-y-1.5">
-            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+            <span className="text-[10px] font-mono text-[rgba(255,255,255,0.45)] uppercase tracking-wider font-semibold">
               STRUCTURAL CLEARANCES & ALIGNMENT
             </span>
             <div className="space-y-1 text-[11px] font-mono">
               {(validationReport?.column_alignment_issues || []).map((issue, i) => (
                 <div
                   key={`align-issue-${i}`}
-                  className="flex items-start gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100 text-slate-700"
+                  className="flex items-start gap-1.5 p-2 rounded-lg bg-[rgba(12,20,38,0.6)] border border-white/8 text-[rgba(255,255,255,0.7)]"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                   <span className="leading-snug">{issue}</span>
                 </div>
               ))}
@@ -1194,9 +1194,9 @@ export const StructureView: React.FC<StructureViewProps> = ({
               {(validationReport?.columns_conflicting_parking || []).map((pConflict, i) => (
                 <div
                   key={`park-conf-${i}`}
-                  className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900"
+                  className="flex items-start gap-1.5 p-2 rounded-lg bg-[rgba(245,158,11,0.12)] border border-amber-500/30 text-amber-200"
                 >
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <span className="leading-snug">{pConflict}</span>
                 </div>
               ))}
@@ -1204,9 +1204,9 @@ export const StructureView: React.FC<StructureViewProps> = ({
               {(validationReport?.unusually_large_spans || []).map((spanNote, i) => (
                 <div
                   key={`span-note-${i}`}
-                  className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900"
+                  className="flex items-start gap-1.5 p-2 rounded-lg bg-[rgba(245,158,11,0.12)] border border-amber-500/30 text-amber-200"
                 >
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <span className="leading-snug">
                     Span {spanNote.from_column} → {spanNote.to_column} ({spanNote.span_ft}ft): Intermediate beam suggested.
                   </span>
@@ -1215,12 +1215,12 @@ export const StructureView: React.FC<StructureViewProps> = ({
             </div>
           </div>
 
-          {/* Engineering Assumptions (Rule 10) */}
+          {/* Engineering Assumptions */}
           <div className="space-y-1.5">
-            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+            <span className="text-[10px] font-mono text-[rgba(255,255,255,0.45)] uppercase tracking-wider font-semibold">
               ASSUMPTIONS
             </span>
-            <ul className="text-[10.5px] font-mono text-slate-600 space-y-1 list-disc list-inside">
+            <ul className="text-[10.5px] font-mono text-[rgba(255,255,255,0.6)] space-y-1 list-disc list-inside">
               <li>Preliminary modular structural grid</li>
               <li>Conceptual column placement based on floor walls</li>
               <li>Assumed RCC framing structural system</li>
@@ -1229,9 +1229,9 @@ export const StructureView: React.FC<StructureViewProps> = ({
           </div>
         </div>
 
-        {/* STRUCTURAL DISCLAIMER (Rule 19) */}
-        <div className="mt-4 pt-3 border-t border-slate-100">
-          <p className="text-[9px] font-mono text-slate-400 leading-relaxed">
+        {/* STRUCTURAL DISCLAIMER */}
+        <div className="mt-4 pt-3 border-t border-white/10">
+          <p className="text-[9px] font-mono text-[rgba(255,255,255,0.4)] leading-relaxed">
             Preliminary structural planning only. Final column sizes, beam sizes, reinforcement, foundations and
             structural safety must be designed and verified by a qualified structural engineer.
           </p>
