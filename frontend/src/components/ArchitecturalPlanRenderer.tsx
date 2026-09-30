@@ -4652,7 +4652,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         <div className="flex-1 flex overflow-hidden relative">
           {/* LEFT PANEL: LAYERS / STRUCTURE */}
           {isLeftPanelOpen && (
-            <aside className="fixed md:static inset-y-12 left-0 w-64 bg-[#16171B] border-r border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none">
+            <aside className={`fixed md:static inset-y-12 left-0 w-64 bg-[#16171B] border-r border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none ${isAiOpen ? "max-md:hidden" : ""}`}>
               {/* Floor switcher */}
               <div className="p-3 border-b border-[#23252B]">
                 <div className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8] mb-2 flex items-center justify-between">
@@ -4797,7 +4797,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
             {/* AI ARCHITECT POPOVER CARD */}
             {isAiOpen && (
-              <div className="absolute top-4 left-4 z-40 w-80 p-4 rounded-2xl bg-[#16171B]/95 backdrop-blur-md border border-[#C48446]/30 shadow-2xl text-[#F5F3EF] animate-in fade-in slide-in-from-left-2 duration-200">
+              <div className="absolute bottom-16 right-4 z-40 w-[min(20rem,calc(100%-2rem))] max-h-[calc(100%-5rem)] overflow-y-auto p-4 rounded-2xl bg-[#16171B]/95 backdrop-blur-md border border-[#C48446]/30 shadow-2xl text-[#F5F3EF] animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center justify-between pb-2 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-[#C48446]" />
@@ -4930,7 +4930,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
           {/* RIGHT PANEL: PROPERTIES / INSPECTOR */}
           {isRightPanelOpen && (
-            <aside className="fixed md:static inset-y-12 right-0 w-72 bg-[#16171B] border-l border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none overflow-y-auto">
+            <aside className={`fixed md:static inset-y-12 right-0 w-72 bg-[#16171B] border-l border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none overflow-y-auto ${isAiOpen ? "max-md:hidden" : ""}`}>
               {/* Inspector Header */}
               <div className="p-3 border-b border-[#23252B] flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8]">

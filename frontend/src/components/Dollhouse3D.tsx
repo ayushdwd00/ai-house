@@ -10,18 +10,12 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import {
-  Camera,
-  ChevronDown,
-  ChevronUp,
-  Bot,
   RotateCcw,
+  ChevronUp,
+  SlidersHorizontal,
   Sun,
   Sunset,
   Moon,
-  Layers,
-  Eye,
-  Scissors,
-  Building,
   Plus,
   Minus,
   Maximize2,
@@ -212,7 +206,6 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
     initialPresentationMode || "cutaway"
   );
   const [cameraView, setCameraView] = useState<CameraPresetType>("cutaway");
-  const [isCameraMenuOpen, setIsCameraMenuOpen] = useState(false);
   const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(false);
   const [showFurnitureState, setShowFurnitureState] = useState(true);
   const [showVegetationState, setShowVegetationState] = useState(true);
@@ -1578,7 +1571,6 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
   // Camera Presets
   const handleCameraPreset = (preset: CameraPresetType) => {
     setCameraView(preset);
-    setIsCameraMenuOpen(false);
     if (!cameraRef.current || !controlsRef.current) return;
     isTransitioningCamera.current = true;
 
@@ -1691,133 +1683,164 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       {/* MODEL VIEW CONTROLS */}
       <div className="absolute top-20 xl:top-4 left-3 right-3 xl:left-4 xl:right-4 z-20 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2 pointer-events-none">
         <div
-          className={`pointer-events-auto justify-self-start rounded-2xl border border-white/10 bg-[#12141A]/95 text-[#9E9C98] shadow-2xl shadow-black/35 backdrop-blur-md ${
-            isControlPanelExpanded ? "w-60 max-w-[calc(100vw-1.5rem)] p-2.5" : "p-1.5"
+          className={`pointer-events-auto max-h-[calc(100dvh-21rem)] justify-self-start overflow-x-hidden overflow-y-auto rounded-2xl border border-white/10 bg-[#12141A]/95 text-[#9E9C98] shadow-2xl shadow-black/35 backdrop-blur-md transition-[width] duration-200 ease-out motion-reduce:transition-none ${
+            isControlPanelExpanded
+              ? "w-64 max-w-[calc(100vw-1.5rem)] p-3"
+              : "w-36 p-1"
           }`}
         >
-          <div className={`flex items-center ${isControlPanelExpanded ? "justify-between px-1 pb-2" : ""}`}>
-            {isControlPanelExpanded && (
-              <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-[#D6D2CA]">
-                <Bot className="h-4 w-4 text-[#C48446]" />
-                Model Controls
-              </div>
-            )}
+          {!isControlPanelExpanded ? (
             <button
               type="button"
-              aria-label={isControlPanelExpanded ? "Collapse model controls" : "Expand model controls"}
-              aria-expanded={isControlPanelExpanded}
-              title={isControlPanelExpanded ? "Collapse model controls" : "Expand model controls"}
-              onClick={() => setIsControlPanelExpanded((expanded) => !expanded)}
-              className={`flex h-9 w-9 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-[#C48446] transition-colors hover:bg-white/10 hover:text-[#F5F3EF] ${
-                isControlPanelExpanded ? "" : "mx-auto"
-              }`}
+              aria-label="Expand Model Controls"
+              aria-expanded={false}
+              onClick={() => setIsControlPanelExpanded(true)}
+              className="flex min-h-9 w-full items-center justify-center gap-2 rounded-full px-1.5 text-[#E69F58] transition-colors hover:bg-white/5 hover:text-[#F5F3EF]"
             >
-              {isControlPanelExpanded
-                ? <ChevronUp className="h-4 w-4" />
-                : <Bot className="h-4 w-4" />}
+              <SlidersHorizontal className="h-4 w-4 shrink-0 text-[#C48446]" />
+              <span className="whitespace-nowrap text-[10px] font-mono font-semibold uppercase tracking-wider">
+                Model Controls
+              </span>
             </button>
-          </div>
+          ) : (
+            <div className="mb-2.5 flex items-center justify-between border-b border-white/10 pb-2">
+              <span className="text-[10px] font-mono font-semibold uppercase tracking-widest text-[#D6D2CA]">
+                Model Controls
+              </span>
+              <button
+                type="button"
+                aria-label="Collapse Model Controls"
+                aria-expanded={true}
+                onClick={() => setIsControlPanelExpanded(false)}
+                className="rounded-md p-1 text-[#9E9C98] transition-colors hover:bg-white/10 hover:text-[#F5F3EF]"
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
-          {isControlPanelExpanded && (
-            <div className="space-y-1.5 border-t border-white/8 pt-2 font-mono text-[10px]">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCutawayMode(true);
-                  setPresentationMode("cutaway");
+          <div
+            aria-hidden={!isControlPanelExpanded}
+            inert={!isControlPanelExpanded}
+            className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out motion-reduce:transition-none ${
+              isControlPanelExpanded
+                ? "mt-2.5 grid-rows-[1fr] opacity-100"
+                : "grid-rows-[0fr] opacity-0"
+            }`}
+          >
+            <div className="min-h-0 overflow-hidden">
+          <div className="space-y-2 font-mono text-[10px]">
+            <div>
+              <span className="mb-1 block uppercase tracking-wider text-[#9E9C98]">View mode</span>
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/25 p-1">
+                <button
+                  type="button"
+                  aria-pressed={isCutawayMode}
+                  onClick={() => {
+                    setIsCutawayMode(true);
+                    setPresentationMode("cutaway");
+                  }}
+                  className={`rounded-lg px-2 py-1.5 transition-colors ${
+                    isCutawayMode
+                      ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
+                      : "text-[#B8B4AC] hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  Dollhouse
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={!isCutawayMode}
+                  onClick={() => {
+                    setIsCutawayMode(false);
+                    setPresentationMode("exterior");
+                  }}
+                  className={`rounded-lg px-2 py-1.5 transition-colors ${
+                    !isCutawayMode
+                      ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
+                      : "text-[#B8B4AC] hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  Exterior
+                </button>
+              </div>
+            </div>
+
+            <label className="flex items-center justify-between gap-3">
+              <span className="shrink-0 uppercase tracking-wider text-[#9E9C98]">Floor</span>
+              <select
+                aria-label="Model floor"
+                value={multiFloorStacked ? "all" : String(activeFloorIndex)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "all") {
+                    setMultiFloorStacked(true);
+                    return;
+                  }
+                  const floorIndex = Number(value);
+                  if (Number.isInteger(floorIndex) && floorIndex >= 0) {
+                    setMultiFloorStacked(false);
+                    onSelectFloor?.(floorIndex);
+                  }
                 }}
-                className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
-                  isCutawayMode
-                    ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
-                    : "bg-white/5 text-[#B8B4AC] hover:bg-white/10 hover:text-white"
-                }`}
+                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#1A1D24] px-2 py-1.5 text-[#E8E4DC] outline-none transition-colors focus:border-[#C48446]/60"
               >
-                <Scissors className="h-4 w-4 shrink-0" />
-                <span>Dollhouse cutaway</span>
-              </button>
+                <option value="all">All Floors</option>
+                {(layout.floors || []).map((floor, index) => (
+                  <option key={floor.floor_id || floor.floor_number} value={index}>
+                    {floor.floor_name || `Floor ${floor.floor_number}`}
+                  </option>
+                ))}
+                {!layout.floors?.length && <option value={0}>Ground Floor</option>}
+              </select>
+            </label>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="uppercase tracking-wider text-[#9E9C98]">Roof visibility</span>
               <button
                 type="button"
-                onClick={() => {
-                  setIsCutawayMode(false);
-                  setPresentationMode("exterior");
-                }}
-                className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
-                  !isCutawayMode
-                    ? "bg-[#C48446] font-semibold text-[#0A0B0E]"
-                    : "bg-white/5 text-[#B8B4AC] hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Building className="h-4 w-4 shrink-0" />
-                <span>Full exterior</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMultiFloorStacked((stacked) => !stacked)}
-                title={multiFloorStacked ? "Isolate the selected floor" : "Show all floors"}
-                className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-2.5 py-2 text-left text-[#B8B4AC] transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <Layers className="h-4 w-4 shrink-0 text-[#C48446]" />
-                <span>{multiFloorStacked ? "All floors" : `Floor ${activeFloorIndex + 1}`}</span>
-              </button>
-              <button
-                type="button"
+                role="switch"
+                aria-label="Roof visibility"
+                aria-checked={effectiveShowRoof}
                 onClick={() => {
                   if (onToggleRoof) onToggleRoof();
                   else setInternalShowRoof((visible) => !visible);
                 }}
-                title={effectiveShowRoof ? "Hide roof in exterior view" : "Show roof in exterior view"}
-                className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
-                  effectiveShowRoof
-                    ? "bg-white/10 text-white"
-                    : "bg-white/5 text-[#9E9C98] hover:bg-white/10 hover:text-white"
+                className={`relative h-5 w-9 shrink-0 overflow-hidden rounded-full transition-colors ${
+                  effectiveShowRoof ? "bg-[#C48446]" : "bg-white/20"
                 }`}
               >
-                <Eye className="h-4 w-4 shrink-0 text-[#C48446]" />
-                <span>Roof visibility</span>
-                <span className={`ml-auto h-1.5 w-1.5 rounded-full ${effectiveShowRoof ? "bg-[#C48446]" : "bg-white/25"}`} />
+                <span
+                  className={`absolute left-0 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                    effectiveShowRoof ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
               </button>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsCameraMenuOpen(!isCameraMenuOpen)}
-                  className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-2.5 py-2 text-left text-[#B8B4AC] transition-colors hover:bg-white/10 hover:text-white"
-                >
-                  <Camera className="h-4 w-4 shrink-0 text-[#C48446]" />
-                  <span className="capitalize">{cameraView} view</span>
-                  <ChevronDown className="ml-auto h-3 w-3 text-[#9E9C98]" />
-                </button>
-                {isCameraMenuOpen && (
-                  <div className="absolute left-0 top-full z-30 mt-1 max-h-64 w-44 overflow-y-auto rounded-xl border border-white/10 bg-[#161922] py-1 shadow-2xl sm:left-full sm:top-0 sm:ml-2 sm:mt-0">
-                    {[
-                      { id: "cutaway", label: "Dollhouse 3/4" },
-                      { id: "exterior", label: "Exterior Perspective" },
-                      { id: "iso", label: "Isometric 45°" },
-                      { id: "top", label: "Top (Plan)" },
-                      { id: "front", label: "Front Facade" },
-                      { id: "entrance", label: "Main Entrance" },
-                      { id: "living", label: "Living Room" },
-                      { id: "kitchen", label: "Kitchen" },
-                      { id: "bedroom", label: "Master Bedroom" },
-                      { id: "garden", label: "Site & Garden" },
-                    ].map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleCameraPreset(item.id as CameraPresetType)}
-                        className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${
-                          cameraView === item.id
-                            ? "bg-[#C48446]/20 font-semibold text-[#C48446]"
-                            : "text-[#9E9C98] hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
-          )}
+
+            <label className="flex items-center justify-between gap-3">
+              <span className="shrink-0 uppercase tracking-wider text-[#9E9C98]">Cutaway view</span>
+              <select
+                aria-label="Cutaway view"
+                value={cameraView}
+                onChange={(event) => handleCameraPreset(event.target.value as CameraPresetType)}
+                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#1A1D24] px-2 py-1.5 text-[#E8E4DC] outline-none transition-colors focus:border-[#C48446]/60"
+              >
+                <option value="cutaway">Dollhouse 3/4</option>
+                <option value="exterior">Exterior Perspective</option>
+                <option value="iso">Isometric 45°</option>
+                <option value="top">Top (Plan)</option>
+                <option value="front">Front Facade</option>
+                <option value="entrance">Main Entrance</option>
+                <option value="living">Living Room</option>
+                <option value="kitchen">Kitchen</option>
+                <option value="bedroom">Master Bedroom</option>
+                <option value="garden">Site &amp; Garden</option>
+              </select>
+            </label>
+          </div>
+            </div>
+          </div>
         </div>
 
         {/* Right: Lighting Atmosphere */}

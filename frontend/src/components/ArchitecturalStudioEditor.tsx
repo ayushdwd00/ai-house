@@ -786,7 +786,7 @@ export const ArchitecturalStudioEditor: React.FC<ArchitecturalStudioEditorProps>
           {!isAiSidebarOpen && (
             <button
               onClick={() => setIsAiSidebarOpen(true)}
-              className="fixed top-32 left-4 sm:left-6 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#F5F3EF] hover:text-[#C48446] transition-all hover:scale-105"
+              className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#F5F3EF] hover:text-[#C48446] transition-all hover:scale-105"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#C48446]" />
               <span>AI ARCHITECT</span>
@@ -801,7 +801,7 @@ export const ArchitecturalStudioEditor: React.FC<ArchitecturalStudioEditorProps>
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: -20, scale: 0.95 }}
                 transition={{ duration: 0.18 }}
-                className="fixed top-32 left-4 sm:left-6 z-40 w-76 sm:w-84 max-h-[calc(100vh-170px)] bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-xs text-[#F5F3EF]"
+                className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-40 w-[min(21rem,calc(100vw-2rem))] max-h-[calc(100dvh-3rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-xs text-[#F5F3EF]"
               >
                 {/* Header */}
                 <div className="h-11 border-b border-white/10 px-3.5 flex items-center justify-between shrink-0">

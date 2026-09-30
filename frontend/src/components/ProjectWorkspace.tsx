@@ -666,6 +666,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         <FloatingAICommandBar
           onApplyInstruction={handleApplyInstruction}
           isLoading={isRefining}
+          context={currentTab}
           selectedRoomName={selectedRoom?.name}
           selectedRoomId={selectedRoomId}
         />

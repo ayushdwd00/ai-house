@@ -59,6 +59,7 @@ function getRoomSuggestions(roomName: string): string[] {
 interface FloatingAICommandBarProps {
   onApplyInstruction: (instruction: string) => Promise<void>;
   isLoading: boolean;
+  context: "plan" | "model";
   selectedRoomName?: string;
   /** Show contextual toolbar for selected room */
   selectedRoomId?: string | null;
@@ -70,6 +71,7 @@ interface FloatingAICommandBarProps {
 export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
   onApplyInstruction,
   isLoading,
+  context,
   selectedRoomName,
   selectedRoomId,
 }) => {
@@ -105,9 +107,15 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
   const placeholder = selectedRoomName
     ? `Edit ${selectedRoomName}… (e.g. "Make it bigger")`
     : "What would you like to change?";
+  const positionClass =
+    context === "model"
+      ? "bottom-[max(1.5rem,env(safe-area-inset-bottom))] max-[640px]:bottom-[max(4rem,calc(env(safe-area-inset-bottom)+2.5rem))] left-[max(1rem,env(safe-area-inset-left))]"
+      : "top-[max(6rem,calc(env(safe-area-inset-top)+5rem))] left-[max(1rem,env(safe-area-inset-left))]";
 
   return (
-    <div className="fixed left-4 top-28 z-40 w-[min(20rem,calc(100vw-2rem))] pointer-events-auto">
+    <div
+      className={`fixed ${positionClass} z-40 w-[min(20rem,calc(100vw-2rem))] max-h-[calc(100dvh-9rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] pointer-events-auto`}
+    >
       {!isExpanded ? (
         <button
           type="button"
@@ -122,7 +130,7 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
         </button>
       ) : (
         <div
-          className={`bg-[#0F1117]/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 transition-all duration-200 ${
+          className={`max-h-full overflow-y-auto bg-[#0F1117]/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/50 transition-all duration-200 ${
             isFocused
               ? "border border-[#C48446]/30 ring-1 ring-[#C48446]/10"
               : "border border-white/8"
