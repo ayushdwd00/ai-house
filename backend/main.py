@@ -48,6 +48,15 @@ from ai.gemini_architect import review_layout_with_gemini
 app = FastAPI(title="AI House Design Generator Professional Architectural Backend", version="2.5.0")
 
 # Global structured error handler
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    detail = exc.detail
+    if isinstance(detail, dict):
+        content = detail
+    else:
+        content = {"detail": str(detail), "message": str(detail)}
+    return JSONResponse(status_code=exc.status_code, content=content)
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     error_msg = str(exc) or "An error occurred during architectural generation."
@@ -68,15 +77,32 @@ default_origins = [
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 env_origins = os.getenv("CORS_ORIGINS", "")
-allowed_origins = [o.strip() for o in env_origins.split(",") if o.strip()] if env_origins else default_origins
+if env_origins:
+    parsed_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
+    if "*" in parsed_origins:
+        allowed_origins = ["*"]
+        allow_creds = False
+        origin_regex = None
+    else:
+        allowed_origins = parsed_origins
+        allow_creds = True
+        origin_regex = r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.onrender\.com)(:\d+)?"
+else:
+    allowed_origins = default_origins
+    allow_creds = True
+    origin_regex = r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.onrender\.com)(:\d+)?"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app)(:\d+)?",
-    allow_credentials=True,
+    allow_origin_regex=origin_regex,
+    allow_credentials=allow_creds,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],

@@ -5,20 +5,16 @@ Solves room positions, dimensions, non-overlap constraints, attached bathrooms,
 circulation access, and topological affinities within the site buildable envelope.
 """
 
-from typing import List, Dict, Tuple, Optional, Any
-import math
+from typing import List, Dict, Optional
 from ortools.sat.python import cp_model
-from shapely.geometry import box, Polygon, LineString
+from shapely.geometry import box
 
-from models import Room, Site, Rect, Point2D
+from models import Room, Site, Rect
 from architecture.topology_engine import ArchitecturalScheme
-from architecture.zoning_graph import (
-    REQUIRED_ADJACENCY, STRONG_ADJACENCY, PREFERRED_ADJACENCY,
-    PREFERRED_SEPARATION, REQUIRED_SEPARATION
-)
 
 # Resolution: 2 units per foot (0.5 ft = 6-inch architectural grid)
 GRID_SCALE = 2
+SOLVER_RELATIVE_GAP_LIMIT = 0.05
 
 
 class SolverCandidate:
@@ -283,11 +279,6 @@ def solve_spatial_layout(
             model.Add(dev_x_align >= x_vars[r1.id] - x_vars[r2.id])
             model.Add(dev_x_align >= x_vars[r2.id] - x_vars[r1.id])
             
-            # Indicator for near-alignment (within 2ft / 4 grid units)
-            is_near_x = model.NewBoolVar(f"near_x_{r1.id}_{r2.id}")
-            model.Add(dev_x_align <= 4).OnlyEnforceIf(is_near_x)
-            model.Add(dev_x_align > 4).OnlyEnforceIf(is_near_x.Not())
-            # Penalize small misalignments to snap them to identical line
             objective_terms.append(dev_x_align * 12)
 
             # Alignment between r1.y and r2.y
@@ -297,7 +288,6 @@ def solve_spatial_layout(
             objective_terms.append(dev_y_align * 12)
 
     # 4. SOFT OBJECTIVES: Adjacency optimization
-    room_map = {r.id: r for r in rooms}
     for r in rooms:
         for adj_id in r.required_adjacencies:
             if adj_id in x_vars and r.id < adj_id:
@@ -365,6 +355,7 @@ def solve_spatial_layout(
     # Solve deterministically
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(time_limit_sec)
+    solver.parameters.relative_gap_limit = SOLVER_RELATIVE_GAP_LIMIT
     solver.parameters.random_seed = int(variant_seed if variant_seed is not None else 42)
     solver.parameters.num_workers = 1
     status = solver.Solve(model)

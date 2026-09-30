@@ -1,7 +1,6 @@
-import pytest
-import time
 from fastapi.testclient import TestClient
 from main import app
+from infrastructure.storage import delete_project
 
 client = TestClient(app)
 
@@ -25,6 +24,41 @@ def test_synchronous_generate():
     assert "id" in data
     assert "rooms" in data
     assert len(data["rooms"]) > 0
+
+def test_create_generate_validate_and_plan_flow():
+    payload = {
+        "plot_width": 30.0,
+        "plot_length": 40.0,
+        "bedrooms": 2,
+        "bathrooms": 2.0,
+        "road_side": "north",
+    }
+    project_id = None
+    try:
+        generated = client.post("/api/generate", json=payload)
+        assert generated.status_code == 200, generated.text
+        layout = generated.json()
+        project_id = layout["id"]
+        assert layout["rooms"] and layout["floors"] and layout["site"]
+
+        created = client.post("/api/projects", json=layout)
+        assert created.status_code == 200, created.text
+        retrieved = client.get(f"/api/projects/{project_id}")
+        assert retrieved.status_code == 200, retrieved.text
+        canonical_layout = retrieved.json()
+
+        validation = client.post("/api/validate", json=canonical_layout)
+        assert validation.status_code == 200, validation.text
+        assert validation.json()["is_valid"]
+
+        plan = client.post("/api/mep/plan", json=canonical_layout)
+        assert plan.status_code == 200, plan.text
+        planned_layout = plan.json()
+        assert planned_layout["id"] == project_id
+        assert planned_layout["mep_plan"] is not None
+    finally:
+        if project_id:
+            assert delete_project(project_id)
 
 def test_async_job_polling_flow():
     payload = {

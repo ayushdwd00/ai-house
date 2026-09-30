@@ -7,16 +7,14 @@ Shared Wall Network -> Doors & Windows -> Mathematical Scoring ->
 Groq Architectural Critic -> Canonical HouseLayout Model.
 """
 
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Optional, Any
 import uuid
 from shapely.geometry import box
 
 from models import (
-    HouseLayout, FloorPlan, Room, Rect, FurnitureItem, Wall, Door, Window,
-    HouseStats, Site, Point2D, ArchitecturalScores, ArchitecturalValidation,
-    Stair, StairGeometry, CirculationNetwork, ConstructionSpecification,
-    MaterialQuantities, CostEstimate, BuildingServices, StructuralPlanning,
-    LandscapePlan, LandscapePreferences
+    HouseLayout, FloorPlan, Room, Rect, HouseStats, Point2D,
+    ArchitecturalScores, ArchitecturalValidation, Stair,
+    ConstructionSpecification, LandscapePreferences
 )
 from architecture.site_planner import plan_site
 from architecture.zoning_graph import ZONE_MAP, PRIVACY_MAP
@@ -31,16 +29,10 @@ from construction.building_services_engine import plan_building_services
 from construction.structural_planner import plan_preliminary_structure
 from estimation.material_quantity_engine import calculate_material_quantities
 from estimation.cost_estimator import estimate_construction_cost
-from ai.groq_service import (
-    critique_architectural_candidates_with_groq,
-    generate_architectural_concepts_with_groq,
-    ArchitecturalRequirements,
-    ArchitecturalCritique
-)
+from ai.groq_service import ArchitecturalRequirements
 from ai.gemini_architect import (
     generate_architectural_concepts_with_gemini,
-    critique_architectural_candidates_with_gemini,
-    review_layout_with_gemini
+    critique_architectural_candidates_with_gemini
 )
 
 ROOM_COLORS = {
@@ -898,7 +890,7 @@ def generate_architectural_house_layout(
     )
 
     # 4. Formulate Architectural Concept Strategies via Gemini Reasoning Layer (with Groq fallback)
-    concepts_key = f"{plot_width}_{plot_length}_{num_floors}_{bedrooms}_{bathrooms}_{road_side}_{style}_{vastu_compliant}_{open_concept}_{sorted(special_rooms or [])}_{user_prompt}"
+    concepts_key = arch_req.model_dump_json()
     if concepts_key in _CONCEPTS_CACHE:
         ai_concepts = _CONCEPTS_CACHE[concepts_key]
     else:

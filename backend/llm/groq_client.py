@@ -213,6 +213,8 @@ class GroqClient(LLMClient):
         if schema:
             schema_json = json.dumps(schema.model_json_schema(), indent=2)
             active_system += f"\n\nYou MUST return a single JSON object strictly matching this schema:\n{schema_json}"
+        elif "json" not in active_system.lower() and "json" not in user.lower():
+            active_system += "\n\nYou MUST respond with a valid JSON object."
 
         messages = [
             {"role": "system", "content": active_system},

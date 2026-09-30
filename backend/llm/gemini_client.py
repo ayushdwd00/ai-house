@@ -110,7 +110,9 @@ class GeminiClient(LLMClient):
                 self._raw_client = None
 
     def is_available(self) -> bool:
-        return bool(self._api_key and self._api_key != "your_gemini_api_key_here")
+        if getattr(self, "_key_invalid", False):
+            return False
+        return bool(self._api_key and self._api_key != "your_gemini_api_key_here" and not self._api_key.startswith("your_"))
 
     def verify_models_startup(self) -> Dict[str, Any]:
         if not self.is_available():
@@ -169,6 +171,10 @@ class GeminiClient(LLMClient):
                 if response and hasattr(response, "text") and response.text:
                     return response.text
             except Exception as e:
+                err_str = str(e)
+                if "API_KEY_INVALID" in err_str or "API key not valid" in err_str:
+                    self._key_invalid = True
+                    raise RuntimeError("Gemini API key is invalid; immediate fallback.")
                 logger.info(f"[GEMINI SDK NOTE] SDK call error ({_safe_str(e)}); trying direct REST fallback...")
 
         # Method B: Direct REST API via httpx (guarantees robust execution without SDK issues)
@@ -192,6 +198,9 @@ class GeminiClient(LLMClient):
         }
         with httpx.Client(timeout=DEFAULT_TIMEOUT_SEC) as client:
             resp = client.post(url, json=payload)
+            if resp.status_code in (400, 401, 403) and ("API_KEY" in resp.text or "API key not valid" in resp.text):
+                self._key_invalid = True
+                raise RuntimeError("Gemini API key is invalid; immediate fallback.")
             resp.raise_for_status()
             res_data = resp.json()
             candidates = res_data.get("candidates", [])

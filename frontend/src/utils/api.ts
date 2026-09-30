@@ -1,48 +1,203 @@
 import { HouseLayout, IntakeRequest, Room, Rect } from "@/types/house";
 
-export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || "http://localhost:8000"
-).replace(/\/+$/, "");
+/**
+ * Resolves the backend API base URL with support for development and production environments.
+ */
+function resolveApiBaseUrl(): string {
+  const envVal = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL;
+  if (envVal && typeof envVal === "string" && envVal.trim() && envVal !== "undefined" && envVal !== "null") {
+    return envVal.trim().replace(/\/+$/, "");
+  }
+  // In browser runtime:
+  if (typeof window !== "undefined") {
+    const loc = window.location;
+    if (loc.hostname === "127.0.0.1") {
+      return `${loc.protocol}//127.0.0.1:8000`;
+    }
+    if (loc.hostname === "localhost") {
+      return `${loc.protocol}//localhost:8000`;
+    }
+  }
+  return "http://localhost:8000";
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
+export interface ApiErrorContext {
+  url?: string;
+  status?: number;
+  statusText?: string;
+  responseBody?: unknown;
+  cause?: unknown;
+}
+
+export class ArchitecturalApiError extends Error {
+  status?: number;
+  url?: string;
+  responseBody?: unknown;
+
+  constructor(message: string, context?: ApiErrorContext) {
+    super(message);
+    this.name = "ArchitecturalApiError";
+    this.status = context?.status;
+    this.url = context?.url;
+    this.responseBody = context?.responseBody;
+  }
+}
 
 /**
  * Normalizes error messages into user-friendly diagnostic notices
  * without leaking raw system stack traces or generic "Failed to fetch".
+ * Distinguishes:
+ * 1. Backend unreachable (network error, CORS, port mismatch, mixed content)
+ * 2. Backend returned HTTP error (400, 422, 500, etc.)
+ * 3. Invalid request / validation failure
+ * 4. Backend returned malformed response
  */
-export function formatApiError(err: unknown): string {
-  if (err instanceof TypeError && err.message.toLowerCase().includes("failed to fetch")) {
-    return "Unable to connect to the architectural synthesis backend. Please verify the backend server is active and accessible.";
+export function formatApiError(err: unknown, requestUrl?: string): string {
+  const status = (err as any)?.status;
+  const targetUrl = requestUrl || (err as any)?.url || API_BASE_URL;
+
+  // 1. Connection / Network / Timeout errors
+  const isNetworkError =
+    err instanceof TypeError &&
+    (err.message.toLowerCase().includes("failed to fetch") ||
+      err.message.toLowerCase().includes("network error") ||
+      err.message.toLowerCase().includes("load failed"));
+
+  const isAbortError =
+    (err as any)?.name === "AbortError" ||
+    (err instanceof Error && err.message.toLowerCase().includes("aborted"));
+
+  if (isAbortError) {
+    return `Architectural synthesis timed out while communicating with ${targetUrl}. The spatial solver may require more time. Please retry.`;
   }
+
+  if (isNetworkError) {
+    // Check for mixed content block (HTTPS frontend -> HTTP backend)
+    if (typeof window !== "undefined" && window.location.protocol === "https:" && targetUrl.startsWith("http://")) {
+      return `Mixed Content Security Block: This application was loaded over HTTPS (${window.location.origin}), but is configured to connect to an insecure HTTP backend (${targetUrl}). Please configure NEXT_PUBLIC_API_URL to use HTTPS.`;
+    }
+
+    // Check for production app pointing to localhost
+    if (
+      typeof window !== "undefined" &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1" &&
+      (targetUrl.includes("localhost") || targetUrl.includes("127.0.0.1"))
+    ) {
+      return `Backend Connection Error: The frontend is deployed at ${window.location.hostname} but attempting to reach ${targetUrl}. Please configure the NEXT_PUBLIC_API_URL environment variable in your production hosting environment (e.g. Vercel) to point to your live FastAPI backend.`;
+    }
+
+    return `Unable to connect to the architectural synthesis backend at ${targetUrl}. Please verify the backend server is active and accessible (e.g., run 'python -m uvicorn main:app --port 8000' in the backend directory).`;
+  }
+
   if (err instanceof Error) {
-    if (err.message === "Generation failed (HTTP 422)" || err.message.toLowerCase() === "unprocessable entity") {
-      return "Some architectural specifications could not be processed. Please review your plot dimensions and requirements.";
+    const msg = err.message;
+
+    // 2. HTTP Status specific handling
+    if (status === 422 || msg.includes("HTTP 422") || msg.toLowerCase().includes("unprocessable entity")) {
+      if (msg.includes("PLOT_ENVELOPE_INFEASIBLE") || msg.includes("buildable envelope") || msg.includes("Recommendation:")) {
+        return msg.replace(/^Generation failed \(HTTP 422\):?\s*/, "");
+      }
+      return msg.length > 25 && !msg.startsWith("Generation failed")
+        ? msg
+        : "Some architectural specifications could not be processed. Please review your plot dimensions and requirements.";
     }
-    if (err.message.includes("504") || err.message.toLowerCase().includes("timeout")) {
-      return "Architectural synthesis timed out. The spatial solver took longer than expected. Please try again.";
+
+    if (status === 404 || msg.includes("HTTP 404")) {
+      return `Architectural API endpoint not found (HTTP 404) at ${targetUrl}. Please verify the backend router configuration.`;
     }
-    if (err.message === "Generation failed (HTTP 500)") {
-      return "The architectural solver encountered an unexpected condition. Please adjust room counts or setbacks and retry.";
+
+    if (status === 400 || msg.includes("HTTP 400")) {
+      return `Invalid architectural request (HTTP 400): ${msg.replace(/^Generation failed \(HTTP 400\):?\s*/, "")}`;
     }
-    return err.message;
+
+    if (status === 500 || msg === "Generation failed (HTTP 500)") {
+      return msg.length > 30 && msg !== "Generation failed (HTTP 500)"
+        ? `Architectural solver error: ${msg.replace(/^Generation failed \(HTTP 500\):?\s*/, "")}`
+        : "The architectural solver encountered an unexpected condition. Please adjust room counts or setbacks and retry.";
+    }
+
+    if (status === 502 || status === 503 || status === 504 || msg.includes("504") || msg.toLowerCase().includes("timeout")) {
+      return `Architectural synthesis service is temporarily unavailable or timed out (HTTP ${status || "504"}). Please retry in a moment.`;
+    }
+
+    // 3. Malformed responses
+    if (msg.toLowerCase().includes("malformed") || msg.toLowerCase().includes("not valid json")) {
+      return `Backend returned a malformed or non-JSON response from ${targetUrl}. Please check backend logs.`;
+    }
+
+    return msg;
   }
+
   return "An unexpected error occurred while communicating with the architectural engine.";
+}
+
+/**
+ * Safely executes a fetch with fallback between localhost and 127.0.0.1 for local dev environments.
+ */
+export async function fetchWithBackendFallback(
+  endpointPath: string,
+  init?: RequestInit,
+  timeoutMs: number = 75000
+): Promise<{ res: Response; url: string }> {
+  const primaryUrl = `${API_BASE_URL}${endpointPath}`;
+  const urlsToTry = [primaryUrl];
+
+  if (primaryUrl.includes("localhost:8000")) {
+    urlsToTry.push(primaryUrl.replace("localhost:8000", "127.0.0.1:8000"));
+  } else if (primaryUrl.includes("127.0.0.1:8000")) {
+    urlsToTry.push(primaryUrl.replace("127.0.0.1:8000", "localhost:8000"));
+  }
+
+  let lastError: unknown = null;
+
+  for (let i = 0; i < urlsToTry.length; i++) {
+    const targetUrl = urlsToTry[i];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(targetUrl, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return { res, url: targetUrl };
+    } catch (fetchErr) {
+      clearTimeout(timer);
+      lastError = fetchErr;
+      if (i < urlsToTry.length - 1) {
+        console.warn(`[API NOTICE] Request to ${targetUrl} failed, trying fallback ${urlsToTry[i + 1]}...`);
+        continue;
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 /**
  * Generate a new architectural house layout from intake specifications.
  */
 export async function generateHouseLayout(req: IntakeRequest): Promise<HouseLayout> {
-  const url = `${API_BASE_URL}/api/generate`;
+  let targetUrl = `${API_BASE_URL}/api/generate`;
   try {
-    const res = await fetch(url, {
+    const { res, url } = await fetchWithBackendFallback("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
-    });
+    }, 90000);
+    targetUrl = url;
 
     if (!res.ok) {
       let detail = `Generation failed (HTTP ${res.status})`;
+      let responseBody = "";
       try {
-        const errJson = await res.json();
+        const text = await res.text();
+        responseBody = text;
+        const errJson = JSON.parse(text);
         if (errJson.detail) {
           if (typeof errJson.detail === "string") {
             detail = errJson.detail;
@@ -53,15 +208,49 @@ export async function generateHouseLayout(req: IntakeRequest): Promise<HouseLayo
               detail += `\n\nRecommendation: ${d.recommendation}`;
             }
           }
+        } else if (errJson.message) {
+          detail = errJson.message;
         }
-      } catch (_) {}
-      throw new Error(detail);
+      } catch (_) {
+        if (responseBody) {
+          detail = `${detail}: ${responseBody.slice(0, 300)}`;
+        }
+      }
+
+      console.error("[API ERROR] generateHouseLayout returned HTTP error:", {
+        url: targetUrl,
+        status: res.status,
+        statusText: res.statusText,
+        detail,
+        req,
+      });
+
+      throw new ArchitecturalApiError(detail, {
+        url: targetUrl,
+        status: res.status,
+        statusText: res.statusText,
+        responseBody,
+      });
     }
 
-    return await res.json();
-  } catch (err) {
-    console.error("[API ERROR] generateHouseLayout failed:", { url, req, error: err });
-    throw new Error(formatApiError(err));
+    try {
+      const data = await res.json();
+      return data;
+    } catch (parseErr) {
+      console.error("[API MALFORMED RESPONSE] generateHouseLayout:", { url: targetUrl, parseErr });
+      throw new ArchitecturalApiError(`Backend returned a malformed or non-JSON response from ${targetUrl}`, {
+        url: targetUrl,
+        status: res.status,
+      });
+    }
+  } catch (err: any) {
+    console.error("[API ERROR] generateHouseLayout failed:", {
+      url: targetUrl,
+      req,
+      error: err,
+      status: err?.status,
+    });
+    throw new Error(formatApiError(err, targetUrl));
   }
 }
 
@@ -468,17 +657,23 @@ export async function generateDesignSchemes(
   layout: HouseLayout,
   vastuEnabled: boolean
 ): Promise<DesignScheme[]> {
-  const url = `${API_BASE_URL}/api/design-schemes?count=4&vastu_enabled=${vastuEnabled}`;
+  const endpoint = `/api/design-schemes?count=4&vastu_enabled=${vastuEnabled}`;
+  let targetUrl = `${API_BASE_URL}${endpoint}`;
   try {
-    const res = await fetch(url, {
+    const { res, url } = await fetchWithBackendFallback(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(layout),
-    });
+    }, 90000);
+    targetUrl = url;
+
     const data: unknown = await res.json();
     if (!res.ok) {
       const detail = isRecord(data) ? data.detail || data.message : undefined;
-      throw new Error(typeof detail === "string" ? detail : `Scheme generation failed (HTTP ${res.status})`);
+      throw new ArchitecturalApiError(
+        typeof detail === "string" ? detail : `Scheme generation failed (HTTP ${res.status})`,
+        { url: targetUrl, status: res.status }
+      );
     }
     const rawSchemes = Array.isArray(data)
       ? data
@@ -528,6 +723,6 @@ export async function generateDesignSchemes(
     }
     return validSchemes;
   } catch (err) {
-    throw new Error(formatApiError(err));
+    throw new Error(formatApiError(err, targetUrl));
   }
 }
