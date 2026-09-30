@@ -248,16 +248,25 @@ export const StructureView: React.FC<StructureViewProps> = ({
       color: 0x3B82F6,
       roughness: 0.4,
       metalness: 0.1,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
     });
     const selectedColumnMat = new THREE.MeshStandardMaterial({
       color: 0xF59E0B,
       roughness: 0.2,
       metalness: 0.2,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
     });
     const beamMat = new THREE.MeshStandardMaterial({
       color: 0x0284C7,
       roughness: 0.4,
       metalness: 0.1,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
     });
     const slabMat = new THREE.MeshStandardMaterial({
       color: 0x64748B,
