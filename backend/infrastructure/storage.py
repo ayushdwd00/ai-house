@@ -27,6 +27,10 @@ def get_project(project_id: str) -> Optional[HouseLayout]:
     """Loads current active project design JSON."""
     return _default_repo.get(project_id)
 
+def list_projects(limit: int = 100, offset: int = 0) -> Tuple[List[Dict[str, Any]], int]:
+    """Lists lightweight project metadata without returning HouseLayout payloads."""
+    return _default_repo.list_projects(limit, offset)
+
 
 def list_project_versions(project_id: str) -> List[Dict[str, Any]]:
     """Lists all saved version snapshots for a project."""

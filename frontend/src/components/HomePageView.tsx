@@ -14,8 +14,6 @@ import {
   Upload,
 } from "lucide-react";
 
-import { GradualBlur } from "@/components/ui/GradualBlur";
-
 interface HomePageViewProps {
   scrollRoot: React.RefObject<HTMLDivElement | null>;
   navbar?: React.ReactNode;
@@ -63,24 +61,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
   });
   const heroScale = useTransform(heroScrollProgress, [0, 1], [1, isCompactViewport ? 0.985 : 0.97]);
   const heroContentOpacity = useTransform(heroScrollProgress, [0, 0.2, 0.5, 1], [1, 0.78, 0, 0]);
-  const heroContentBlur = useTransform(heroScrollProgress, [0, 1], ["blur(0px)", "blur(2px)"]);
   const heroOverlayOpacity = useTransform(heroScrollProgress, [0, 0.25, 0.7, 1], [0, 0.16, 0.62, 0.88]);
-
-  const revealProps = (delay = 0, distance = 16) => ({
-    initial: reducedMotion
-      ? false
-      : { opacity: 0, y: distance, scale: 0.985, filter: "blur(4px)" },
-    animate: reducedMotion
-      ? { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
-      : undefined,
-    whileInView: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" },
-    viewport: { root: scrollRoot, once: true, amount: 0.15 },
-    transition: {
-      duration: reducedMotion ? 0 : 0.85,
-      delay: reducedMotion ? 0 : delay,
-      ease: [0.23, 1, 0.32, 1] as const,
-    },
-  });
 
   return (
     <div className="relative isolate w-full min-h-screen bg-[#030303] text-[#F5F5F5] overflow-x-clip selection:bg-[#2563EB]/40 selection:text-white">
@@ -127,7 +108,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
           className="sticky top-0 z-0 h-[100svh] min-h-screen w-full overflow-hidden border-b border-white/5"
         >
           <motion.div
-            style={reducedMotion ? undefined : { opacity: heroContentOpacity, filter: heroContentBlur }}
+            style={reducedMotion ? undefined : { opacity: heroContentOpacity }}
             className="relative z-20 flex min-h-full w-full flex-col justify-between"
           >
             {navbar && (
@@ -227,14 +208,10 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         </motion.section>
         </div>
 
-        {/* ── 2. ARCHITECTURAL JOURNEY (WITH GRADUAL BLUR TRANSITIONS) ── */}
+        {/* ── 2. ARCHITECTURAL JOURNEY ── */}
         <section className="relative z-10 -mt-[100svh] w-full bg-[rgba(3,3,3,0.96)] py-20 sm:py-28 px-4 sm:px-8 md:px-16 overflow-hidden">
-          {/* Subtle progressive gradual blur along the top and bottom boundaries */}
-          <GradualBlur position="top" height="88px" strength={6} layerCount={4} opacity={0.65} color="rgba(3,3,3,0.8)" />
-          <GradualBlur position="bottom" height="88px" strength={6} layerCount={4} opacity={0.65} color="rgba(3,3,3,0.8)" />
-
           {/* Section Header */}
-          <motion.div {...revealProps(0, 18)} className="max-w-4xl mx-auto text-center mb-16">
+          <motion.div className="max-w-4xl mx-auto text-center mb-16">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(214,184,120,0.08)] border border-[rgba(214,184,120,0.18)] text-[10px] font-mono tracking-[0.24em] text-[#D6B878] uppercase mb-4">
               ARCHITECTURAL JOURNEY
             </span>
@@ -251,7 +228,6 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 1: PHILOSOPHY // 01 ══ */}
             <motion.div
-              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(214,184,120,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(214,184,120,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -289,7 +265,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   </div>
                 </div>
 
-                <motion.div {...revealProps(0.12, 14)} className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl">
+                <motion.div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl">
                   <img
                     src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"
                     alt="Architectural Craftsmanship"
@@ -313,7 +289,6 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 2: PRECISION // 02 ══ */}
             <motion.div
-              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(96,165,250,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(96,165,250,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -370,7 +345,6 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 3: INTELLIGENCE // 03 ══ */}
             <motion.div
-              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(167,139,250,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(167,139,250,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -383,7 +357,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-14 items-center my-auto">
-                <motion.div {...revealProps(0.12, 14)} className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl order-2 lg:order-1">
+                <motion.div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl order-2 lg:order-1">
                   <img
                     src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop"
                     alt="Floor plan geometry"
@@ -430,7 +404,6 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 4: IMMERSION // 04 ══ */}
             <motion.div
-              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(120,168,135,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(120,168,135,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -451,7 +424,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   and study daylight through real shadow calculations.
                 </p>
 
-                <motion.div {...revealProps(0.12, 14)} className="w-full max-w-4xl h-72 sm:h-96 rounded-2xl border border-white/10 overflow-hidden relative group bg-[#05070B] shadow-2xl">
+                <motion.div className="w-full max-w-4xl h-72 sm:h-96 rounded-2xl border border-white/10 overflow-hidden relative group bg-[#05070B] shadow-2xl">
                   <img
                     src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1600&auto=format&fit=crop"
                     alt="3D Architectural Dollhouse View"
@@ -479,7 +452,6 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 5: TYPOLOGIES // 05 ══ */}
             <motion.div
-              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(214,184,120,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(214,184,120,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -601,21 +573,20 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-transparent text-center overflow-hidden">
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_48%_38%,rgba(139,92,246,0.055)_0%,transparent_55%),radial-gradient(ellipse_at_75%_72%,rgba(214,184,120,0.045)_0%,transparent_48%),radial-gradient(ellipse_at_24%_70%,rgba(37,99,235,0.035)_0%,transparent_52%)]" />
 
-          <motion.div {...revealProps(0, 20)} className="relative z-10 max-w-3xl mx-auto flex flex-col items-center">
+          <motion.div className="relative z-10 max-w-3xl mx-auto flex flex-col items-center">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(214,184,120,0.08)] border border-[rgba(214,184,120,0.18)] text-[10px] font-mono tracking-[0.24em] text-[#D6B878] uppercase mb-5">
               BEGIN CONSULTATION
             </span>
 
-            <motion.h2 {...revealProps(0.08, 16)} className="text-4xl sm:text-6xl md:text-7xl font-serif font-light text-[#F4F1EA] mb-6 tracking-tight leading-tight">
+            <motion.h2 className="text-4xl sm:text-6xl md:text-7xl font-serif font-light text-[#F4F1EA] mb-6 tracking-tight leading-tight">
               Ready to design your residence?
             </motion.h2>
 
-            <motion.p {...revealProps(0.16, 12)} className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light max-w-lg mb-10 leading-relaxed">
+            <motion.p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light max-w-lg mb-10 leading-relaxed">
               Start the step-by-step architectural consultation and experience your future home generated in minutes.
             </motion.p>
 
             <motion.button
-              {...revealProps(0.24, 10)}
               onClick={onStartDesign}
               className="px-10 py-4.5 rounded-full btn-primary-blue font-medium text-xs tracking-widest uppercase flex items-center gap-2 group cursor-pointer shadow-[0_15px_40px_rgba(37,99,235,0.35)]"
             >

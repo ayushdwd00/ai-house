@@ -9,8 +9,6 @@ import {
   Compass,
   Check,
   Building,
-  Car,
-  Layers,
   Sun,
   Shield,
   Loader2,
@@ -18,7 +16,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { DreamHomeStructuredRequirements, HouseLayout } from "@/types/house";
-import { interpretDreamHomePrompt, generateDreamHomeLayout } from "@/utils/api";
+import { interpretDreamHomePrompt, generateDreamHomeLayout, GenerationProgress } from "@/utils/api";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
 
 interface DreamHomeConsultationModalProps {
@@ -42,6 +40,7 @@ export const DreamHomeConsultationModal: React.FC<DreamHomeConsultationModalProp
   const [prompt, setPrompt] = useState("");
   const [isInterpreting, setIsInterpreting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStage, setGenerationStage] = useState<GenerationProgress["stage"]>("queued");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Structured brief state
@@ -77,10 +76,13 @@ export const DreamHomeConsultationModal: React.FC<DreamHomeConsultationModalProp
   const handleGenerateHome = async () => {
     if (!brief) return;
     setIsGenerating(true);
+    setGenerationStage("queued");
     setErrorMessage(null);
 
     try {
-      const rawLayout = await generateDreamHomeLayout(brief);
+      const rawLayout = await generateDreamHomeLayout(brief, (progress) => {
+        setGenerationStage(progress.stage);
+      });
       const sanitized = validateAndSanitizeHouseLayout(rawLayout) || rawLayout;
       onSuccess(sanitized);
     } catch (err) {
@@ -354,7 +356,7 @@ export const DreamHomeConsultationModal: React.FC<DreamHomeConsultationModalProp
                   {isGenerating ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>SYNTHESIZING HOUSE & COLUMNS...</span>
+                      <span>SYNTHESIZING · {generationStage === "queued" ? "QUEUED" : generationStage.toUpperCase()}...</span>
                     </>
                   ) : (
                     <>

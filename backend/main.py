@@ -3,16 +3,18 @@ import base64
 import time
 import uuid
 import asyncio
+import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request, Path as FastPath
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request, Path as FastPath, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, PlainTextResponse
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 from export.cad_export_engine import export_layout_to_dxf, export_layout_to_indian_drawing_svg, get_door_window_schedules
 
 from models import (
@@ -36,7 +38,8 @@ from architecture.floorplan_reconstruction import reconstruct_floorplan_vector, 
 from architecture.geometry_normalizer import calibrate_scale
 from mep_planning import generate_mep_plan as build_mep_plan
 from shapely.geometry import box
-from infrastructure.storage import save_project, get_project, list_project_versions, restore_project_version, undo_project_version, delete_project
+from infrastructure.storage import save_project, get_project, list_projects, list_project_versions, restore_project_version, undo_project_version, delete_project
+from infrastructure.generation_context import GenerationRunContext, CURRENT_GENERATION, record_generation_timing, report_generation_stage
 from ai.groq_service import (
     parse_intake_with_groq_or_fallback,
     interpret_dream_home_prompt,
@@ -46,6 +49,7 @@ from ai.groq_service import (
 from ai.gemini_architect import review_layout_with_gemini
 
 app = FastAPI(title="AI House Design Generator Professional Architectural Backend", version="2.5.0")
+generation_logger = logging.getLogger("generation")
 
 # Global structured error handler
 @app.exception_handler(HTTPException)
@@ -174,11 +178,84 @@ def recommend_dimensions_endpoint(req: DimensionRecommendationRequest):
     return analyze_and_recommend_dimensions(req)
 
 JOBS_DB: Dict[str, Dict[str, Any]] = {}
-thread_pool = ThreadPoolExecutor(max_workers=4)
+JOBS_DB_LOCK = threading.RLock()
+JOB_IDEMPOTENCY_KEYS: Dict[str, str] = {}
+JOB_RETENTION_SECONDS = 24 * 60 * 60
+GENERATION_WORKERS = int(os.getenv("GENERATION_WORKERS", "2"))
+if GENERATION_WORKERS < 1:
+    raise ValueError("GENERATION_WORKERS must be greater than zero")
+thread_pool = ThreadPoolExecutor(max_workers=GENERATION_WORKERS)
 
 
-def _execute_generation(req: IntakeRequest) -> HouseLayout:
-    t0 = time.time()
+def _update_job(job_id: str, **updates: Any) -> None:
+    with JOBS_DB_LOCK:
+        job = JOBS_DB.get(job_id)
+        if job:
+            job.update(updates)
+            job["updated_at"] = time.time()
+
+
+def _report_job_stage(job_id: str, stage: str) -> None:
+    stages = ["understanding", "planning", "solving", "validating", "rendering"]
+    completed = stages[:stages.index(stage)] if stage in stages else []
+    _update_job(job_id, status="processing", stage=stage, completed_stages=completed)
+
+
+def _remove_expired_jobs(now: float) -> None:
+    with JOBS_DB_LOCK:
+        expired_ids = [
+            job_id
+            for job_id, job in JOBS_DB.items()
+            if job.get("status") in {"completed", "failed"}
+            and now - job.get("updated_at", now) > JOB_RETENTION_SECONDS
+        ]
+        for job_id in expired_ids:
+            del JOBS_DB[job_id]
+        expired_keys = [
+            key for key, job_id in JOB_IDEMPOTENCY_KEYS.items()
+            if job_id not in JOBS_DB
+        ]
+        for key in expired_keys:
+            del JOB_IDEMPOTENCY_KEYS[key]
+
+
+def _remove_project_jobs(project_id: str) -> None:
+    with JOBS_DB_LOCK:
+        related_ids = [
+            job_id for job_id, job in JOBS_DB.items()
+            if job.get("project_id") == project_id
+        ]
+        for job_id in related_ids:
+            del JOBS_DB[job_id]
+        for key, job_id in list(JOB_IDEMPOTENCY_KEYS.items()):
+            if job_id in related_ids:
+                del JOB_IDEMPOTENCY_KEYS[key]
+
+
+def _execute_generation(
+    req: IntakeRequest,
+    request_id: Optional[str] = None,
+    on_stage: Optional[Callable[[str], None]] = None,
+) -> HouseLayout:
+    context = GenerationRunContext(request_id=request_id or str(uuid.uuid4()), on_stage=on_stage)
+    context_token = CURRENT_GENERATION.set(context)
+    try:
+        return _execute_generation_in_context(req, context)
+    except Exception:
+        generation_logger.exception(
+            "[GENERATION] failed after %.3fs request_id=%s",
+            time.perf_counter() - context.started_at,
+            context.request_id,
+        )
+        raise
+    finally:
+        CURRENT_GENERATION.reset(context_token)
+
+
+def _execute_generation_in_context(req: IntakeRequest, context: GenerationRunContext) -> HouseLayout:
+    request_id = context.request_id
+    started = time.perf_counter()
+    generation_logger.info("[GENERATION] request received request_id=%s", request_id)
     plot_w = req.plot_width or 40.0
     plot_l = req.plot_length or 50.0
     if req.plot:
@@ -191,6 +268,8 @@ def _execute_generation(req: IntakeRequest) -> HouseLayout:
         if l_val:
             plot_l = round(float(l_val) * mult, 1)
 
+    report_generation_stage("understanding")
+    phase_started = time.perf_counter()
     if req.user_prompt and len(req.user_prompt.strip()) > 3:
         parsed = parse_intake_with_groq_or_fallback(req.user_prompt)
         if not req.plot and not req.plot_width:
@@ -210,9 +289,12 @@ def _execute_generation(req: IntakeRequest) -> HouseLayout:
         style = req.style or "Modern Scandinavian"
         special_rooms = req.special_rooms or []
         open_concept = req.open_concept if req.open_concept is not None else True
+    record_generation_timing("requirements parsed", time.perf_counter() - phase_started)
 
     allocations = req.room_requirements or req.room_allocations
 
+    report_generation_stage("planning")
+    phase_started = time.perf_counter()
     layout = generate_architectural_house_layout(
         plot_width=plot_w,
         plot_length=plot_l,
@@ -231,6 +313,7 @@ def _execute_generation(req: IntakeRequest) -> HouseLayout:
         landscape_preferences=req.landscape_preferences,
         room_allocations=allocations
     )
+    record_generation_timing("architectural engine", time.perf_counter() - phase_started)
 
     # Check if the solver determined the requested program is infeasible for the site
     if layout.validation and not layout.validation.is_valid and len(layout.rooms) == 0:
@@ -267,48 +350,70 @@ def _execute_generation(req: IntakeRequest) -> HouseLayout:
             detail=infeasible_detail
         )
 
-    t_total_ms = round((time.time() - t0) * 1000, 1)
     layout.metadata["timing_ms"] = {
-        "total_ms": t_total_ms,
-        "site_ms": 15.0,
-        "solver_ms": 110.0,
-        "validation_ms": 25.0,
-        "quantities_ms": 18.0,
-        "cost_estimate_ms": 12.0
+        **{f"{stage.replace(' ', '_')}_ms": round(seconds * 1000, 1) for stage, seconds in context.timings.items()},
+        "solver_ms": round(context.solver_seconds * 1000, 1),
+        "solver_attempts": context.solver_attempts,
     }
 
-    try:
-        save_project(layout, layout.id)
-    except Exception as e:
-        print(f"[STORAGE WARNING] Could not persist project: {e}")
+    report_generation_stage("rendering")
+    phase_started = time.perf_counter()
+    save_project(layout, layout.id)
+    record_generation_timing("project persistence", time.perf_counter() - phase_started)
+    generation_logger.info(
+        "[GENERATION] CP-SAT: %.3fs across %d attempts request_id=%s",
+        context.solver_seconds,
+        context.solver_attempts,
+        request_id,
+    )
+    generation_logger.info(
+        "[GENERATION] generation pipeline: %.3fs request_id=%s",
+        time.perf_counter() - started,
+        request_id,
+    )
 
     return layout
 
 
 def _run_job_worker(job_id: str, req: IntakeRequest):
+    started = time.perf_counter()
     try:
-        JOBS_DB[job_id]["status"] = "processing"
-        JOBS_DB[job_id]["progress"] = 30.0
-        JOBS_DB[job_id]["stage"] = "spatial_solver"
-        layout = _execute_generation(req)
-        JOBS_DB[job_id]["status"] = "completed"
-        JOBS_DB[job_id]["progress"] = 100.0
-        JOBS_DB[job_id]["stage"] = "done"
-        JOBS_DB[job_id]["result"] = layout.model_dump()
+        layout = _execute_generation(
+            req,
+            request_id=job_id,
+            on_stage=lambda stage: _report_job_stage(job_id, stage),
+        )
+        serialization_started = time.perf_counter()
+        result = layout.model_dump(mode="json")
+        serialization_seconds = time.perf_counter() - serialization_started
+        generation_logger.info(
+            "[GENERATION] serialization: %.3fs request_id=%s",
+            serialization_seconds,
+            job_id,
+        )
+        _update_job(
+            job_id,
+            status="completed",
+            stage="completed",
+            completed_stages=["understanding", "planning", "solving", "validating", "rendering"],
+            project_id=layout.id,
+            result=result,
+            error=None,
+        )
+        generation_logger.info(
+            "[GENERATION] TOTAL: %.3fs request_id=%s",
+            time.perf_counter() - started,
+            job_id,
+        )
     except HTTPException as he:
-        JOBS_DB[job_id]["status"] = "failed"
-        JOBS_DB[job_id]["progress"] = 0.0
-        JOBS_DB[job_id]["stage"] = "error"
-        JOBS_DB[job_id]["error"] = he.detail if isinstance(he.detail, dict) else {
+        _update_job(job_id, status="failed", stage="failed", error=he.detail if isinstance(he.detail, dict) else {
             "status": "infeasible",
             "error_code": "PLOT_ENVELOPE_INFEASIBLE",
             "message": str(he.detail),
-        }
+        })
     except Exception as e:
-        JOBS_DB[job_id]["status"] = "failed"
-        JOBS_DB[job_id]["progress"] = 0.0
-        JOBS_DB[job_id]["stage"] = "error"
-        JOBS_DB[job_id]["error"] = {
+        generation_logger.exception("[GENERATION] job failed request_id=%s", job_id)
+        _update_job(job_id, status="failed", stage="failed", error={
             "status": "failed",
             "stage": "solver",
             "error_code": "GENERATION_FAILURE",
@@ -317,11 +422,15 @@ def _run_job_worker(job_id: str, req: IntakeRequest):
                 f"Plot dimensions: {req.plot_width}x{req.plot_length}",
                 f"Requested program: {req.bedrooms}BHK, {req.num_floors} floors"
             ]
-        }
+        })
 
 
 @app.post("/api/generate")
-def generate_layout_endpoint(req: IntakeRequest, async_job: bool = False):
+def generate_layout_endpoint(
+    req: IntakeRequest,
+    async_job: bool = False,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+):
     """
     Executes the site-first architectural design engine.
     If async_job=True, returns 202 Accepted with job_id for non-blocking polling.
@@ -329,18 +438,54 @@ def generate_layout_endpoint(req: IntakeRequest, async_job: bool = False):
     """
     if async_job:
         job_id = str(uuid.uuid4())
-        JOBS_DB[job_id] = {
-            "job_id": job_id,
-            "status": "queued",
-            "progress": 0.0,
-            "stage": "queued",
-            "result": None,
-            "error": None
-        }
-        thread_pool.submit(_run_job_worker, job_id, req)
+        now = time.time()
+        _remove_expired_jobs(now)
+        with JOBS_DB_LOCK:
+            if idempotency_key:
+                existing_id = JOB_IDEMPOTENCY_KEYS.get(idempotency_key)
+                if existing_id and existing_id in JOBS_DB:
+                    existing_job = JOBS_DB[existing_id]
+                    return JSONResponse(
+                        status_code=202,
+                        content={"job_id": existing_id, "status": existing_job["status"]},
+                    )
+            JOBS_DB[job_id] = {
+                "job_id": job_id,
+                "status": "queued",
+                "stage": "queued",
+                "completed_stages": [],
+                "project_id": None,
+                "result": None,
+                "error": None,
+                "created_at": now,
+                "updated_at": now,
+            }
+            if idempotency_key:
+                JOB_IDEMPOTENCY_KEYS[idempotency_key] = job_id
+        try:
+            thread_pool.submit(_run_job_worker, job_id, req)
+        except RuntimeError as error:
+            _update_job(job_id, status="failed", stage="failed", error={"message": str(error)})
+            raise HTTPException(status_code=503, detail="Generation workers are unavailable.") from error
+        generation_logger.info("[GENERATION] request received request_id=%s status=queued", job_id)
         return JSONResponse(status_code=202, content={"job_id": job_id, "status": "queued"})
 
-    return _execute_generation(req)
+    request_id = str(uuid.uuid4())
+    started = time.perf_counter()
+    layout = _execute_generation(req, request_id=request_id)
+    serialization_started = time.perf_counter()
+    result = layout.model_dump(mode="json")
+    generation_logger.info(
+        "[GENERATION] serialization: %.3fs request_id=%s",
+        time.perf_counter() - serialization_started,
+        request_id,
+    )
+    generation_logger.info(
+        "[GENERATION] TOTAL: %.3fs request_id=%s",
+        time.perf_counter() - started,
+        request_id,
+    )
+    return JSONResponse(content=result)
 
 
 @app.post("/api/mep/plan", response_model=HouseLayout)
@@ -362,18 +507,35 @@ def generate_design_schemes_endpoint(
             count=count,
             vastu_enabled=vastu_enabled,
         )
-    except (SchemeGenerationError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"schemes": schemes}
+    except SchemeGenerationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "NO_VALID_ARCHITECTURAL_SCHEME",
+                "message": str(exc),
+                "reasons": exc.reasons,
+            },
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_SCHEME_REQUEST",
+                "message": str(exc),
+                "reasons": [str(exc)],
+            },
+        ) from exc
+    return schemes
 
 
 @app.get("/api/jobs/{job_id}")
 def get_job_status_endpoint(job_id: str):
     """Returns status, progress, stage and result or diagnostics of a background generation job."""
-    job = JOBS_DB.get(job_id)
+    with JOBS_DB_LOCK:
+        job = JOBS_DB.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
+    return dict(job)
 
 
 @app.post("/api/estimate", response_model=CostEstimate)
@@ -433,14 +595,21 @@ def dream_home_interpret_endpoint(req: Dict[str, Any]):
     }
 
 @app.post("/api/dream-home/generate", response_model=HouseLayout)
-def dream_home_generate_endpoint(brief: DreamHomeStructuredRequirements):
+def dream_home_generate_endpoint(
+    brief: DreamHomeStructuredRequirements,
+    async_job: bool = False,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+):
     """
     Generates a full HouseLayout from confirmed DreamHomeStructuredRequirements.
     Executes: Zoning -> Spatial CP-SAT -> Structural Column Planner -> Quantities & Cost.
     """
     intake = brief.to_intake_request()
-    layout = generate_layout_endpoint(intake)
-    return layout
+    return generate_layout_endpoint(
+        intake,
+        async_job=async_job,
+        idempotency_key=idempotency_key,
+    )
 
 
 @app.post("/api/refine", response_model=HouseLayout)
@@ -628,46 +797,72 @@ async def legacy_upload_floorplan_endpoint(
     }
 
 # Project Persistence & Version History API
+@app.get("/api/projects")
+def list_projects_endpoint(limit: int = 100, offset: int = 0):
+    if limit < 1 or limit > 100 or offset < 0:
+        raise HTTPException(status_code=422, detail="limit must be 1-100 and offset must be non-negative")
+    projects, total = list_projects(limit=limit, offset=offset)
+    return {"projects": projects, "total": total, "limit": limit, "offset": offset}
+
+
 @app.get("/api/projects/{project_id}", response_model=HouseLayout)
 def get_project_endpoint(project_id: str):
-    proj = get_project(project_id)
+    try:
+        proj = get_project(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
     return proj
 
 @app.post("/api/projects", response_model=HouseLayout)
 def save_project_endpoint(layout: HouseLayout):
-    pid, ver = save_project(layout, layout.id)
+    try:
+        pid, ver = save_project(layout, layout.id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     return layout
 
 @app.get("/api/projects/{project_id}/versions")
 def list_versions_endpoint(project_id: str):
-    return {"project_id": project_id, "versions": list_project_versions(project_id)}
+    try:
+        versions = list_project_versions(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {"project_id": project_id, "versions": versions}
 
 @app.post("/api/projects/{project_id}/restore/{version_number}", response_model=HouseLayout)
 def restore_version_endpoint(project_id: str, version_number: int):
-    restored = restore_project_version(project_id, version_number)
+    try:
+        restored = restore_project_version(project_id, version_number)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     if not restored:
         raise HTTPException(status_code=404, detail="Version not found")
     return restored
 
 @app.post("/api/projects/{project_id}/undo", response_model=HouseLayout)
 def undo_version_endpoint(project_id: str):
-    undone = undo_project_version(project_id)
+    try:
+        undone = undo_project_version(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     if not undone:
         raise HTTPException(status_code=404, detail="Cannot undo")
     return undone
 
 @app.delete("/api/projects/{project_id}")
 def delete_project_endpoint(project_id: str):
-    success = delete_project(project_id)
+    try:
+        success = delete_project(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=500, detail="Could not delete project from storage") from error
     if not success:
-        # Check if project exists
-        proj = get_project(project_id)
-        if not proj:
-            return {"status": "ok", "deleted": True, "message": "Project already deleted or not found"}
-        raise HTTPException(status_code=500, detail="Could not delete project from storage")
-    return {"status": "ok", "deleted": True, "project_id": project_id}
+        raise HTTPException(status_code=404, detail="Project not found")
+    _remove_project_jobs(project_id)
+    return {"success": True, "project_id": project_id}
 
 
 @app.post("/api/edit-room", response_model=EditRoomResponse)

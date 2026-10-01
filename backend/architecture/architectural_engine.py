@@ -7,6 +7,7 @@ Shared Wall Network -> Doors & Windows -> Mathematical Scoring ->
 Groq Architectural Critic -> Canonical HouseLayout Model.
 """
 
+import time
 from typing import List, Dict, Optional, Any
 import uuid
 from shapely.geometry import box
@@ -28,6 +29,7 @@ from construction.construction_engine import recommend_construction_specificatio
 from construction.building_services_engine import plan_building_services
 from construction.structural_planner import plan_preliminary_structure
 from estimation.material_quantity_engine import calculate_material_quantities
+from infrastructure.generation_context import record_generation_timing, report_generation_stage
 from estimation.cost_estimator import estimate_construction_cost
 from ai.groq_service import ArchitecturalRequirements
 from ai.gemini_architect import (
@@ -537,19 +539,55 @@ def build_room_program(
                 ))
 
             pwd_mw, pwd_ml, pwd_pw, pwd_pl = (3.0, 4.0, 3.5, 4.5) if rebalance_mode else ((3.5, 4.5, 4.0, 5.0) if compact_mode else (4.0, 5.5, 5.0, 6.5))
+            projected_bathroom_count = 0.5 + int(target_attached >= 2)
+            if total_floors >= 2:
+                projected_bathroom_count += 1 + int(target_attached >= 1)
+                projected_bathroom_count += sum(
+                    target_attached >= 3 + bedroom_index
+                    for bedroom_index in range(max(0, bedrooms - 2))
+                )
+            projected_bathroom_count += max(0, total_floors - 2)
+            bathroom_deficit = max(0.0, round(bathrooms - projected_bathroom_count, 1))
+            promote_powder_room = bathroom_deficit > 0 and (
+                bathroom_deficit <= 0.5
+                or (int(bathroom_deficit) < bathroom_deficit <= int(bathroom_deficit) + 0.5)
+            )
+            additional_full_baths = (
+                int(bathroom_deficit) if promote_powder_room
+                else int(bathroom_deficit) + int(bathroom_deficit > int(bathroom_deficit))
+            )
             rooms.append(Room(
                 id=f"f{floor_num}_powder_room",
-                name="Powder Room",
-                type="powder_room",
+                name="Common Bath" if promote_powder_room else "Powder Room",
+                type="bathroom" if promote_powder_room else "powder_room",
                 zone="service",
                 floor=floor_num,
                 min_width=pwd_mw, min_length=pwd_ml,
                 preferred_width=pwd_pw, preferred_length=pwd_pl,
                 max_width=6.5, max_length=8.0,
                 privacy_level="semi_private",
-                color=ROOM_COLORS["powder_room"],
-                rationale="Guest half-bath located near the entry foyer."
+                color=ROOM_COLORS["bathroom"] if promote_powder_room else ROOM_COLORS["powder_room"],
+                rationale=(
+                    "Full bathroom included to meet the requested bathroom program."
+                    if promote_powder_room
+                    else "Guest half-bath located near the entry foyer."
+                ),
             ))
+            for bathroom_index in range(additional_full_baths):
+                rooms.append(Room(
+                    id=f"f{floor_num}_requested_bath_{bathroom_index + 1}",
+                    name=f"Additional Common Bath {bathroom_index + 1}",
+                    type="bathroom",
+                    zone="service",
+                    floor=floor_num,
+                    min_width=pwd_mw, min_length=pwd_ml,
+                    preferred_width=pwd_pw, preferred_length=pwd_pl,
+                    max_width=6.5, max_length=8.0,
+                    privacy_level="semi_private",
+                    ventilation_requirement="direct_exterior",
+                    color=ROOM_COLORS["bathroom"],
+                    rationale="Additional full bathroom required by the room program.",
+                ))
 
     # Level 2 / Upper floor of multi-story
     elif floor_num == 2:
@@ -855,13 +893,17 @@ def generate_architectural_house_layout(
             bathrooms = max(float(bathrooms), float(target_att))
 
     # 1. Plan Construction Specification (wall thicknesses, vertical heights, quality tier)
+    phase_started = time.perf_counter()
     active_spec = construction_spec or recommend_construction_specification(
         plot_width=plot_width,
         plot_length=plot_length,
         num_floors=num_floors
     )
+    record_generation_timing("construction specification", time.perf_counter() - phase_started)
 
     # 2. Plan Site with SetbackProfile
+    report_generation_stage("planning")
+    phase_started = time.perf_counter()
     site = plan_site(
         plot_width=plot_width,
         plot_length=plot_length,
@@ -869,6 +911,7 @@ def generate_architectural_house_layout(
         parking_spaces=parking_spaces
     )
     site.north_direction = compute_north_angle(road_side, north_direction)
+    record_generation_timing("site planning", time.perf_counter() - phase_started)
 
     # 3. Structure architectural requirements via Pydantic model
     arch_req = ArchitecturalRequirements(
@@ -894,8 +937,10 @@ def generate_architectural_house_layout(
     if concepts_key in _CONCEPTS_CACHE:
         ai_concepts = _CONCEPTS_CACHE[concepts_key]
     else:
+        phase_started = time.perf_counter()
         ai_concepts_res = generate_architectural_concepts_with_gemini(arch_req)
         ai_concepts = ai_concepts_res.concepts if ai_concepts_res else []
+        record_generation_timing("LLM reasoning", time.perf_counter() - phase_started)
         if ai_concepts:
             _CONCEPTS_CACHE[concepts_key] = ai_concepts
 
@@ -924,12 +969,15 @@ def generate_architectural_house_layout(
         )
 
         # Generate architectural topological schemes (integrating Groq concept strategies)
+        report_generation_stage("planning")
+        phase_started = time.perf_counter()
         schemes = generate_architectural_schemes(
             rooms=floor_rooms,
             site=site,
             vastu_compliant=vastu_compliant,
             ai_concepts=ai_concepts
         )
+        record_generation_timing("topology", time.perf_counter() - phase_started)
 
         # Solve candidates with OR-Tools CP-SAT and evaluate
         pinned_rooms: Dict[str, Rect] = {}
@@ -946,6 +994,7 @@ def generate_architectural_house_layout(
         solved_candidates = []
         candidate_summaries = []
 
+        report_generation_stage("solving")
         for s in schemes:
             candidate = solve_spatial_layout(
                 floor_rooms, site, s,
@@ -968,22 +1017,28 @@ def generate_architectural_house_layout(
 
             if candidate and candidate.is_valid:
                 # Deduplicate walls with real thickness from ConstructionSpecification
+                report_generation_stage("validating")
+                phase_started = time.perf_counter()
                 walls, doors, windows = generate_wall_network_and_openings(
                     candidate.rooms,
                     site,
                     wall_height=active_spec.wall_height_ft,
                     construction_spec=active_spec
                 )
+                record_generation_timing("wall network and doors/windows", time.perf_counter() - phase_started)
 
                 # Place furniture aligned with walls and clear of doors/windows
+                phase_started = time.perf_counter()
                 furn_scores = []
                 for r in candidate.rooms:
                     f_items, f_score, _ = validate_and_place_furniture(r, doors=doors, windows=windows)
                     r.furniture = f_items
                     r.furniture_ids = [f.id for f in f_items]
                     furn_scores.append(f_score)
+                record_generation_timing("furniture validation", time.perf_counter() - phase_started)
 
                 # Compute real architectural scores
+                phase_started = time.perf_counter()
                 scores, validation = calculate_architectural_scores(
                     rooms=candidate.rooms,
                     site=site,
@@ -993,6 +1048,7 @@ def generate_architectural_house_layout(
                     furniture_scores=furn_scores,
                     vastu_enabled=vastu_compliant
                 )
+                record_generation_timing("architectural validation and scoring", time.perf_counter() - phase_started)
 
                 candidate_obj = {
                     "candidate": candidate,
@@ -1054,12 +1110,14 @@ def generate_architectural_house_layout(
                             rm.min_length = 4.0
                             rm.preferred_width = 3.5
                             rm.preferred_length = 4.5
+                phase_started = time.perf_counter()
                 alt_schemes = generate_architectural_schemes(
                     rooms=alt_rooms,
                     site=site,
                     vastu_compliant=vastu_compliant,
                     ai_concepts=ai_concepts
                 )
+                record_generation_timing("fallback topology", time.perf_counter() - phase_started)
                 for s in alt_schemes:
                     cand = solve_spatial_layout(
                         alt_rooms, site, s,
@@ -1074,19 +1132,25 @@ def generate_architectural_house_layout(
                             )
                     if cand and cand.is_valid:
                         applied_optimization_note = "Compact layout optimized for your plot"
+                        phase_started = time.perf_counter()
                         w_list, d_list, win_list = generate_wall_network_and_openings(
                             cand.rooms, site, wall_height=active_spec.wall_height_ft, construction_spec=active_spec
                         )
+                        record_generation_timing("fallback wall network and doors/windows", time.perf_counter() - phase_started)
+                        phase_started = time.perf_counter()
                         f_scores = []
                         for r in cand.rooms:
                             f_items, f_score, _ = validate_and_place_furniture(r, doors=d_list, windows=win_list)
                             r.furniture = f_items
                             r.furniture_ids = [f.id for f in f_items]
                             f_scores.append(f_score)
+                        record_generation_timing("fallback furniture validation", time.perf_counter() - phase_started)
+                        phase_started = time.perf_counter()
                         sc, vl = calculate_architectural_scores(
                             rooms=cand.rooms, site=site, walls=w_list, doors=d_list, windows=win_list,
                             furniture_scores=f_scores, vastu_enabled=vastu_compliant
                         )
+                        record_generation_timing("fallback architectural validation", time.perf_counter() - phase_started)
                         cand_obj = {
                             "candidate": cand,
                             "walls": w_list,
@@ -1377,6 +1441,8 @@ def generate_architectural_house_layout(
             entry_pt = Point2D(x=round(plot_width / 2.0, 1), y=round(plot_length - site.setbacks.front, 1))
 
     layout_id = f"layout_{uuid.uuid4().hex[:8]}"
+    report_generation_stage("rendering")
+    phase_started = time.perf_counter()
     layout = HouseLayout(
         id=layout_id,
         project_id=layout_id,
@@ -1420,23 +1486,30 @@ def generate_architectural_house_layout(
         interior_walls=ground_floor.interior_walls,
         entry_point={"x": entry_pt.x, "y": entry_pt.y, "direction": 0.0}
     )
+    record_generation_timing("canonical layout assembly", time.perf_counter() - phase_started)
 
     # 5. Multi-floor MEP & Structural Planning
+    phase_started = time.perf_counter()
     layout.building_services = plan_building_services(floors_list, plot_width, plot_length)
     layout.structural_planning = plan_preliminary_structure(
         floors_list, active_spec, site=site, plot_width=plot_width, plot_length=plot_length, layout=layout
     )
     layout.structural_system = layout.structural_planning.structural_system
+    record_generation_timing("staircase and structural planning", time.perf_counter() - phase_started)
 
     # 6. Physical Material Takeoff & Bottom-Up Cost Estimation
+    phase_started = time.perf_counter()
     layout.quantities = calculate_material_quantities(layout, active_spec)
     layout.cost_estimate = estimate_construction_cost(layout, layout.quantities)
+    record_generation_timing("quantities and cost estimate", time.perf_counter() - phase_started)
 
     # 7. Deterministic Site Landscaping
+    phase_started = time.perf_counter()
     try:
         from landscape.landscape_engine import generate_landscape_plan
         layout.landscape = generate_landscape_plan(layout, preferences=landscape_preferences)
     except Exception as e:
         print(f"[LANDSCAPE WARNING] Could not generate landscape plan: {e}")
+    record_generation_timing("landscape", time.perf_counter() - phase_started)
 
     return layout

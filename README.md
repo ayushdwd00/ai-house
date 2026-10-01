@@ -141,6 +141,21 @@ Generated designs are checked for:
 - Vercel — Frontend
 - Render — Backend
 
+### Generation and project endpoints
+
+New generation requests use `POST /api/generate?async_job=true` and poll
+`GET /api/jobs/{job_id}` until the job is completed or failed. The response
+reports the current pipeline stage; generation timing and CP-SAT attempt totals
+are written to backend logs with the request/job ID. `CP_SAT_TIME_LIMIT_SECONDS`
+controls the solver budget per attempt (default `1.5` seconds), and
+`GENERATION_WORKERS` controls the local worker pool (default `2`).
+
+`GET /api/projects` returns paginated project summaries, and
+`DELETE /api/projects/{project_id}` removes that project and its version files.
+Generation job state is currently process-local, so deploy with a single backend
+process/instance; process restarts or multi-instance routing require a shared job
+store/queue to preserve job status across workers.
+
 ---
 
 ## 📁 Project Structure

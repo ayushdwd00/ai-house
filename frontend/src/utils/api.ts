@@ -1,4 +1,4 @@
-import { HouseLayout, IntakeRequest, Room, Rect } from "@/types/house";
+import { HouseLayout, IntakeRequest, Rect } from "@/types/house";
 
 /**
  * Resolves the backend API base URL with support for development and production environments.
@@ -55,8 +55,12 @@ export class ArchitecturalApiError extends Error {
  * 4. Backend returned malformed response
  */
 export function formatApiError(err: unknown, requestUrl?: string): string {
-  const status = (err as any)?.status;
-  const targetUrl = requestUrl || (err as any)?.url || API_BASE_URL;
+  const errorRecord = err !== null && typeof err === "object"
+    ? err as Record<string, unknown>
+    : undefined;
+  const status = typeof errorRecord?.status === "number" ? errorRecord.status : undefined;
+  const errorUrl = typeof errorRecord?.url === "string" ? errorRecord.url : undefined;
+  const targetUrl = requestUrl || errorUrl || API_BASE_URL;
 
   // 1. Connection / Network / Timeout errors
   const isNetworkError =
@@ -66,7 +70,7 @@ export function formatApiError(err: unknown, requestUrl?: string): string {
       err.message.toLowerCase().includes("load failed"));
 
   const isAbortError =
-    (err as any)?.name === "AbortError" ||
+    errorRecord?.name === "AbortError" ||
     (err instanceof Error && err.message.toLowerCase().includes("aborted"));
 
   if (isAbortError) {
@@ -178,80 +182,119 @@ export async function fetchWithBackendFallback(
   throw lastError;
 }
 
+export interface GenerationProgress {
+  status: "queued" | "processing" | "completed" | "failed";
+  stage: "queued" | "understanding" | "planning" | "solving" | "validating" | "rendering" | "completed" | "failed";
+}
+
+interface GenerationJobResponse {
+  job_id?: string;
+  status?: GenerationProgress["status"];
+  stage?: GenerationProgress["stage"];
+  result?: HouseLayout;
+  error?: unknown;
+}
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+async function responseError(res: Response, label: string): Promise<string> {
+  try {
+    const data = await res.json();
+    const detail = data?.detail ?? data?.message ?? data;
+    if (typeof detail === "string") return detail;
+    if (detail && typeof detail === "object") {
+      return String(detail.message ?? detail.designer_rationale ?? JSON.stringify(detail));
+    }
+  } catch {
+    const text = await res.text().catch(() => "");
+    if (text) return `${label} (HTTP ${res.status}): ${text.slice(0, 300)}`;
+  }
+  return `${label} (HTTP ${res.status})`;
+}
+
+async function generateLayoutJob(
+  endpoint: string,
+  request: unknown,
+  onProgress?: (progress: GenerationProgress) => void
+): Promise<HouseLayout> {
+  const targetUrl = `${API_BASE_URL}${endpoint}`;
+  try {
+    const key = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const { res } = await fetchWithBackendFallback(`${endpoint}?async_job=true`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify(request),
+    }, 30000);
+
+    if (!res.ok) {
+      throw new ArchitecturalApiError(
+        await responseError(res, "Generation failed"),
+        { url: targetUrl, status: res.status }
+      );
+    }
+
+    const initial = await res.json() as GenerationJobResponse | HouseLayout;
+    if (res.status !== 202) {
+      return initial as HouseLayout;
+    }
+
+    const jobId = (initial as GenerationJobResponse).job_id;
+    if (!jobId) {
+      throw new ArchitecturalApiError("Backend returned a generation response without a job ID.", { url: targetUrl });
+    }
+    onProgress?.({ status: "queued", stage: "queued" });
+
+    while (true) {
+      await wait(1000);
+      const { res: jobRes } = await fetchWithBackendFallback(
+        `/api/jobs/${encodeURIComponent(jobId)}`,
+        { method: "GET" },
+        15000
+      );
+      if (!jobRes.ok) {
+        throw new ArchitecturalApiError(
+          await responseError(jobRes, "Could not read generation status"),
+          { url: `${API_BASE_URL}/api/jobs/${encodeURIComponent(jobId)}`, status: jobRes.status }
+        );
+      }
+
+      const job = await jobRes.json() as GenerationJobResponse;
+      const status = job.status ?? "processing";
+      const stage = job.stage ?? "queued";
+      onProgress?.({ status, stage });
+
+      if (status === "completed") {
+        if (!job.result) {
+          throw new ArchitecturalApiError("Generation completed without a project layout.", { url: targetUrl });
+        }
+        return job.result;
+      }
+      if (status === "failed") {
+        const detail = job.error && typeof job.error === "object"
+          ? (job.error as { message?: string; designer_rationale?: string }).message
+            ?? (job.error as { designer_rationale?: string }).designer_rationale
+            ?? JSON.stringify(job.error)
+          : String(job.error ?? "Architectural generation failed.");
+        throw new ArchitecturalApiError(detail, { url: targetUrl });
+      }
+    }
+  } catch (err) {
+    console.error("[API ERROR] generation job failed:", { url: targetUrl, error: err });
+    throw new Error(formatApiError(err, targetUrl));
+  }
+}
+
 /**
  * Generate a new architectural house layout from intake specifications.
  */
-export async function generateHouseLayout(req: IntakeRequest): Promise<HouseLayout> {
-  let targetUrl = `${API_BASE_URL}/api/generate`;
-  try {
-    const { res, url } = await fetchWithBackendFallback("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req),
-    }, 90000);
-    targetUrl = url;
-
-    if (!res.ok) {
-      let detail = `Generation failed (HTTP ${res.status})`;
-      let responseBody = "";
-      try {
-        const text = await res.text();
-        responseBody = text;
-        const errJson = JSON.parse(text);
-        if (errJson.detail) {
-          if (typeof errJson.detail === "string") {
-            detail = errJson.detail;
-          } else if (typeof errJson.detail === "object") {
-            const d = errJson.detail;
-            detail = d.message || d.designer_rationale || JSON.stringify(d);
-            if (d.recommendation) {
-              detail += `\n\nRecommendation: ${d.recommendation}`;
-            }
-          }
-        } else if (errJson.message) {
-          detail = errJson.message;
-        }
-      } catch (_) {
-        if (responseBody) {
-          detail = `${detail}: ${responseBody.slice(0, 300)}`;
-        }
-      }
-
-      console.error("[API ERROR] generateHouseLayout returned HTTP error:", {
-        url: targetUrl,
-        status: res.status,
-        statusText: res.statusText,
-        detail,
-        req,
-      });
-
-      throw new ArchitecturalApiError(detail, {
-        url: targetUrl,
-        status: res.status,
-        statusText: res.statusText,
-        responseBody,
-      });
-    }
-
-    try {
-      const data = await res.json();
-      return data;
-    } catch (parseErr) {
-      console.error("[API MALFORMED RESPONSE] generateHouseLayout:", { url: targetUrl, parseErr });
-      throw new ArchitecturalApiError(`Backend returned a malformed or non-JSON response from ${targetUrl}`, {
-        url: targetUrl,
-        status: res.status,
-      });
-    }
-  } catch (err: any) {
-    console.error("[API ERROR] generateHouseLayout failed:", {
-      url: targetUrl,
-      req,
-      error: err,
-      status: err?.status,
-    });
-    throw new Error(formatApiError(err, targetUrl));
-  }
+export async function generateHouseLayout(
+  req: IntakeRequest,
+  onProgress?: (progress: GenerationProgress) => void
+): Promise<HouseLayout> {
+  return generateLayoutJob("/api/generate", req, onProgress);
 }
 
 /**
@@ -303,6 +346,27 @@ export async function fetchProjectById(projectId: string): Promise<HouseLayout |
   }
 }
 
+export interface ServerProjectSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+  areaSqft?: number;
+  bedrooms?: number;
+  floors?: number;
+}
+
+export async function fetchProjectSummaries(): Promise<ServerProjectSummary[]> {
+  const { res } = await fetchWithBackendFallback("/api/projects?limit=100", { method: "GET" }, 15000);
+  if (!res.ok) {
+    throw new Error(await responseError(res, "Could not load projects"));
+  }
+  const data = await res.json() as { projects?: ServerProjectSummary[] };
+  if (!Array.isArray(data.projects)) {
+    throw new Error("Backend returned an invalid project list.");
+  }
+  return data.projects;
+}
+
 /**
  * Persist a project layout to the backend server.
  */
@@ -325,14 +389,16 @@ export async function saveProjectToServer(layout: HouseLayout): Promise<HouseLay
 /**
  * Permanently delete a project from backend server storage.
  */
-export async function deleteProjectApi(projectId: string): Promise<boolean> {
+export async function deleteProjectApi(projectId: string): Promise<void> {
   const url = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`;
   try {
-    const res = await fetch(url, { method: "DELETE" });
-    return res.ok;
+    const { res } = await fetchWithBackendFallback(`/api/projects/${encodeURIComponent(projectId)}`, { method: "DELETE" });
+    if (!res.ok) {
+      throw new Error(await responseError(res, "Project deletion failed"));
+    }
   } catch (err) {
-    console.warn(`[API NOTICE] Could not delete project ${projectId} on server:`, err);
-    return false;
+    console.error(`[API ERROR] Could not delete project ${projectId} on server:`, err);
+    throw new Error(formatApiError(err, url));
   }
 }
 
@@ -466,29 +532,10 @@ export async function interpretDreamHomePrompt(
  * Generates a full HouseLayout from confirmed DreamHomeStructuredRequirements.
  */
 export async function generateDreamHomeLayout(
-  brief: import("@/types/house").DreamHomeStructuredRequirements
+  brief: import("@/types/house").DreamHomeStructuredRequirements,
+  onProgress?: (progress: GenerationProgress) => void
 ): Promise<HouseLayout> {
-  const url = `${API_BASE_URL}/api/dream-home/generate`;
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(brief),
-    });
-
-    if (!res.ok) {
-      let detail = `Dream home generation failed (HTTP ${res.status})`;
-      try {
-        const errJson = await res.json();
-        if (errJson.detail) detail = String(errJson.detail);
-      } catch (_) {}
-      throw new Error(detail);
-    }
-    return await res.json();
-  } catch (err) {
-    console.error("[API ERROR] generateDreamHomeLayout failed:", { url, error: err });
-    throw new Error(formatApiError(err));
-  }
+  return generateLayoutJob("/api/dream-home/generate", brief, onProgress);
 }
 
 /**
@@ -638,6 +685,13 @@ export interface DesignScheme {
   layout: HouseLayout;
 }
 
+export interface DesignSchemesResult {
+  schemes: DesignScheme[];
+  requested_variants: number;
+  generated_variants: number;
+  generation_warning?: string | null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -656,7 +710,7 @@ function isHouseLayout(value: unknown): value is HouseLayout {
 export async function generateDesignSchemes(
   layout: HouseLayout,
   vastuEnabled: boolean
-): Promise<DesignScheme[]> {
+): Promise<DesignSchemesResult> {
   const endpoint = `/api/design-schemes?count=4&vastu_enabled=${vastuEnabled}`;
   let targetUrl = `${API_BASE_URL}${endpoint}`;
   try {
@@ -670,8 +724,21 @@ export async function generateDesignSchemes(
     const data: unknown = await res.json();
     if (!res.ok) {
       const detail = isRecord(data) ? data.detail || data.message : undefined;
+      const structuredError = isRecord(detail)
+        ? detail
+        : isRecord(data) && (typeof data.code === "string" || Array.isArray(data.reasons))
+          ? data
+          : undefined;
+      const detailMessage = structuredError
+        ? [
+            typeof structuredError.message === "string" ? structuredError.message : undefined,
+            ...(Array.isArray(structuredError.reasons)
+              ? structuredError.reasons.filter((item): item is string => typeof item === "string")
+              : []),
+          ].filter(Boolean).join("\n")
+        : typeof detail === "string" ? detail : undefined;
       throw new ArchitecturalApiError(
-        typeof detail === "string" ? detail : `Scheme generation failed (HTTP ${res.status})`,
+        detailMessage || `Scheme generation failed (HTTP ${res.status})`,
         { url: targetUrl, status: res.status }
       );
     }
@@ -718,10 +785,25 @@ export async function generateDesignSchemes(
       };
     });
     const validSchemes = schemes.filter((scheme) => scheme.validation_status === "valid" && scheme.layout);
-    if (validSchemes.length < 3) {
-      throw new Error("The architectural engine returned fewer than three valid design schemes.");
+    if (validSchemes.length === 0) {
+      throw new Error(
+        isRecord(data) && typeof data.generation_warning === "string"
+          ? data.generation_warning
+          : "The architectural engine returned no valid design schemes."
+      );
     }
-    return validSchemes;
+    return {
+      schemes: validSchemes,
+      requested_variants: isRecord(data) && typeof data.requested_variants === "number"
+        ? data.requested_variants
+        : 4,
+      generated_variants: isRecord(data) && typeof data.generated_variants === "number"
+        ? data.generated_variants
+        : validSchemes.length,
+      generation_warning: isRecord(data) && typeof data.generation_warning === "string"
+        ? data.generation_warning
+        : null,
+    };
   } catch (err) {
     throw new Error(formatApiError(err, targetUrl));
   }

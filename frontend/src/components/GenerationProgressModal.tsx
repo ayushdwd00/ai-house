@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Check, Compass, Layers, Ruler, Box, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import { GenerationProgress } from "@/utils/api";
 
 interface GenerationProgressModalProps {
   isOpen: boolean;
+  progress?: GenerationProgress;
 }
 
 const STAGES = [
@@ -18,20 +20,21 @@ const STAGES = [
 
 export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = ({
   isOpen,
+  progress = { status: "queued", stage: "queued" },
 }) => {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const interval = setInterval(() => {
-      setCurrentStepIndex((prev) => (prev < STAGES.length - 1 ? prev + 1 : prev));
-    }, 1100);
-
-    return () => clearInterval(interval);
-  }, [isOpen]);
-
   if (!isOpen) return null;
+  const stageIndexes: Record<GenerationProgress["stage"], number> = {
+    queued: -1,
+    understanding: 0,
+    planning: 1,
+    solving: 2,
+    validating: 3,
+    rendering: 4,
+    completed: STAGES.length,
+    failed: 0,
+  };
+  const currentStepIndex = stageIndexes[progress.stage];
+  const isComplete = progress.status === "completed";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#0A0B0E]">
@@ -85,14 +88,16 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
           DESIGNING YOUR HOME
         </h3>
         <p className="text-xs text-[#9E9C98] font-light mb-6 max-w-sm">
-          Synthesizing site-specific setbacks, functional zoning, watertight wall networks, and deterministic spatial layout.
+          {progress.status === "queued"
+            ? "Waiting for an available architecture worker."
+            : "Synthesizing site-specific setbacks, functional zoning, watertight wall networks, and deterministic spatial layout."}
         </p>
 
         {/* Progress Stages */}
         <div className="w-full space-y-2 text-left">
           {STAGES.map((stage, idx) => {
-            const isCompleted = idx < currentStepIndex;
-            const isCurrent = idx === currentStepIndex;
+            const isCompleted = isComplete || idx < currentStepIndex;
+            const isCurrent = !isComplete && idx === currentStepIndex;
             const StageIcon = stage.icon;
 
             return (

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, Field
@@ -18,9 +20,11 @@ from models import (
 from architecture.architectural_scorer import calculate_architectural_scores
 from architecture.architectural_validator import validate_design
 from architecture.furniture_validator import validate_and_place_furniture
-from architecture.spatial_solver import solve_spatial_layout
+from architecture.spatial_solver import DEFAULT_SOLVER_TIME_LIMIT_SECONDS, solve_spatial_layout
 from architecture.topology_engine import ArchitecturalScheme, generate_architectural_schemes
 from architecture.wall_network import generate_wall_network_and_openings
+
+generation_logger = logging.getLogger("generation")
 
 
 class SchemeVariant(BaseModel):
@@ -44,6 +48,10 @@ class SchemeGenerationResult(BaseModel):
 class SchemeGenerationError(ValueError):
     """Raised when the canonical program cannot produce the requested variants."""
 
+    def __init__(self, message: str, reasons: Optional[List[str]] = None):
+        super().__init__(message)
+        self.reasons = reasons or [message]
+
 
 def generate_house_schemes(
     layout: HouseLayout,
@@ -52,7 +60,7 @@ def generate_house_schemes(
     count: int = 3,
     variant_seed: Optional[int] = None,
 ) -> SchemeGenerationResult:
-    """Return 3–5 valid variants while retaining the source layout's room program.
+    """Return up to ``count`` valid variants while retaining the source room program.
 
     Requirements can select directional preferences (notably Vastu), but the
     canonical layout remains authoritative for room identities, quantities,
@@ -63,20 +71,22 @@ def generate_house_schemes(
     topologies from the existing topology engine are attempted in stable order;
     solver seeds only break ties within those topological constraints.
     """
-    if count < 3 or count > 5:
-        raise ValueError("count must be between 3 and 5")
+    if count < 1 or count > 5:
+        raise ValueError("count must be between 1 and 5")
     if layout.site is None:
         raise SchemeGenerationError("A canonical layout with a planned site is required.")
 
     source_validation = validate_design(layout)
     if not source_validation.is_valid:
+        reasons = list(source_validation.errors)
         raise SchemeGenerationError(
             "The supplied canonical layout does not pass architectural validation: "
-            + "; ".join(source_validation.errors[:5])
+            + "; ".join(reasons[:5]),
+            reasons=reasons,
         )
 
     preferences = preferences or {}
-    time_limit = float(preferences.get("solver_time_limit_sec", 3.0))
+    time_limit = float(preferences.get("solver_time_limit_sec", DEFAULT_SOLVER_TIME_LIMIT_SECONDS))
     if time_limit <= 0:
         raise ValueError("solver_time_limit_sec must be positive")
     preferred_ids = list(preferences.get("preferred_scheme_ids", []))
@@ -110,39 +120,151 @@ def generate_house_schemes(
         scheme_ids.remove("scheme_vastu_optimized")
         scheme_ids.insert(0, "scheme_vastu_optimized")
     if not scheme_ids:
-        raise SchemeGenerationError("No deterministic topologies are available for this room program.")
+        raise SchemeGenerationError(
+            "No deterministic topologies are available for this room program.",
+            reasons=["No topology could be created for the canonical room program."],
+        )
 
     seed_base = int(variant_seed if variant_seed is not None else 42)
     variants: List[SchemeVariant] = []
     signatures = set()
-    failed_validation: List[str] = []
+    rejection_reasons: List[str] = []
 
     # First pass covers each distinct built-in topology. Additional stable
     # solver seeds are fallback candidates only; no geometry is nudged manually.
-    max_rounds = max(2, count)
+    max_rounds = 2
     for seed_offset in range(max_rounds):
         for scheme_id in scheme_ids:
             if len(variants) >= count:
                 break
-            solved_floors = _solve_all_floors(
-                source_floors,
-                schemes_by_floor,
-                scheme_id,
-                layout,
-                seed_base + seed_offset,
-                time_limit,
-            )
-            if solved_floors is None:
-                continue
-            signature = _topology_signature(solved_floors, layout.site)
-            if signature in signatures:
+            candidate_id = f"{scheme_id}:seed-{seed_base + seed_offset}"
+            solver_diagnostics: List[Dict[str, Any]] = []
+            try:
+                solved_floors = _solve_all_floors(
+                    source_floors,
+                    schemes_by_floor,
+                    scheme_id,
+                    layout,
+                    seed_base + seed_offset,
+                    time_limit,
+                    solver_diagnostics,
+                )
+            except Exception as exc:
+                reason = f"Candidate {candidate_id} raised {type(exc).__name__}: {exc}"
+                rejection_reasons.append(reason)
+                generation_logger.exception(
+                    "[SCHEME CANDIDATE] candidate execution failed candidate_id=%s",
+                    candidate_id,
+                )
+                _log_candidate(
+                    candidate_id,
+                    solver_diagnostics,
+                    source_floors,
+                    validation_status="not_run",
+                    failed_checks=[],
+                    violations={},
+                    exception=f"{type(exc).__name__}: {exc}",
+                    rejection_reason=reason,
+                )
                 continue
 
-            candidate_layout = _rebuild_layout(layout, solved_floors, vastu_enabled=vastu)
-            validation = validate_design(candidate_layout)
-            if not validation.is_valid:
-                failed_validation.extend(validation.errors[:3])
+            if solved_floors is None:
+                statuses = [item.get("solver_status", "UNKNOWN") for item in solver_diagnostics]
+                floor_reasons = [
+                    str(item["rejection_reason"])
+                    for item in solver_diagnostics
+                    if item.get("rejection_reason")
+                ]
+                reason = "; ".join(floor_reasons) or (
+                    f"CP-SAT returned {', '.join(statuses)}."
+                    if statuses
+                    else "No solver result was produced for this candidate."
+                )
+                rejection_reasons.append(f"Candidate {candidate_id}: {reason}")
+                _log_candidate(
+                    candidate_id,
+                    solver_diagnostics,
+                    source_floors,
+                    validation_status="not_run",
+                    failed_checks=[],
+                    violations={},
+                    rejection_reason=reason,
+                )
                 continue
+            signature = _topology_signature(solved_floors, layout.site)
+
+            try:
+                candidate_layout = _rebuild_layout(layout, solved_floors, vastu_enabled=vastu)
+                validation = validate_design(candidate_layout)
+                circulation_failures = [
+                    warning
+                    for warning in validation.warnings
+                    if "lacks a mapped door access path" in warning.lower()
+                ]
+                if circulation_failures:
+                    validation.errors.extend(circulation_failures)
+                    validation.hard_failures.extend(circulation_failures)
+                    validation.is_valid = False
+            except Exception as exc:
+                reason = f"Candidate {candidate_id} failed reconstruction: {type(exc).__name__}: {exc}"
+                rejection_reasons.append(reason)
+                generation_logger.exception(
+                    "[SCHEME CANDIDATE] candidate reconstruction failed candidate_id=%s",
+                    candidate_id,
+                )
+                _log_candidate(
+                    candidate_id,
+                    solver_diagnostics,
+                    solved_floors,
+                    validation_status="not_run",
+                    failed_checks=[],
+                    violations={},
+                    exception=f"{type(exc).__name__}: {exc}",
+                    rejection_reason=reason,
+                )
+                continue
+
+            violations = _validation_violations(validation)
+            if not validation.is_valid:
+                reason = "Hard architectural validation failed: " + "; ".join(validation.errors[:5])
+                rejection_reasons.append(f"Candidate {candidate_id}: {reason}")
+                _log_candidate(
+                    candidate_id,
+                    solver_diagnostics,
+                    solved_floors,
+                    validation_status="invalid",
+                    failed_checks=list(validation.errors),
+                    violations=violations,
+                    validation_warnings=list(validation.warnings),
+                    rejection_reason=reason,
+                )
+                continue
+
+            if signature in signatures:
+                reason = "Duplicate room-position and adjacency signature."
+                rejection_reasons.append(f"Candidate {candidate_id}: {reason}")
+                _log_candidate(
+                    candidate_id,
+                    solver_diagnostics,
+                    solved_floors,
+                    validation_status="valid",
+                    failed_checks=[],
+                    violations=violations,
+                    validation_warnings=list(validation.warnings),
+                    rejection_reason=reason,
+                )
+                continue
+
+            _log_candidate(
+                candidate_id,
+                solver_diagnostics,
+                solved_floors,
+                validation_status="valid",
+                failed_checks=[],
+                violations=violations,
+                validation_warnings=list(validation.warnings),
+                rejection_reason=None,
+            )
 
             scheme = schemes_by_floor[0][scheme_id]
             prior_family_variants = sum(variant.topology_id == scheme_id for variant in variants)
@@ -194,17 +316,16 @@ def generate_house_schemes(
         if len(variants) >= count:
             break
 
-    if len(variants) < 3:
-        detail = "; ".join(dict.fromkeys(failed_validation[:5]))
-        reason = f"Only {len(variants)} meaningfully distinct valid variant(s) could be generated."
-        if detail:
-            reason += f" Candidate validation failures: {detail}"
-        raise SchemeGenerationError(reason)
-
     warnings = []
     if len(variants) < count:
-        warnings.append(
-            f"Requested {count} variants; returned {len(variants)} after deterministic topology and seed retries."
+        warnings.append(_partial_generation_warning(count, len(variants)))
+    if not variants:
+        reasons = list(dict.fromkeys(rejection_reasons)) or [
+            "No candidate passed CP-SAT and hard architectural validation."
+        ]
+        raise SchemeGenerationError(
+            "No valid layout could satisfy the current hard constraints.",
+            reasons=reasons,
         )
     return SchemeGenerationResult(
         variants=variants,
@@ -218,10 +339,10 @@ def generate_design_schemes(
     base_layout: HouseLayout,
     count: int = 4,
     vastu_enabled: bool = False,
-) -> list[dict]:
+) -> Dict[str, Any]:
     """Public, JSON-ready API returning named canonical design scheme entries.
 
-    Each entry has exactly these keys:
+    The ``schemes`` list entries have exactly these keys:
     ``id``, ``name``, ``concept``, ``characteristics``, ``validation_status``,
     and ``layout``. ``layout`` is the canonical HouseLayout serialized in JSON
     mode; validation status contains the actual validator result, not a score.
@@ -231,7 +352,7 @@ def generate_design_schemes(
         requirements=ArchitecturalRequirements(vastu_compliant=vastu_enabled),
         count=count,
     )
-    return [
+    schemes = [
         {
             "id": variant.scheme_id,
             "name": variant.name,
@@ -245,6 +366,12 @@ def generate_design_schemes(
         }
         for variant in result.variants
     ]
+    return {
+        "schemes": schemes,
+        "requested_variants": result.requested_count,
+        "generated_variants": len(schemes),
+        "generation_warning": result.warnings[0] if result.warnings else None,
+    }
 
 
 def _validation_status(variant: SchemeVariant) -> Dict[str, Any]:
@@ -282,6 +409,7 @@ def _solve_all_floors(
     layout: HouseLayout,
     seed: int,
     time_limit: float,
+    diagnostics: List[Dict[str, Any]],
 ) -> Optional[List[FloorPlan]]:
     solved: List[FloorPlan] = []
     for floor, floor_schemes in zip(floors, schemes_by_floor):
@@ -293,6 +421,11 @@ def _solve_all_floors(
             for room in floor.rooms
             if room.type == "staircase" and room.rect is not None
         }
+        solver_diagnostic: Dict[str, Any] = {
+            "floor": floor.floor_number,
+            "room_count": len(floor.rooms),
+        }
+        diagnostics.append(solver_diagnostic)
         candidate = solve_spatial_layout(
             rooms=floor.rooms,
             site=layout.site,
@@ -300,8 +433,14 @@ def _solve_all_floors(
             time_limit_sec=time_limit,
             pinned_rooms=pinned or None,
             variant_seed=seed,
+            diagnostics=solver_diagnostic,
         )
         if candidate is None or not candidate.is_valid:
+            solver_diagnostic["rejection_reason"] = (
+                "; ".join(candidate.validation_errors)
+                if candidate is not None and candidate.validation_errors
+                else f"CP-SAT status {solver_diagnostic.get('solver_status', 'UNKNOWN')} did not produce a feasible solution."
+            )
             return None
 
         # Reconstruct Room models through their canonical initializer so their
@@ -329,6 +468,92 @@ def _solve_all_floors(
             rooms.append(Room(**data))
         solved.append(floor.model_copy(deep=True, update={"rooms": rooms}))
     return solved
+
+
+def _partial_generation_warning(requested: int, generated: int) -> str:
+    if generated == 1:
+        return "Only one valid architectural scheme was found."
+    return (
+        f"Only {generated} valid architectural schemes were found "
+        f"out of {requested} requested."
+    )
+
+
+def _validation_violations(validation: ArchitecturalValidation) -> Dict[str, List[str]]:
+    categories = {
+        "overlap": {"zero_overlap"},
+        "buildable_envelope": {"envelope_containment"},
+        "adjacency": {"attached_adjacency"},
+        "circulation": {"circulation", "circulation_connectivity"},
+        "furniture": {"furniture_clearance"},
+        "door_window": {"door_connectivity", "natural_ventilation"},
+    }
+    result: Dict[str, List[str]] = {}
+    for category, rules in categories.items():
+        messages = [
+            issue.message
+            for issue in validation.issues
+            if (
+                issue.severity == "error"
+                and (
+                    getattr(issue, "rule", getattr(issue, "category", "")) in rules
+                    or any(token in issue.message.lower() for token in _violation_keywords(category))
+                )
+            )
+        ]
+        messages.extend(
+            error
+            for error in validation.errors
+            if any(token in error.lower() for token in _violation_keywords(category))
+        )
+        result[category] = list(dict.fromkeys(messages))
+    return result
+
+
+def _violation_keywords(category: str) -> Tuple[str, ...]:
+    return {
+        "overlap": ("overlap", "intersects"),
+        "buildable_envelope": ("buildable envelope", "envelope boundary"),
+        "adjacency": ("attached", "en-suite", "adjacent"),
+        "circulation": ("circulation", "connectivity"),
+        "furniture": ("furniture",),
+        "door_window": ("door", "window", "ventilation", "glazing"),
+    }[category]
+
+
+def _log_candidate(
+    candidate_id: str,
+    solver_diagnostics: List[Dict[str, Any]],
+    floors: Sequence[FloorPlan],
+    validation_status: str,
+    failed_checks: List[str],
+    violations: Dict[str, List[str]],
+    rejection_reason: Optional[str],
+    validation_warnings: Optional[List[str]] = None,
+    exception: Optional[str] = None,
+) -> None:
+    record = {
+        "candidate_id": candidate_id,
+        "solver_status": [item.get("solver_status", "UNKNOWN") for item in solver_diagnostics],
+        "solver_by_floor": solver_diagnostics,
+        "room_count": sum(len(floor.rooms) for floor in floors),
+        "floor_count": len(floors),
+        "validation_status": validation_status,
+        "failed_validation_checks": failed_checks,
+        "validation_warnings": validation_warnings or [],
+        "overlap_violations": violations.get("overlap", []),
+        "buildable_envelope_violations": violations.get("buildable_envelope", []),
+        "adjacency_violations": violations.get("adjacency", []),
+        "circulation_violations": violations.get("circulation", []),
+        "furniture_violations": violations.get("furniture", []),
+        "door_window_violations": violations.get("door_window", []),
+        "exception": exception,
+        "rejection_reason": rejection_reason,
+    }
+    generation_logger.info(
+        "[SCHEME CANDIDATE] %s",
+        json.dumps(record, sort_keys=True, default=str),
+    )
 
 
 def _rebuild_layout(
@@ -504,12 +729,12 @@ def _topology_signature(floors: Sequence[FloorPlan], site: Any) -> Tuple[Any, ..
             if not room.rect:
                 continue
             lateral, front = _relative_position(room.rect, envelope, site.road_side)
-            positions.append((room.type, room.name, _third(lateral), _third(front)))
+            positions.append((room.id, room.type, _fifth(lateral), _fifth(front)))
         spatial.extend((floor.floor_number, *position) for position in sorted(positions))
         for i, first in enumerate(rooms):
             for second in rooms[i + 1 :]:
                 if first.rect and second.rect and _share_wall(first.rect, second.rect):
-                    adjacency.append((floor.floor_number, *sorted((first.type, second.type))))
+                    adjacency.append((floor.floor_number, *sorted((first.id, second.id))))
     return tuple(sorted(spatial)), tuple(sorted(adjacency))
 
 
@@ -529,8 +754,8 @@ def _relative_position(rect: Rect, envelope: Rect, road_side: str) -> Tuple[floa
     return max(0.0, min(1.0, lateral)), max(0.0, min(1.0, front))
 
 
-def _third(value: float) -> str:
-    return "first" if value < 1 / 3 else "middle" if value < 2 / 3 else "last"
+def _fifth(value: float) -> int:
+    return min(4, max(0, int(value * 5)))
 
 
 def _share_wall(first: Rect, second: Rect) -> bool:

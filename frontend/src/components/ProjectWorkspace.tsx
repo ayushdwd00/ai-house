@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +18,7 @@ import { MEPLayerControls, MEPLayerVisibility } from "@/components/MEPLayerContr
 import { DesignSchemeSelectionModal } from "@/components/DesignSchemeSelectionModal";
 import { useProject } from "@/context/ProjectContext";
 import { validateAndSanitizeHouseLayout, validateAndSanitizeHouseLayoutDetailed } from "@/utils/layoutValidator";
-import { generateHouseLayout, editRoomLayout, applyProjectEdit, previewProjectEditIntent, generateMepPlan, generateDesignSchemes, saveProjectToServer, DesignScheme, EditStage } from "@/utils/api";
+import { generateHouseLayout, editRoomLayout, applyProjectEdit, previewProjectEditIntent, generateMepPlan, generateDesignSchemes, saveProjectToServer, DesignScheme, EditStage, GenerationProgress } from "@/utils/api";
 import { Loader2 } from "lucide-react";
 
 // ── Code-split heavy components (3D only loads on MODEL tab) ──
@@ -141,7 +141,13 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({
+    status: "queued",
+    stage: "queued",
+  });
+  const generationInFlight = useRef(false);
   const [designSchemes, setDesignSchemes] = useState<DesignScheme[]>([]);
+  const [schemeGenerationWarning, setSchemeGenerationWarning] = useState<string | null>(null);
   const [schemeReturnFlow, setSchemeReturnFlow] = useState<"consultation" | "dreamHome">("consultation");
   const [isVastuAuditOpen, setIsVastuAuditOpen] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -279,16 +285,19 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   // ── Generate new project from consultation ──
   const handleStartGeneration = async (req: IntakeRequest) => {
+    if (generationInFlight.current) return;
+    generationInFlight.current = true;
     setIsConsultationOpen(false);
     setIsGenerating(true);
+    setGenerationProgress({ status: "queued", stage: "queued" });
     setGenerationError(null);
 
     try {
-      const rawData = await generateHouseLayout(req);
+      const rawData = await generateHouseLayout(req, setGenerationProgress);
 
       if (!rawData || !rawData.rooms || rawData.rooms.length === 0) {
-        const valErrors = (rawData as any)?.validation?.errors;
-        const rationale = (rawData as any)?.designer_rationale;
+        const valErrors = rawData?.validation?.hard_failures;
+        const rationale = rawData?.designer_rationale;
         throw new Error(
           valErrors?.length
             ? valErrors.join("\n")
@@ -302,13 +311,16 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         throw new Error(detailed.errors?.[0] || "Received an unrenderable layout from solver.");
       }
 
-      const schemes = await generateDesignSchemes(sanitized, Boolean(req.vastu_compliant));
       setIsGenerating(false);
+      const result = await generateDesignSchemes(sanitized, Boolean(req.vastu_compliant));
       setSchemeReturnFlow("consultation");
-      setDesignSchemes(schemes);
+      setDesignSchemes(result.schemes);
+      setSchemeGenerationWarning(result.generation_warning || null);
     } catch (err) {
       setIsGenerating(false);
       setGenerationError(err instanceof Error ? err.message : "Failed to synthesize design.");
+    } finally {
+      generationInFlight.current = false;
     }
   };
 
@@ -320,6 +332,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       return;
     }
     setDesignSchemes([]);
+    setSchemeGenerationWarning(null);
     const newPid = createProject(sanitized);
     router.push(`/project/${newPid}/plan`);
   };
@@ -327,19 +340,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const handleDreamHomeSuccess = async (dreamHomeLayout: HouseLayout) => {
     setIsDreamHomeOpen(false);
     setIsGenerating(true);
+    setGenerationProgress({ status: "processing", stage: "solving" });
     setGenerationError(null);
     try {
       const canonicalLayout = validateAndSanitizeHouseLayout(dreamHomeLayout);
       if (!canonicalLayout) {
         throw new Error("The dream-home brief did not produce a valid canonical layout.");
       }
-      const schemes = await generateDesignSchemes(
+      const result = await generateDesignSchemes(
         canonicalLayout,
         Boolean(dreamHomeLayout.metadata?.vastu_compliant)
       );
       setIsGenerating(false);
       setSchemeReturnFlow("dreamHome");
-      setDesignSchemes(schemes);
+      setDesignSchemes(result.schemes);
+      setSchemeGenerationWarning(result.generation_warning || null);
     } catch (error) {
       setIsGenerating(false);
       setGenerationError(error instanceof Error ? error.message : "Could not create architectural alternatives.");
@@ -722,6 +737,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       <ProjectsModal
         isOpen={isProjectsOpen}
         onClose={() => setIsProjectsOpen(false)}
+        onDeletedActive={() => router.push("/")}
         onSelectProject={(pid) => { router.push(`/project/${pid}/plan`); }}
         onStartNew={() => { setIsProjectsOpen(false); setIsCreateChoiceOpen(true); }}
       />
@@ -729,14 +745,17 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       <GenerationProgressModal
         key={isGenerating ? "generating" : "idle"}
         isOpen={isGenerating}
+        progress={generationProgress}
       />
 
       {designSchemes.length > 0 && (
         <DesignSchemeSelectionModal
           schemes={designSchemes}
+          generationWarning={schemeGenerationWarning}
           onSelect={handleSelectDesignScheme}
           onBack={() => {
             setDesignSchemes([]);
+            setSchemeGenerationWarning(null);
             setIsConsultationOpen(schemeReturnFlow === "consultation");
             setIsDreamHomeOpen(schemeReturnFlow === "dreamHome");
           }}

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { HouseLayout } from "@/types/house";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
-import { fetchProjectById, saveProjectToServer, deleteProjectApi } from "@/utils/api";
+import { fetchProjectById, fetchProjectSummaries, saveProjectToServer, deleteProjectApi } from "@/utils/api";
 
 export const STORAGE_KEY = "atelier_archai_saved_layout";
 export const RECENT_PROJECTS_KEY = "atelier_archai_recent_projects";
@@ -18,6 +18,14 @@ export interface ProjectSummary {
   floors?: number;
 }
 
+function isProjectSummary(value: unknown): value is ProjectSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const summary = value as Record<string, unknown>;
+  return typeof summary.id === "string"
+    && typeof summary.title === "string"
+    && typeof summary.updatedAt === "string";
+}
+
 interface ProjectContextValue {
   activeProject: HouseLayout | null;
   projectId: string | null;
@@ -27,6 +35,7 @@ interface ProjectContextValue {
   createProject: (layout: HouseLayout) => string;
   updateProject: (layout: HouseLayout) => void;
   loadProject: (id: string) => Promise<HouseLayout | null>;
+  refreshProjects: () => Promise<void>;
   deleteProject: (id: string) => Promise<{ remainingCount: number; nextActiveId: string | null }>;
   clearActiveProject: () => void;
   setProjectStatus: (status: "idle" | "creating" | "ready" | "error") => void;
@@ -43,7 +52,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Keep a stable ref to activeProject to avoid stale closures in callbacks
   const activeProjectRef = useRef<HouseLayout | null>(null);
-  activeProjectRef.current = activeProject;
+  useEffect(() => {
+    activeProjectRef.current = activeProject;
+  }, [activeProject]);
 
   // Deterministic hydration from localStorage only after client mount
   useEffect(() => {
@@ -237,83 +248,83 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [saveRecentProject]
   );
 
+  const refreshProjects = useCallback(async () => {
+    const serverProjects = await fetchProjectSummaries();
+    const merged = new Map<string, ProjectSummary>();
+    try {
+      const stored = localStorage.getItem(RECENT_PROJECTS_KEY);
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          for (const project of parsed) {
+            if (isProjectSummary(project)) {
+              merged.set(project.id, project);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Could not read cached project metadata:", error);
+    }
+    for (const project of serverProjects) merged.set(project.id, project);
+    const updated = [...merged.values()].sort(
+      (first, second) => Date.parse(second.updatedAt) - Date.parse(first.updatedAt)
+    );
+    setRecentProjects(updated);
+    try {
+      localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(updated.slice(0, 100)));
+    } catch (error) {
+      console.warn("Could not cache refreshed project metadata:", error);
+    }
+  }, []);
+
   const deleteProject = useCallback(
     async (id: string): Promise<{ remainingCount: number; nextActiveId: string | null }> => {
-      // 1. Remove from local multi-project cache
+      await deleteProjectApi(id);
+
+      // Update local state only after the backend confirms deletion.
       try {
         if (typeof window !== "undefined") {
           localStorage.removeItem(PROJECT_STORAGE_PREFIX + id);
         }
-      } catch (_) {}
+      } catch (error) {
+        console.warn(`Could not remove cached project ${id}:`, error);
+      }
 
-      // 2. Compute updated recent projects list
-      let nextRecents: ProjectSummary[] = [];
-      setRecentProjects((prev) => {
-        nextRecents = prev.filter((p) => p.id !== id);
-        try {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(nextRecents));
-          }
-        } catch (_) {}
-        return nextRecents;
-      });
+      const nextRecents = recentProjects.filter((project) => project.id !== id);
+      setRecentProjects(nextRecents);
+      try {
+        localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(nextRecents));
+      } catch (error) {
+        console.warn("Could not update cached project metadata:", error);
+      }
 
-      // 3. Handle active project deletion
+      // Clear the active project before navigating away from its workspace.
       let nextActiveId: string | null = null;
       const current = activeProjectRef.current;
       if (current && current.id === id) {
-        // If there's another project in recent projects, switch to it
         const candidate = nextRecents.find((p) => p.id !== id);
         if (candidate) {
           nextActiveId = candidate.id;
-          // Load the candidate
-          try {
-            const cached = localStorage.getItem(PROJECT_STORAGE_PREFIX + candidate.id);
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              const sanitized = validateAndSanitizeHouseLayout(parsed);
-              if (sanitized) {
-                setActiveProject(sanitized);
-                setProjectId(sanitized.id);
-                setProjectStatus("ready");
-                try {
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-                } catch (_) {}
-              }
-            } else {
-              // Try loading via loadProject
-              loadProject(candidate.id);
-            }
-          } catch (_) {
-            loadProject(candidate.id);
-          }
-        } else {
-          // No projects remain
-          setActiveProject(null);
-          setProjectId(null);
-          setProjectStatus("idle");
-          try {
-            if (typeof window !== "undefined") {
-              localStorage.removeItem(STORAGE_KEY);
-            }
-          } catch (_) {}
+        }
+        setActiveProject(null);
+        setProjectId(null);
+        setProjectStatus("idle");
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch (error) {
+          console.warn("Could not clear the deleted active project cache:", error);
         }
       } else {
-        // Deleted a non-active project; active project remains intact
         nextActiveId = current?.id || null;
       }
-
-      // 4. Trigger server deletion asynchronously
-      deleteProjectApi(id).catch((e) => {
-        console.warn(`[STORAGE] Server deletion notice for project ${id}:`, e);
-      });
 
       return {
         remainingCount: nextRecents.length,
         nextActiveId,
       };
     },
-    [loadProject]
+    [recentProjects]
   );
 
   const clearActiveProject = useCallback(() => {
@@ -338,6 +349,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         createProject,
         updateProject,
         loadProject,
+        refreshProjects,
         deleteProject,
         clearActiveProject,
         setProjectStatus,
@@ -355,4 +367,3 @@ export const useProject = (): ProjectContextValue => {
   }
   return context;
 };
-

@@ -68,11 +68,23 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           bedrooms: 3,
           bathrooms: 2.0,
           style: "Architectural Digitization",
+        }, ({ stage }) => {
+          const labels = {
+            queued: "Generation queued...",
+            understanding: "Understanding requirements...",
+            planning: "Planning spaces...",
+            solving: "Generating architectural layout...",
+            validating: "Validating architecture...",
+            rendering: "Preparing floor plan...",
+            completed: "Generation complete.",
+            failed: "Generation failed.",
+          };
+          setStatusMessage(labels[stage]);
         });
         onSuccess(layout);
         onClose();
       } catch (fallbackErr) {
-        alert(err instanceof Error ? err.message : "Failed to process floor plan upload.");
+        alert(fallbackErr instanceof Error ? fallbackErr.message : "Failed to process floor plan upload.");
       }
     } finally {
       setStep("drop");

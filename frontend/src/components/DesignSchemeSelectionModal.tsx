@@ -5,6 +5,7 @@ import { DesignScheme } from "@/utils/api";
 
 interface DesignSchemeSelectionModalProps {
   schemes: DesignScheme[];
+  generationWarning?: string | null;
   onSelect: (scheme: DesignScheme) => void;
   onBack: () => void;
 }
@@ -20,6 +21,7 @@ function roomColor(type: string): string {
 
 export const DesignSchemeSelectionModal: React.FC<DesignSchemeSelectionModalProps> = ({
   schemes,
+  generationWarning,
   onSelect,
   onBack,
 }) => (
@@ -35,6 +37,11 @@ export const DesignSchemeSelectionModal: React.FC<DesignSchemeSelectionModalProp
           <p className="mb-1 text-[10px] font-mono uppercase tracking-[0.22em] text-[#C48446]">Architectural concepts</p>
           <h2 id="scheme-selection-title" className="text-xl font-medium">Choose a design direction</h2>
           <p className="mt-1 text-xs text-[#9599A5]">Each option preserves the same brief and solver constraints. No scheme is preselected.</p>
+          {generationWarning && (
+            <p role="status" className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-200">
+              {generationWarning}
+            </p>
+          )}
         </div>
         <button type="button" onClick={onBack} className="shrink-0 rounded-lg border border-white/10 px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[#A4A7B0] hover:text-white">
           Back

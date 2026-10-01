@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FolderGit2, ArrowRight, X, Sparkles, Home, Trash2, AlertTriangle } from "lucide-react";
 import { useProject, ProjectSummary } from "@/context/ProjectContext";
@@ -10,6 +10,7 @@ interface ProjectsModalProps {
   onClose: () => void;
   onSelectProject: (projectId: string) => void;
   onStartNew: () => void;
+  onDeletedActive?: () => void;
 }
 
 export const ProjectsModal: React.FC<ProjectsModalProps> = ({
@@ -17,11 +18,23 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   onClose,
   onSelectProject,
   onStartNew,
+  onDeletedActive,
 }) => {
-  const { recentProjects, activeProject, deleteProject } = useProject();
+  const { recentProjects, activeProject, deleteProject, refreshProjects } = useProject();
   const [projectToDelete, setProjectToDelete] = useState<ProjectSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void refreshProjects()
+      .then(() => setListError(null))
+      .catch((error: unknown) => {
+        console.error("Could not refresh project list:", error);
+        setListError("Couldn't refresh saved projects. Showing projects available on this device.");
+      });
+  }, [isOpen, refreshProjects]);
 
   if (!isOpen) return null;
 
@@ -32,18 +45,22 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
 
     try {
       const isCurrentActive = activeProject?.id === projectToDelete.id;
-      const { remainingCount, nextActiveId } = await deleteProject(projectToDelete.id);
+      const { nextActiveId } = await deleteProject(projectToDelete.id);
 
       setProjectToDelete(null);
       setIsDeleting(false);
 
-      if (isCurrentActive && nextActiveId) {
-        onSelectProject(nextActiveId);
+      if (isCurrentActive) {
+        if (nextActiveId) {
+          onSelectProject(nextActiveId);
+        } else {
+          onDeletedActive?.();
+        }
       }
     } catch (err) {
       console.error("Deletion error:", err);
       setIsDeleting(false);
-      setDeleteError("Could not delete project. Please try again.");
+      setDeleteError("Couldn't delete this project. Please try again.");
     }
   };
 
@@ -87,6 +104,11 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
 
           {/* Project List */}
           <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 mb-6">
+            {listError && (
+              <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200/80">
+                {listError}
+              </p>
+            )}
             {recentProjects.length === 0 && (
               <div className="py-12 text-center rounded-2xl bg-[#0A0B0E]/60 border border-white/5 p-6">
                 <Home className="w-10 h-10 text-[#6B6964] mx-auto mb-3 opacity-60" />
@@ -173,7 +195,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                         focus-visible:opacity-100
                       `}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -204,7 +226,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
               className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-[#151720] border border-white/15 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-left space-y-4">
+              <div className="bg-[#151720] border border-white/15 rounded-2xl p-5 sm:p-6 w-full max-w-sm max-h-full overflow-y-auto shadow-2xl text-left space-y-4">
                 <div className="flex items-center gap-2.5 text-amber-500/90 text-xs font-mono uppercase tracking-wider">
                   <AlertTriangle className="w-4 h-4" />
                   <span>Delete this project?</span>
@@ -212,15 +234,18 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
 
                 <div>
                   <h3 className="text-base font-serif text-[#F5F3EF] leading-snug">
-                    &ldquo;{projectToDelete.title}&rdquo;
+                    Delete project?
                   </h3>
+                  <p className="text-xs text-[#DCD8D0] break-words mt-2">
+                    Are you sure you want to delete {projectToDelete.title}?
+                  </p>
                   {activeProject?.id === projectToDelete.id && (
                     <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-[#C48446]/20 border border-[#C48446]/40 text-[#C48446]">
                       Current Active Project
                     </span>
                   )}
                   <p className="text-xs text-[#9E9C98] font-light mt-2 leading-relaxed">
-                    This saved design will be permanently removed.
+                    This will permanently remove this project and its generated data.
                   </p>
                 </div>
 
@@ -228,7 +253,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                   <p className="text-xs text-red-400 font-mono">{deleteError}</p>
                 )}
 
-                <div className="flex items-center justify-end gap-2.5 pt-2">
+                <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
                   <button
                     type="button"
                     disabled={isDeleting}
@@ -247,7 +272,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                     className="px-4 py-2 rounded-xl text-xs font-mono text-red-300 hover:text-red-200 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 transition-colors flex items-center gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>{isDeleting ? "Deleting..." : "Delete"}</span>
+                    <span>{isDeleting ? "Deleting..." : "Delete project"}</span>
                   </button>
                 </div>
               </div>
@@ -258,4 +283,3 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
     </div>
   );
 };
-

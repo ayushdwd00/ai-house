@@ -10,7 +10,7 @@ import { ProjectsModal } from "@/components/ProjectsModal";
 import { useProject } from "@/context/ProjectContext";
 import { HouseLayout, IntakeRequest } from "@/types/house";
 import { validateAndSanitizeHouseLayout, validateAndSanitizeHouseLayoutDetailed } from "@/utils/layoutValidator";
-import { DesignScheme, generateDesignSchemes, generateHouseLayout } from "@/utils/api";
+import { DesignScheme, GenerationProgress, generateDesignSchemes, generateHouseLayout } from "@/utils/api";
 import { DesignSchemeSelectionModal } from "@/components/DesignSchemeSelectionModal";
 
 // Code splitting: Heavy modals and consultation loaded on demand only
@@ -37,6 +37,7 @@ const GenerationProgressModal = dynamic(
 export default function HomePage() {
   const router = useRouter();
   const homeScrollRoot = useRef<HTMLDivElement>(null);
+  const generationInFlight = useRef(false);
   const { activeProject, projectId, createProject } = useProject();
 
   // Modals & User Flow States
@@ -48,9 +49,14 @@ export default function HomePage() {
 
   // Synthesis States
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({
+    status: "queued",
+    stage: "queued",
+  });
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [lastIntakeRequest, setLastIntakeRequest] = useState<IntakeRequest | null>(null);
   const [designSchemes, setDesignSchemes] = useState<DesignScheme[]>([]);
+  const [schemeGenerationWarning, setSchemeGenerationWarning] = useState<string | null>(null);
   const [schemeReturnFlow, setSchemeReturnFlow] = useState<"consultation" | "dreamHome">("consultation");
 
   const handleNavigate = (view: NavView) => {
@@ -88,16 +94,18 @@ export default function HomePage() {
   const handleDreamHomeSuccess = async (layout: HouseLayout) => {
     setIsDreamHomeOpen(false);
     setIsGenerating(true);
+    setGenerationProgress({ status: "processing", stage: "solving" });
     setGenerationError(null);
     try {
       const canonicalLayout = validateAndSanitizeHouseLayout(layout);
       if (!canonicalLayout) {
         throw new Error("The dream-home brief did not produce a valid canonical layout.");
       }
-      const schemes = await generateDesignSchemes(canonicalLayout, Boolean(layout.metadata?.vastu_compliant));
+      const result = await generateDesignSchemes(canonicalLayout, Boolean(layout.metadata?.vastu_compliant));
       setIsGenerating(false);
       setSchemeReturnFlow("dreamHome");
-      setDesignSchemes(schemes);
+      setDesignSchemes(result.schemes);
+      setSchemeGenerationWarning(result.generation_warning || null);
     } catch (error) {
       setIsGenerating(false);
       setGenerationError(error instanceof Error ? error.message : "Could not create architectural alternatives.");
@@ -106,19 +114,20 @@ export default function HomePage() {
 
   // Submit intake from step-by-step Architectural Consultation
   const handleStartGeneration = async (req: IntakeRequest) => {
-    if (isGenerating) return;
+    if (generationInFlight.current) return;
+    generationInFlight.current = true;
     setLastIntakeRequest(req);
-    // Keep consultation open behind generation screen or transition immediately
     setIsGenerating(true);
+    setGenerationProgress({ status: "queued", stage: "queued" });
     setGenerationError(null);
 
     try {
-      const rawData = await generateHouseLayout(req);
+      const rawData = await generateHouseLayout(req, setGenerationProgress);
 
       // Check if backend returned an empty/infeasible layout directly (fallback for 200 OK responses)
       if (!rawData || !rawData.rooms || rawData.rooms.length === 0) {
-        const valErrors = (rawData as any)?.validation?.errors;
-        const rationale = (rawData as any)?.designer_rationale;
+        const valErrors = rawData?.validation?.hard_failures;
+        const rationale = rawData?.designer_rationale;
         const msg = (valErrors && valErrors.length > 0)
           ? valErrors.join("\n")
           : (rationale || "The requested room program exceeds the buildable envelope of the plot. Try increasing floors or adjusting room sizes.");
@@ -132,17 +141,20 @@ export default function HomePage() {
         throw new Error(reason);
       }
 
-      const schemes = await generateDesignSchemes(sanitized, Boolean(req.vastu_compliant));
       setIsGenerating(false);
+      const result = await generateDesignSchemes(sanitized, Boolean(req.vastu_compliant));
       setIsConsultationOpen(false);
       setIsCreateChoiceOpen(false);
       setIsDreamHomeOpen(false);
       setSchemeReturnFlow("consultation");
-      setDesignSchemes(schemes);
+      setDesignSchemes(result.schemes);
+      setSchemeGenerationWarning(result.generation_warning || null);
     } catch (err) {
       console.error("[GENERATION ERROR]", err);
       setIsGenerating(false);
       setGenerationError(err instanceof Error ? err.message : "Failed to connect to architectural synthesis backend.");
+    } finally {
+      generationInFlight.current = false;
     }
   };
 
@@ -154,6 +166,7 @@ export default function HomePage() {
       return;
     }
     setDesignSchemes([]);
+    setSchemeGenerationWarning(null);
     const newProjectId = createProject(sanitized);
     router.push(`/project/${newProjectId}/plan`);
   };
@@ -262,6 +275,7 @@ export default function HomePage() {
       <ProjectsModal
         isOpen={isProjectsOpen}
         onClose={() => setIsProjectsOpen(false)}
+        onDeletedActive={() => router.push("/")}
         onSelectProject={(pid) => {
           router.push(`/project/${pid}/plan`);
         }}
@@ -272,14 +286,20 @@ export default function HomePage() {
       />
 
       {/* GENERATION PROGRESS MODAL */}
-      <GenerationProgressModal key={isGenerating ? "generating" : "idle"} isOpen={isGenerating} />
+      <GenerationProgressModal
+        key={isGenerating ? "generating" : "idle"}
+        isOpen={isGenerating}
+        progress={generationProgress}
+      />
 
       {designSchemes.length > 0 && (
         <DesignSchemeSelectionModal
           schemes={designSchemes}
+          generationWarning={schemeGenerationWarning}
           onSelect={handleSelectDesignScheme}
           onBack={() => {
             setDesignSchemes([]);
+            setSchemeGenerationWarning(null);
             setIsConsultationOpen(schemeReturnFlow === "consultation");
             setIsDreamHomeOpen(schemeReturnFlow === "dreamHome");
           }}

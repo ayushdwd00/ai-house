@@ -5,23 +5,37 @@ Solves room positions, dimensions, non-overlap constraints, attached bathrooms,
 circulation access, and topological affinities within the site buildable envelope.
 """
 
+import math
+import os
+import time
 from typing import List, Dict, Optional
 from ortools.sat.python import cp_model
 from shapely.geometry import box
 
 from models import Room, Site, Rect
 from architecture.topology_engine import ArchitecturalScheme
+from infrastructure.generation_context import record_solver_timing
 
 # Resolution: 2 units per foot (0.5 ft = 6-inch architectural grid)
 GRID_SCALE = 2
 SOLVER_RELATIVE_GAP_LIMIT = 0.05
+DEFAULT_SOLVER_TIME_LIMIT_SECONDS = float(os.getenv("CP_SAT_TIME_LIMIT_SECONDS", "1.5"))
+if not math.isfinite(DEFAULT_SOLVER_TIME_LIMIT_SECONDS) or DEFAULT_SOLVER_TIME_LIMIT_SECONDS <= 0:
+    raise ValueError("CP_SAT_TIME_LIMIT_SECONDS must be greater than zero")
 
 
 class SolverCandidate:
-    def __init__(self, scheme_id: str, rooms: List[Room], solved_rects: Dict[str, Rect]):
+    def __init__(
+        self,
+        scheme_id: str,
+        rooms: List[Room],
+        solved_rects: Dict[str, Rect],
+        solver_status: str = "UNKNOWN",
+    ):
         self.scheme_id = scheme_id
         self.rooms = rooms
         self.solved_rects = solved_rects
+        self.solver_status = solver_status
         self.is_valid = True
         self.validation_errors: List[str] = []
 
@@ -30,9 +44,10 @@ def solve_spatial_layout(
     rooms: List[Room],
     site: Site,
     scheme: ArchitecturalScheme,
-    time_limit_sec: float = 3.0,
+    time_limit_sec: Optional[float] = None,
     pinned_rooms: Optional[Dict[str, Rect]] = None,
-    variant_seed: Optional[int] = None
+    variant_seed: Optional[int] = None,
+    diagnostics: Optional[Dict[str, object]] = None,
 ) -> Optional[SolverCandidate]:
     """
     CP-SAT constraint formulation for residential floor planning.
@@ -267,7 +282,59 @@ def solve_spatial_layout(
                 # At least one touch direction must hold
                 model.AddBoolOr([b_left_of_p, b_right_of_p, b_above_p, b_below_p])
 
-    # 3. WALL ALIGNMENT OBJECTIVE: Strongly reward collinear walls between neighboring rooms
+    # 3. HARD CIRCULATION: give each un-attached room a door-width wall to a
+    # circulation/public connector so regenerated openings cannot leave it
+    # isolated from the plan.
+    hallway_ids = [room.id for room in rooms if room.type == "hallway"]
+    living_ids = [room.id for room in rooms if room.type == "living_room"]
+    foyer_ids = [room.id for room in rooms if room.type == "entry_foyer"]
+    staircase_ids = [room.id for room in rooms if room.type == "staircase"]
+    for room in rooms:
+        if room.id not in x_vars:
+            continue
+        attached_parent = room.parent_room_id or room.attached_room_id
+        if room.type in ["bathroom", "powder_room"] and attached_parent in x_vars:
+            continue
+        if room.type == "hallway":
+            connector_ids = living_ids + foyer_ids + staircase_ids
+        elif room.type == "entry_foyer":
+            connector_ids = hallway_ids + living_ids
+        elif room.type == "living_room":
+            connector_ids = hallway_ids + foyer_ids
+        else:
+            connector_ids = hallway_ids + living_ids
+        connector_ids = [room_id for room_id in connector_ids if room_id != room.id]
+        if not connector_ids:
+            continue
+
+        touching_options = []
+        for connector_id in connector_ids:
+            directions = [
+                model.NewBoolVar(f"circulation_{room.id}_{connector_id}_{direction}")
+                for direction in ("left", "right", "above", "below")
+            ]
+            left, right, above, below = directions
+            min_door_overlap = 3 * GRID_SCALE
+
+            model.Add(x_vars[room.id] + w_vars[room.id] == x_vars[connector_id]).OnlyEnforceIf(left)
+            model.Add(y_vars[room.id] <= y_vars[connector_id] + l_vars[connector_id] - min_door_overlap).OnlyEnforceIf(left)
+            model.Add(y_vars[connector_id] <= y_vars[room.id] + l_vars[room.id] - min_door_overlap).OnlyEnforceIf(left)
+
+            model.Add(x_vars[connector_id] + w_vars[connector_id] == x_vars[room.id]).OnlyEnforceIf(right)
+            model.Add(y_vars[room.id] <= y_vars[connector_id] + l_vars[connector_id] - min_door_overlap).OnlyEnforceIf(right)
+            model.Add(y_vars[connector_id] <= y_vars[room.id] + l_vars[room.id] - min_door_overlap).OnlyEnforceIf(right)
+
+            model.Add(y_vars[room.id] + l_vars[room.id] == y_vars[connector_id]).OnlyEnforceIf(above)
+            model.Add(x_vars[room.id] <= x_vars[connector_id] + w_vars[connector_id] - min_door_overlap).OnlyEnforceIf(above)
+            model.Add(x_vars[connector_id] <= x_vars[room.id] + w_vars[room.id] - min_door_overlap).OnlyEnforceIf(above)
+
+            model.Add(y_vars[connector_id] + l_vars[connector_id] == y_vars[room.id]).OnlyEnforceIf(below)
+            model.Add(x_vars[room.id] <= x_vars[connector_id] + w_vars[connector_id] - min_door_overlap).OnlyEnforceIf(below)
+            model.Add(x_vars[connector_id] <= x_vars[room.id] + w_vars[room.id] - min_door_overlap).OnlyEnforceIf(below)
+            touching_options.extend(directions)
+        model.AddBoolOr(touching_options)
+
+    # 4. WALL ALIGNMENT OBJECTIVE: Strongly reward collinear walls between neighboring rooms
     # (Eliminates small jogs, notches, and slivers, producing clean rectangular architectural boundaries)
     r_list = [r for r in rooms if r.id in x_vars]
     for i in range(len(r_list)):
@@ -352,13 +419,45 @@ def solve_spatial_layout(
     # Minimize total objective terms
     model.Minimize(sum(objective_terms))
 
-    # Solve deterministically
+    # Reserve part of the bounded budget for a feasibility-only retry. A time
+    # limit with an objective can end as UNKNOWN before CP-SAT discovers its
+    # first layout; clearing soft objectives gives the hard constraints a
+    # bounded opportunity to produce a FEASIBLE candidate.
+    total_budget = float(
+        time_limit_sec if time_limit_sec is not None else DEFAULT_SOLVER_TIME_LIMIT_SECONDS
+    )
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = float(time_limit_sec)
+    solver.parameters.max_time_in_seconds = total_budget * 0.8
     solver.parameters.relative_gap_limit = SOLVER_RELATIVE_GAP_LIMIT
     solver.parameters.random_seed = int(variant_seed if variant_seed is not None else 42)
     solver.parameters.num_workers = 1
+    solve_started = time.perf_counter()
     status = solver.Solve(model)
+    initial_status_name = solver.StatusName(status)
+    solver_status_attempts = [initial_status_name]
+    if status == cp_model.UNKNOWN:
+        remaining_budget = total_budget - (time.perf_counter() - solve_started)
+        if remaining_budget > 0.01:
+            model.clear_objective()
+            feasibility_solver = cp_model.CpSolver()
+            feasibility_solver.parameters.max_time_in_seconds = remaining_budget
+            feasibility_solver.parameters.random_seed = int(
+                variant_seed if variant_seed is not None else 42
+            )
+            feasibility_solver.parameters.num_workers = 1
+            solver = feasibility_solver
+            status = solver.Solve(model)
+            solver_status_attempts.append(solver.StatusName(status))
+    elapsed = time.perf_counter() - solve_started
+    record_solver_timing(elapsed)
+    status_name = solver.StatusName(status)
+    if diagnostics is not None:
+        diagnostics.update({
+            "solver_status": status_name,
+            "solver_status_code": int(status),
+            "solver_status_attempts": solver_status_attempts,
+            "solver_wall_time_seconds": round(elapsed, 3),
+        })
 
     if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         return None
@@ -391,7 +490,8 @@ def solve_spatial_layout(
     candidate = SolverCandidate(
         scheme_id=scheme.scheme_id,
         rooms=updated_rooms,
-        solved_rects=solved_rects
+        solved_rects=solved_rects,
+        solver_status=status_name,
     )
 
     # Validate using Shapely

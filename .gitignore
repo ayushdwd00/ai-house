@@ -23,6 +23,10 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 
+# Derived project metadata cache
+backend/projects/*/metadata.json
+backend/projects/*/metadata.json.tmp
+
 # OS
 .DS_Store
 Thumbs.db
