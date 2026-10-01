@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { PredictiveArcCanvas } from "@designcodeio/threeui";
 import {
   Sparkles,
@@ -17,6 +17,8 @@ import {
 import { GradualBlur } from "@/components/ui/GradualBlur";
 
 interface HomePageViewProps {
+  scrollRoot: React.RefObject<HTMLDivElement | null>;
+  navbar?: React.ReactNode;
   onStartDesign: () => void;
   onOpenPlanMode: () => void;
   onOpenModelMode: () => void;
@@ -33,12 +35,52 @@ interface HomePageViewProps {
 }
 
 export const HomePageView: React.FC<HomePageViewProps> = ({
+  scrollRoot,
+  navbar,
   onStartDesign,
   onOpenPlanMode,
   onOpenModelMode,
   onOpenUpload,
   onSelectPreset,
 }) => {
+  const reducedMotion = useReducedMotion();
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const compactViewport = window.matchMedia("(max-width: 767px)");
+    const updateViewport = () => setIsCompactViewport(compactViewport.matches);
+
+    updateViewport();
+    compactViewport.addEventListener("change", updateViewport);
+    return () => compactViewport.removeEventListener("change", updateViewport);
+  }, []);
+
+  const { scrollYProgress: heroScrollProgress } = useScroll({
+    container: scrollRoot,
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const heroScale = useTransform(heroScrollProgress, [0, 1], [1, isCompactViewport ? 0.985 : 0.97]);
+  const heroContentOpacity = useTransform(heroScrollProgress, [0, 0.2, 0.5, 1], [1, 0.78, 0, 0]);
+  const heroContentBlur = useTransform(heroScrollProgress, [0, 1], ["blur(0px)", "blur(2px)"]);
+  const heroOverlayOpacity = useTransform(heroScrollProgress, [0, 0.25, 0.7, 1], [0, 0.16, 0.62, 0.88]);
+
+  const revealProps = (delay = 0, distance = 16) => ({
+    initial: reducedMotion
+      ? false
+      : { opacity: 0, y: distance, scale: 0.985, filter: "blur(4px)" },
+    animate: reducedMotion
+      ? { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+      : undefined,
+    whileInView: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" },
+    viewport: { root: scrollRoot, once: true, amount: 0.15 },
+    transition: {
+      duration: reducedMotion ? 0 : 0.85,
+      delay: reducedMotion ? 0 : delay,
+      ease: [0.23, 1, 0.32, 1] as const,
+    },
+  });
 
   return (
     <div className="relative isolate w-full min-h-screen bg-[#030303] text-[#F5F5F5] overflow-x-clip selection:bg-[#2563EB]/40 selection:text-white">
@@ -74,98 +116,125 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
       <div className="relative z-10">
 
         {/* ── 1. CINEMATIC HERO SECTION ── */}
-        <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden border-b border-white/5">
-          {/* Top spacer for floating navbar */}
-          <div className="w-full h-24 sm:h-28 relative z-20 pointer-events-none" />
+        <div className="relative h-[200svh]">
+        <div
+          ref={heroRef}
+          aria-hidden="true"
+          className="absolute top-0 left-0 h-[100svh] w-px pointer-events-none"
+        />
+        <motion.section
+          style={reducedMotion ? undefined : { scale: heroScale }}
+          className="sticky top-0 z-0 h-[100svh] min-h-screen w-full overflow-hidden border-b border-white/5"
+        >
+          <motion.div
+            style={reducedMotion ? undefined : { opacity: heroContentOpacity, filter: heroContentBlur }}
+            className="relative z-20 flex min-h-full w-full flex-col justify-between"
+          >
+            {navbar && (
+              <div className="absolute inset-x-0 top-2 sm:top-4 z-30">
+                {navbar}
+              </div>
+            )}
 
-          {/* Hero Content */}
-          <div className="relative z-20 max-w-5xl mx-auto px-6 md:px-12 text-center flex flex-col items-center my-auto pointer-events-auto">
-            {/* Monospace Architectural Badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
-              className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[rgba(8,15,28,0.7)] border border-[rgba(96,165,250,0.22)] text-[10px] sm:text-[11px] font-mono tracking-[0.24em] text-[#93C5FD] mb-6 uppercase shadow-[0_0_25px_rgba(37,99,235,0.18)] backdrop-blur-xl"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] shadow-[0_0_8px_#06B6D4] animate-pulse" />
-              <span>COMPUTATIONAL ARCHITECTURAL ATELIER</span>
-            </motion.div>
+            {/* Top spacer for floating navbar */}
+            <div className="w-full h-24 sm:h-28 relative z-20 pointer-events-none" />
 
-            {/* Editorial Instrument Serif Headline */}
-            <motion.h1
-              initial={{ opacity: 0, y: 22 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.85, delay: 0.1, ease: [0.23, 1, 0.32, 1] }}
-              className="text-5xl sm:text-7xl md:text-8xl lg:text-[7.2rem] font-serif font-light tracking-[-0.04em] text-[#F4F1EA] leading-[0.92] mb-7 drop-shadow-[0_10px_35px_rgba(0,0,0,0.7)]"
-            >
-              YOUR HOME. <br />
-              <span className="italic font-normal text-[#DED8F0] drop-shadow-[0_0_36px_rgba(139,92,246,0.16)]">
-                DESIGNED INTELLIGENTLY.
-              </span>
-            </motion.h1>
-
-            {/* Inter Body Statement */}
-            <motion.p
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
-              className="text-sm sm:text-base md:text-lg text-[rgba(255,255,255,0.64)] font-light max-w-2xl mx-auto mb-10 leading-relaxed drop-shadow-md"
-            >
-              An avant-garde residential studio synthesizing plot physics, daylight azimuths, and bespoke living
-              rituals into verified architectural blueprints and cinematic 3D models.
-            </motion.p>
-
-            {/* Unified CTA Actions */}
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3, ease: [0.23, 1, 0.32, 1] }}
-              className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
-            >
-              <button
-                onClick={onStartDesign}
-                className="w-full sm:w-auto px-8 py-4 rounded-full btn-primary-blue font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 group cursor-pointer"
+            {/* Hero Content */}
+            <div className="relative z-20 max-w-5xl mx-auto px-6 md:px-12 text-center flex flex-col items-center my-auto pointer-events-auto">
+              {/* Monospace Architectural Badge */}
+              <motion.div
+                initial={reducedMotion ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reducedMotion ? 0 : 0.7, ease: [0.23, 1, 0.32, 1] }}
+                className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[rgba(8,15,28,0.7)] border border-[rgba(96,165,250,0.22)] text-[10px] sm:text-[11px] font-mono tracking-[0.24em] text-[#93C5FD] mb-6 uppercase shadow-[0_0_25px_rgba(37,99,235,0.18)] backdrop-blur-xl"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>CREATE YOUR HOME</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-              </button>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] shadow-[0_0_8px_#06B6D4] animate-pulse" />
+                <span>COMPUTATIONAL ARCHITECTURAL ATELIER</span>
+              </motion.div>
 
-              <button
-                onClick={onOpenModelMode}
-                className="w-full sm:w-auto px-8 py-4 rounded-full btn-secondary-glass font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_25px_rgba(139,92,246,0.06)]"
+              {/* Editorial Instrument Serif Headline */}
+              <motion.h1
+                initial={reducedMotion ? false : { opacity: 0, y: 22 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reducedMotion ? 0 : 0.85, delay: reducedMotion ? 0 : 0.1, ease: [0.23, 1, 0.32, 1] }}
+                className="text-5xl sm:text-7xl md:text-8xl lg:text-[7.2rem] font-serif font-light tracking-[-0.04em] text-[#F4F1EA] leading-[0.92] mb-7 drop-shadow-[0_10px_35px_rgba(0,0,0,0.7)]"
               >
-                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
-                <span>EXPLORE 3D MODEL</span>
-              </button>
-            </motion.div>
-          </div>
+                YOUR HOME. <br />
+                <span className="italic font-normal text-[#DED8F0] drop-shadow-[0_0_36px_rgba(139,92,246,0.16)]">
+                  DESIGNED INTELLIGENTLY.
+                </span>
+              </motion.h1>
 
-          {/* Hero Bottom Metadata Row */}
-          <div className="relative z-20 w-full px-6 sm:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] sm:text-[11px] font-mono text-[rgba(255,255,255,0.38)] border-t border-white/5 bg-[rgba(3,3,3,0.4)] backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-[linear-gradient(135deg,#2563EB,#06B6D4)] shadow-[0_0_8px_#06B6D4] animate-pulse" />
-              <span>AI HOUSE // RESIDENTIAL SYNTHESIS CORE</span>
+              {/* Inter Body Statement */}
+              <motion.p
+                initial={reducedMotion ? false : { opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reducedMotion ? 0 : 0.8, delay: reducedMotion ? 0 : 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="text-sm sm:text-base md:text-lg text-[rgba(255,255,255,0.64)] font-light max-w-2xl mx-auto mb-10 leading-relaxed drop-shadow-md"
+              >
+                An avant-garde residential studio synthesizing plot physics, daylight azimuths, and bespoke living
+                rituals into verified architectural blueprints and cinematic 3D models.
+              </motion.p>
+
+              {/* Unified CTA Actions */}
+              <motion.div
+                initial={reducedMotion ? false : { opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reducedMotion ? 0 : 0.8, delay: reducedMotion ? 0 : 0.3, ease: [0.23, 1, 0.32, 1] }}
+                className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
+              >
+                <button
+                  onClick={onStartDesign}
+                  className="w-full sm:w-auto px-8 py-4 rounded-full btn-primary-blue font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 group cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>CREATE YOUR HOME</span>
+                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                </button>
+
+                <button
+                  onClick={onOpenModelMode}
+                  className="w-full sm:w-auto px-8 py-4 rounded-full btn-secondary-glass font-medium text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_25px_rgba(139,92,246,0.06)]"
+                >
+                  <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  <span>EXPLORE 3D MODEL</span>
+                </button>
+              </motion.div>
             </div>
 
-            <button
-              onClick={onOpenUpload}
-              className="flex items-center gap-2 text-[rgba(255,255,255,0.64)] hover:text-[#60A5FA] transition-colors cursor-pointer group"
-            >
-              <Upload className="w-3.5 h-3.5 text-[#60A5FA] transition-transform group-hover:-translate-y-0.5" />
-              <span>HAVE A SKETCH OR PLAN? UPLOAD TO 3D</span>
-            </button>
-          </div>
-        </section>
+            {/* Hero Bottom Metadata Row */}
+            <div className="relative z-20 w-full px-6 sm:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] sm:text-[11px] font-mono text-[rgba(255,255,255,0.38)] border-t border-white/5 bg-[rgba(3,3,3,0.4)] backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-[linear-gradient(135deg,#2563EB,#06B6D4)] shadow-[0_0_8px_#06B6D4] animate-pulse" />
+                <span>AI HOUSE // RESIDENTIAL SYNTHESIS CORE</span>
+              </div>
+
+              <button
+                onClick={onOpenUpload}
+                className="flex items-center gap-2 text-[rgba(255,255,255,0.64)] hover:text-[#60A5FA] transition-colors cursor-pointer group"
+              >
+                <Upload className="w-3.5 h-3.5 text-[#60A5FA] transition-transform group-hover:-translate-y-0.5" />
+                <span>HAVE A SKETCH OR PLAN? UPLOAD TO 3D</span>
+              </button>
+            </div>
+          </motion.div>
+
+          <motion.div
+            aria-hidden="true"
+            style={reducedMotion ? undefined : { opacity: heroOverlayOpacity }}
+            className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(135deg,rgba(3,3,3,0.78)_0%,rgba(37,99,235,0.42)_55%,rgba(6,182,212,0.28)_100%)]"
+          />
+        </motion.section>
+        </div>
 
         {/* ── 2. ARCHITECTURAL JOURNEY (WITH GRADUAL BLUR TRANSITIONS) ── */}
-        <section className="relative w-full py-20 sm:py-28 px-4 sm:px-8 md:px-16 overflow-hidden">
+        <section className="relative z-10 -mt-[100svh] w-full bg-[rgba(3,3,3,0.96)] py-20 sm:py-28 px-4 sm:px-8 md:px-16 overflow-hidden">
           {/* Subtle progressive gradual blur along the top and bottom boundaries */}
-          <GradualBlur position="top" height="110px" strength={14} color="rgba(3,3,3,0.8)" />
-          <GradualBlur position="bottom" height="110px" strength={14} color="rgba(3,3,3,0.8)" />
+          <GradualBlur position="top" height="88px" strength={6} layerCount={4} opacity={0.65} color="rgba(3,3,3,0.8)" />
+          <GradualBlur position="bottom" height="88px" strength={6} layerCount={4} opacity={0.65} color="rgba(3,3,3,0.8)" />
 
           {/* Section Header */}
-          <div className="max-w-4xl mx-auto text-center mb-16">
+          <motion.div {...revealProps(0, 18)} className="max-w-4xl mx-auto text-center mb-16">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(214,184,120,0.08)] border border-[rgba(214,184,120,0.18)] text-[10px] font-mono tracking-[0.24em] text-[#D6B878] uppercase mb-4">
               ARCHITECTURAL JOURNEY
             </span>
@@ -175,13 +244,14 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
             <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light mt-3 max-w-xl mx-auto">
               Explore the architectural intelligence powering every bespoke residence.
             </p>
-          </div>
+          </motion.div>
 
           {/* Sequential Architectural Presentation Deck */}
           <div className="relative max-w-6xl mx-auto space-y-12 sm:space-y-16">
 
             {/* ══ CARD 1: PHILOSOPHY // 01 ══ */}
-            <div
+            <motion.div
+              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(214,184,120,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(214,184,120,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -219,7 +289,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   </div>
                 </div>
 
-                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl">
+                <motion.div {...revealProps(0.12, 14)} className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl">
                   <img
                     src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"
                     alt="Architectural Craftsmanship"
@@ -232,17 +302,18 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                     <span className="text-[#D6B878]">RESIDENTIAL STUDY // LOT 42</span>
                     <span className="text-[rgba(255,255,255,0.5)]">SCANDINAVIAN MODERN</span>
                   </div>
-                </div>
+                </motion.div>
               </div>
 
               <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
                 <span className="text-[#D6B878] font-semibold">01 // PHILOSOPHY</span>
                 <span className="text-[rgba(255,255,255,0.45)]">DATUM REF ±0.000M</span>
               </div>
-            </div>
+            </motion.div>
 
             {/* ══ CARD 2: PRECISION // 02 ══ */}
-            <div
+            <motion.div
+              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(96,165,250,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(96,165,250,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -295,10 +366,11 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                 <span className="text-[#38BDF8] font-semibold">02 // PRECISION</span>
                 <span className="text-[rgba(255,255,255,0.45)]">SOLAR HARMONY</span>
               </div>
-            </div>
+            </motion.div>
 
             {/* ══ CARD 3: INTELLIGENCE // 03 ══ */}
-            <div
+            <motion.div
+              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(167,139,250,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(167,139,250,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -311,7 +383,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-14 items-center my-auto">
-                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl order-2 lg:order-1">
+                <motion.div {...revealProps(0.12, 14)} className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-[#05070B] shadow-2xl order-2 lg:order-1">
                   <img
                     src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop"
                     alt="Floor plan geometry"
@@ -323,7 +395,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   <div className="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-[#101216]/90 border border-[rgba(167,139,250,0.22)] text-[10px] font-mono text-[#A78BFA]">
                     TOPOLOGY SOLVER // SHAPELY + NETWORKX
                   </div>
-                </div>
+                </motion.div>
 
                 <div className="order-1 lg:order-2">
                   <h3 className="text-3xl sm:text-5xl font-serif font-light text-[#F5F5F5] leading-tight mb-5">
@@ -354,10 +426,11 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                 <span className="text-[#A78BFA] font-semibold">03 // INTELLIGENCE</span>
                 <span className="text-[rgba(255,255,255,0.45)]">CP-SAT SOLVER</span>
               </div>
-            </div>
+            </motion.div>
 
             {/* ══ CARD 4: IMMERSION // 04 ══ */}
-            <div
+            <motion.div
+              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(120,168,135,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(120,168,135,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -378,7 +451,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                   and study daylight through real shadow calculations.
                 </p>
 
-                <div className="w-full max-w-4xl h-72 sm:h-96 rounded-2xl border border-white/10 overflow-hidden relative group bg-[#05070B] shadow-2xl">
+                <motion.div {...revealProps(0.12, 14)} className="w-full max-w-4xl h-72 sm:h-96 rounded-2xl border border-white/10 overflow-hidden relative group bg-[#05070B] shadow-2xl">
                   <img
                     src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1600&auto=format&fit=crop"
                     alt="3D Architectural Dollhouse View"
@@ -395,17 +468,18 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                       <span>LAUNCH 3D VIEWER</span>
                     </button>
                   </div>
-                </div>
+                </motion.div>
               </div>
 
               <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[rgba(255,255,255,0.7)] bg-[#070D1A] px-4 py-2 -mx-4 -mb-4 sm:-mx-8 sm:-mb-8 md:-mx-12 md:-mb-12 rounded-b-[28px] sm:rounded-b-[36px]">
                 <span className="text-[#78A887] font-semibold">04 // IMMERSION</span>
                 <span className="text-[rgba(255,255,255,0.45)]">3D DOLLHOUSE</span>
               </div>
-            </div>
+            </motion.div>
 
             {/* ══ CARD 5: TYPOLOGIES // 05 ══ */}
-            <div
+            <motion.div
+              {...revealProps(0.04)}
               className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(214,184,120,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(214,184,120,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
@@ -518,37 +592,38 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
                 <span className="text-[#D6B878] font-semibold">05 // TYPOLOGIES</span>
                 <span className="text-[rgba(255,255,255,0.45)]">DECK COMPLETE · 5 OF 5</span>
               </div>
-            </div>
+            </motion.div>
 
           </div>
         </section>
 
         {/* ── 3. FINAL CALL-TO-ACTION SECTION ── */}
-        <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-[linear-gradient(180deg,#030303_0%,#101216_100%)] text-center overflow-hidden">
+        <section className="relative w-full py-36 px-6 md:px-16 border-t border-white/5 bg-transparent text-center overflow-hidden">
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_48%_38%,rgba(139,92,246,0.055)_0%,transparent_55%),radial-gradient(ellipse_at_75%_72%,rgba(214,184,120,0.045)_0%,transparent_48%),radial-gradient(ellipse_at_24%_70%,rgba(37,99,235,0.035)_0%,transparent_52%)]" />
 
-          <div className="relative z-10 max-w-3xl mx-auto flex flex-col items-center">
+          <motion.div {...revealProps(0, 20)} className="relative z-10 max-w-3xl mx-auto flex flex-col items-center">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(214,184,120,0.08)] border border-[rgba(214,184,120,0.18)] text-[10px] font-mono tracking-[0.24em] text-[#D6B878] uppercase mb-5">
               BEGIN CONSULTATION
             </span>
 
-            <h2 className="text-4xl sm:text-6xl md:text-7xl font-serif font-light text-[#F4F1EA] mb-6 tracking-tight leading-tight">
+            <motion.h2 {...revealProps(0.08, 16)} className="text-4xl sm:text-6xl md:text-7xl font-serif font-light text-[#F4F1EA] mb-6 tracking-tight leading-tight">
               Ready to design your residence?
-            </h2>
+            </motion.h2>
 
-            <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light max-w-lg mb-10 leading-relaxed">
+            <motion.p {...revealProps(0.16, 12)} className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light max-w-lg mb-10 leading-relaxed">
               Start the step-by-step architectural consultation and experience your future home generated in minutes.
-            </p>
+            </motion.p>
 
-            <button
+            <motion.button
+              {...revealProps(0.24, 10)}
               onClick={onStartDesign}
               className="px-10 py-4.5 rounded-full btn-primary-blue font-medium text-xs tracking-widest uppercase flex items-center gap-2 group cursor-pointer shadow-[0_15px_40px_rgba(37,99,235,0.35)]"
             >
               <Sparkles className="w-4 h-4" />
               <span>CREATE YOUR HOME</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </section>
 
       </div>

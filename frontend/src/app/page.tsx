@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { FloatingNav, NavView } from "@/components/FloatingNav";
@@ -36,6 +36,7 @@ const GenerationProgressModal = dynamic(
 
 export default function HomePage() {
   const router = useRouter();
+  const homeScrollRoot = useRef<HTMLDivElement>(null);
   const { activeProject, projectId, createProject } = useProject();
 
   // Modals & User Flow States
@@ -185,23 +186,20 @@ export default function HomePage() {
 
   return (
     <div className="relative w-full max-w-full h-[100dvh] overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
-      {/* INITIAL WEBSITE NAVIGATION:
-          When NO project workspace is active, shows strictly:
-          ATELIER | HOME | PROJECTS | CREATE
-          Does NOT show PLAN, MODEL, ESTIMATE. */}
-      {!isConsultationOpen && (
-        <FloatingNav
-          currentView="home"
-          onNavigate={handleNavigate}
-          isProjectWorkspace={false}
-          hasProject={Boolean(projectId)}
-          onOpenProjects={() => setIsProjectsOpen(true)}
-        />
-      )}
-
       {/* FULL-PAGE CINEMATIC HOME VIEW */}
-      <main className="w-full h-full relative overflow-y-auto">
+      <main ref={homeScrollRoot} className="w-full h-full relative overflow-y-auto">
         <HomePageView
+          scrollRoot={homeScrollRoot}
+          navbar={!isConsultationOpen ? (
+            <FloatingNav
+              currentView="home"
+              onNavigate={handleNavigate}
+              isProjectWorkspace={false}
+              hasProject={Boolean(projectId)}
+              onOpenProjects={() => setIsProjectsOpen(true)}
+              placement="flow"
+            />
+          ) : null}
           onStartDesign={() => setIsCreateChoiceOpen(true)}
           onOpenPlanMode={handleExplorePlan}
           onOpenModelMode={handleExplore3D}
