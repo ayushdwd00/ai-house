@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ChevronDown, ChevronUp, Menu, X, Check } from "lucide-react";
 
 export type NavView =
   | "home"
@@ -43,6 +43,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 });
   const [expandedNav, setExpandedNav] = useState<"create" | "projects" | null>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -202,8 +203,36 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
           </span>
         </button>
 
-        {/* ── Nav items ── */}
-        <div id="home-secondary-navigation" className="contents">
+        {/* ── Mobile Compact Navigation Control (<= 768px) ── */}
+        <div className="md:hidden flex items-center gap-1.5 pl-1">
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+            aria-expanded={isMobileMenuOpen}
+            aria-label="Toggle Navigation Menu"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-[10px] font-mono tracking-widest text-[#F5F5F5] border border-white/10 active:scale-95 transition-all"
+          >
+            <span className="uppercase text-[#60A5FA] font-semibold">{currentView}</span>
+            <ChevronDown className={`w-3 h-3 text-[rgba(255,255,255,0.6)] transition-transform duration-200 ${isMobileMenuOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {isProjectWorkspace && currentView === "plan" && onTogglePlanEditMode && (
+            <button
+              type="button"
+              onClick={onTogglePlanEditMode}
+              className={`px-2 py-1 rounded-full text-[9px] font-mono tracking-wider transition-all ${
+                isPlanEditMode
+                  ? "bg-[#3B82F6]/30 text-[#93C5FD] border border-[#3B82F6]/40"
+                  : "bg-white/5 text-white/60 hover:text-white"
+              }`}
+            >
+              {isPlanEditMode ? "EDITING" : "EDIT"}
+            </button>
+          )}
+        </div>
+
+        {/* ── Desktop Nav items (screens > 768px) ── */}
+        <div id="home-secondary-navigation" className="hidden md:contents">
           <AnimatePresence initial={false}>
             {navItems.length > 0 && (
               <motion.div
@@ -217,35 +246,35 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
                 aria-label={expandedNav === "projects" ? "Project navigation" : "Create navigation"}
               >
                 {navItems.map((item) => {
-            const isActive = currentView === item.id;
-            const itemButton = (
-              <button
-                key={item.id}
-                onClick={() => handleNavClick(item.id)}
-                className={`relative flex shrink-0 items-center whitespace-nowrap px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all duration-200 ${
-                  isActive
-                    ? "text-[#F5F5F5] font-medium"
-                    : "text-[rgba(255,255,255,0.62)] hover:text-[#F5F5F5] hover:-translate-y-[1px]"
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeNavIndicator"
-                    className="absolute inset-0 rounded-full border border-[rgba(96,165,250,0.28)] bg-[linear-gradient(135deg,rgba(37,99,235,0.18),rgba(6,182,212,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_18px_rgba(37,99,235,0.22)]"
-                    transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                  />
-                )}
-                <span className="relative z-10">{item.label}</span>
-              </button>
-            );
-            return (
-              <React.Fragment key={item.id}>
-                {item.id === "model" && isProjectWorkspace && currentView === "plan" && onTogglePlanEditMode && (
-                  renderEditModeToggle()
-                )}
-                {itemButton}
-              </React.Fragment>
-            );
+                  const isActive = currentView === item.id;
+                  const itemButton = (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavClick(item.id)}
+                      className={`relative flex shrink-0 items-center whitespace-nowrap px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all duration-200 ${
+                        isActive
+                          ? "text-[#F5F5F5] font-medium"
+                          : "text-[rgba(255,255,255,0.62)] hover:text-[#F5F5F5] hover:-translate-y-[1px]"
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeNavIndicator"
+                          className="absolute inset-0 rounded-full border border-[rgba(96,165,250,0.28)] bg-[linear-gradient(135deg,rgba(37,99,235,0.18),rgba(6,182,212,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_18px_rgba(37,99,235,0.22)]"
+                          transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                        />
+                      )}
+                      <span className="relative z-10">{item.label}</span>
+                    </button>
+                  );
+                  return (
+                    <React.Fragment key={item.id}>
+                      {item.id === "model" && isProjectWorkspace && currentView === "plan" && onTogglePlanEditMode && (
+                        renderEditModeToggle()
+                      )}
+                      {itemButton}
+                    </React.Fragment>
+                  );
                 })}
               </motion.div>
             )}
@@ -258,7 +287,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
             onClick={handleProjectsClick}
             aria-expanded={expandedNav === "projects"}
             aria-controls="home-secondary-navigation"
-            className={`relative flex shrink-0 items-center whitespace-nowrap px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all duration-200 ${
+            className={`hidden md:flex relative shrink-0 items-center whitespace-nowrap px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all duration-200 ${
               expandedNav === "projects"
                 ? "text-[#F5F5F5] font-medium"
                 : "text-[rgba(255,255,255,0.62)] hover:text-[#F5F5F5] hover:-translate-y-[1px]"
@@ -279,7 +308,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
         {isProjectWorkspace && onOpenVastuAudit && (
           <button
             onClick={onOpenVastuAudit}
-            className="inline-flex items-center gap-1 px-2.5 py-1 sm:py-1.5 rounded-full border border-[#06B6D4]/30 bg-[#06B6D4]/10 text-[#A5F3FC] text-[9px] sm:text-[10px] font-mono transition-all hover:bg-[#06B6D4]/20 hover:-translate-y-[1px] shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+            className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 sm:py-1.5 rounded-full border border-[#06B6D4]/30 bg-[#06B6D4]/10 text-[#A5F3FC] text-[9px] sm:text-[10px] font-mono transition-all hover:bg-[#06B6D4]/20 hover:-translate-y-[1px] shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
             title="View Vastu Compliance Audit"
           >
             <span>VASTU</span>
@@ -301,6 +330,67 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
           <span>CREATE</span>
         </button>
       </nav>
+
+      {/* ── Mobile Navigation Dropdown Popover (<= 768px) ── */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.96 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="md:hidden pointer-events-auto mt-2 w-[min(280px,calc(100vw-32px))] rounded-2xl border border-[rgba(96,165,250,0.24)] bg-[rgba(8,12,22,0.96)] backdrop-blur-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(37,99,235,0.18)] p-2 text-xs font-mono tracking-wider space-y-1 mx-auto"
+          >
+            {(isProjectWorkspace ? projectNavItems : [{ id: "home" as NavView, label: "HOME" }]).map((item) => {
+              const isActive = currentView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    handleNavClick(item.id);
+                  }}
+                  className={`flex w-full items-center justify-between px-3 py-2 rounded-xl transition-all ${
+                    isActive
+                      ? "bg-[linear-gradient(135deg,rgba(37,99,235,0.22),rgba(6,182,212,0.14))] text-white border border-[#3B82F6]/30 font-semibold"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  {isActive && <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] shadow-[0_0_8px_#06B6D4]" />}
+                </button>
+              );
+            })}
+
+            {!isProjectWorkspace && onOpenProjects && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onOpenProjects();
+                }}
+                className="flex w-full items-center justify-between px-3 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <span>PROJECTS</span>
+              </button>
+            )}
+
+            {isProjectWorkspace && onOpenVastuAudit && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onOpenVastuAudit();
+                }}
+                className="flex w-full items-center justify-between px-3 py-2 rounded-xl text-[#A5F3FC] hover:bg-[#06B6D4]/15 transition-all border border-[#06B6D4]/25"
+              >
+                <span>VASTU AUDIT</span>
+                <span className="text-[10px] text-[#06B6D4]">HARMONY</span>
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 };

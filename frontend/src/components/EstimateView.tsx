@@ -594,7 +594,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
   }, [layout, grandTotalExpected, ratePerSqft, structuralQuantities.count]);
 
   return (
-    <div className="w-full h-full overflow-y-auto bg-[#030303] p-4 sm:p-8 lg:p-12 text-[#F5F5F5]">
+    <div className="w-full h-full overflow-y-auto bg-[#030303] px-4 sm:px-8 lg:px-12 pt-20 sm:pt-24 pb-12 text-[#F5F5F5]">
       <div className="max-w-6xl mx-auto space-y-10">
         {/* 1. HEADER & INTERACTIVE SPECIFICATION SELECTORS */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-white/10">

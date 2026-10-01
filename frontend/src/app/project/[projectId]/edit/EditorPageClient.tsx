@@ -122,7 +122,7 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
   }
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-[#ECEEF2]">
+    <div className="w-full max-w-full h-[100dvh] overflow-hidden bg-[#ECEEF2]">
       <ArchitecturalPlanRenderer
         layout={layout}
         mode="edit"

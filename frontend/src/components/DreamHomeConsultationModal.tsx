@@ -98,7 +98,7 @@ export const DreamHomeConsultationModal: React.FC<DreamHomeConsultationModalProp
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 15 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-2xl bg-[#12141A] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden my-auto"
+          className="relative w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-[#12141A] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl my-auto"
         >
           {/* Close button */}
           <button

@@ -60,6 +60,7 @@ import {
   ChevronDown,
   ChevronRight,
   PenTool,
+  MoreHorizontal,
 } from "lucide-react";
 
 export type PlanMode = "view" | "edit";
@@ -634,8 +635,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // Figma-Style Editor Panels & Tools
   const [activeTool, setActiveTool] = useState<"select" | "room" | "wall" | "door" | "window" | "furniture" | "dimension">("select");
   const [showDimensions, setShowDimensions] = useState(true);
-  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(() => (typeof window !== "undefined" && window.innerWidth <= 768 ? false : true));
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(() => (typeof window !== "undefined" && window.innerWidth <= 768 ? false : true));
+  const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
   const [alignmentGuides, setAlignmentGuides] = useState<Array<{ type: "h" | "v"; pos: number }>>([]);
 
   // Overlays
@@ -1281,13 +1283,16 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const handleResetView = useCallback(() => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const pad = 60;
+      const isMobile = rect.width <= 768 || (typeof window !== "undefined" && window.innerWidth <= 768);
+      const pad = isMobile ? 24 : 60;
       const fitZoom = Math.min(
-        (rect.width - pad * 2) / (svgWidth + 120),
-        (rect.height - pad * 2) / (svgHeight + 120),
+        (rect.width - pad * 2) / (svgWidth + (isMobile ? 40 : 120)),
+        (rect.height - pad * 2) / (svgHeight + (isMobile ? 40 : 120)),
         1.5
       );
-      setZoom(Math.max(0.4, Math.min(2.0, fitZoom)));
+      // On mobile, keep viewport readable rather than over-shrinking; user can pan and pinch-zoom freely
+      const resolvedZoom = isMobile ? Math.max(0.65, fitZoom) : Math.max(0.4, Math.min(2.0, fitZoom));
+      setZoom(resolvedZoom);
       setPan({ x: 0, y: 0 });
     } else {
       setZoom(1.0);
@@ -1389,6 +1394,103 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [canUndo, canRedo, undo, redo]);
+
+  // Mobile Touch Gestures (Pan, Pinch-to-Zoom, Two-Finger Pan, Tap-Selection)
+  const pinchStartRef = useRef<{ dist: number; zoom: number; midX: number; midY: number; panX: number; panY: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const touchMovedRef = useRef<boolean>(false);
+
+  // Prevent browser viewport pinch-zoom on mobile when gesturing inside the plan canvas
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleNativeTouchMove = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("touchmove", handleNativeTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", handleNativeTouchMove);
+  }, []);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const midX = (t1.clientX + t2.clientX) / 2;
+      const midY = (t1.clientY + t2.clientY) / 2;
+      pinchStartRef.current = { dist, zoom, midX, midY, panX: pan.x, panY: pan.y };
+      touchMovedRef.current = true;
+      setIsPanning(false);
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+      touchMovedRef.current = false;
+      if (
+        isPanMode ||
+        mode === "view" ||
+        (!draggingRoom && !draggingFurniture && !resizingRoom && !draggingWall && !resizingWallEndpoint)
+      ) {
+        setIsPanning(true);
+        setPanStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const midX = (t1.clientX + t2.clientX) / 2;
+      const midY = (t1.clientY + t2.clientY) / 2;
+      const { dist: startDist, zoom: startZoom, midX: startMidX, midY: startMidY, panX: startPanX, panY: startPanY } = pinchStartRef.current;
+
+      if (startDist > 0 && containerRef.current) {
+        const scaleFactor = dist / startDist;
+        const newZoom = Math.min(3.5, Math.max(0.4, startZoom * scaleFactor));
+        const deltaX = midX - startMidX;
+        const deltaY = midY - startMidY;
+
+        const rect = containerRef.current.getBoundingClientRect();
+        const relX = startMidX - rect.left - rect.width / 2;
+        const relY = startMidY - rect.top - rect.height / 2;
+        const newPanX = relX - (relX - startPanX) * (newZoom / startZoom) + deltaX;
+        const newPanY = relY - (relY - startPanY) * (newZoom / startZoom) + deltaY;
+
+        setZoom(newZoom);
+        setPan({ x: newPanX, y: newPanY });
+      }
+      return;
+    }
+
+    if (e.touches.length === 1 && touchStartRef.current) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      if (Math.hypot(dx, dy) > 6) {
+        touchMovedRef.current = true;
+      }
+
+      if (isPanning && !draggingRoom && !draggingFurniture && !resizingRoom && !draggingWall && !resizingWallEndpoint) {
+        setPan({ x: touch.clientX - panStart.x, y: touch.clientY - panStart.y });
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      pinchStartRef.current = null;
+    }
+    if (e.touches.length === 0) {
+      setIsPanning(false);
+      touchStartRef.current = null;
+    }
+  };
 
   // Global Mouse Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -2180,63 +2282,6 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       pushSnapshot(layout);
       setDraggingFurniture(null);
     }
-  };
-
-  // Touch Handlers for Mobile Pinch-to-Zoom and Pan
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
-      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      touchStateRef.current = {
-        initialDist: dist,
-        initialZoom: zoom,
-        startX: (t1.clientX + t2.clientX) / 2,
-        startY: (t1.clientY + t2.clientY) / 2,
-        startPanX: pan.x,
-        startPanY: pan.y,
-      };
-    } else if (e.touches.length === 1) {
-      const t = e.touches[0];
-      touchStateRef.current = {
-        initialDist: null,
-        initialZoom: zoom,
-        startX: t.clientX,
-        startY: t.clientY,
-        startPanX: pan.x,
-        startPanY: pan.y,
-      };
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && touchStateRef.current.initialDist !== null) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
-      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      const scaleFactor = dist / touchStateRef.current.initialDist;
-      const nextZoom = Math.min(3.5, Math.max(0.4, touchStateRef.current.initialZoom * scaleFactor));
-      setZoom(nextZoom);
-    } else if (e.touches.length === 1 && touchStateRef.current.initialDist === null) {
-      const t = e.touches[0];
-      const dx = t.clientX - touchStateRef.current.startX;
-      const dy = t.clientY - touchStateRef.current.startY;
-      setPan({
-        x: touchStateRef.current.startPanX + dx,
-        y: touchStateRef.current.startPanY + dy,
-      });
-    }
-  };
-
-  const handleTouchEnd = () => {
-    touchStateRef.current = {
-      initialDist: null,
-      initialZoom: zoom,
-      startX: 0,
-      startY: 0,
-      startPanX: pan.x,
-      startPanY: pan.y,
-    };
   };
 
   const handleApplyExactDimensions = async () => {
@@ -4267,9 +4312,10 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
                 const patchW = Math.min(rw - 12, Math.max(70, maxContentW + 20));
                 const patchH = isCompact ? 32 : 46;
+                const labelScale = zoom < 0.85 ? Math.min(1.35, 0.85 / zoom) : 1.0;
 
                 return (
-                  <g key={`lbl-${room.id}`} transform={`translate(${rx + rw / 2}, ${ry + rl / 2})`}>
+                  <g key={`lbl-${room.id}`} transform={`translate(${rx + rw / 2}, ${ry + rl / 2}) scale(${labelScale})`}>
                     {/* Clean background badge completely masks furniture lines underneath */}
                     <rect
                       x={-patchW / 2}
@@ -4466,8 +4512,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             </div>
           </div>
 
-          {/* Center: Minimal Icon-Based Toolbar */}
-          <div className="flex items-center gap-0.5 sm:gap-1 bg-[#202227] p-1 rounded-xl border border-white/5 shadow-inner overflow-x-auto">
+          {/* Center: Minimal Icon-Based Toolbar (Desktop) */}
+          <div className="hidden md:flex items-center gap-0.5 sm:gap-1 bg-[#202227] p-1 rounded-xl border border-white/5 shadow-inner overflow-x-auto">
             <button
               id="tool-select"
               type="button"
@@ -4650,6 +4696,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
         {/* WORKBENCH BODY: Left Panel + Dominant Canvas + Right Inspector Panel */}
         <div className="flex-1 flex overflow-hidden relative">
+          {/* Mobile backdrop for Left Panel */}
+          {isLeftPanelOpen && (
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-25 md:hidden"
+              onClick={() => setIsLeftPanelOpen(false)}
+            />
+          )}
           {/* LEFT PANEL: LAYERS / STRUCTURE */}
           {isLeftPanelOpen && (
             <aside className={`fixed md:static inset-y-12 left-0 w-64 bg-[#16171B] border-r border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none ${isAiOpen ? "max-md:hidden" : ""}`}>
@@ -4892,7 +4945,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             )}
 
             {/* BOTTOM-RIGHT FLOATING ZOOM/PAN CONTROLS */}
-            <div className="absolute bottom-4 right-4 z-30 flex items-center gap-1 p-1 rounded-xl bg-[#16171B]/95 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#94A3B8]">
+            <div className="absolute bottom-16 md:bottom-4 right-3 sm:right-4 z-30 flex items-center gap-1 p-1 rounded-xl bg-[#16171B]/95 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#94A3B8]">
               <button
                 onClick={() => setZoom((z) => Math.max(0.4, z * 0.85))}
                 className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white"
@@ -4928,6 +4981,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             </div>
           </main>
 
+          {/* Mobile backdrop for Right Panel */}
+          {isRightPanelOpen && (
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-25 md:hidden"
+              onClick={() => setIsRightPanelOpen(false)}
+            />
+          )}
           {/* RIGHT PANEL: PROPERTIES / INSPECTOR */}
           {isRightPanelOpen && (
             <aside className={`fixed md:static inset-y-12 right-0 w-72 bg-[#16171B] border-l border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none overflow-y-auto ${isAiOpen ? "max-md:hidden" : ""}`}>
@@ -5443,6 +5503,195 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           </aside>
         )}
         </div>
+
+        {/* MOBILE DOCKED TOOLBAR (<= 768px): Select | Measure | Structure | Landscape | More */}
+        <div className="md:hidden fixed bottom-3 left-3 right-3 z-40 flex items-center justify-between px-3 py-2 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl">
+          <button
+            type="button"
+            id="mobile-tool-select"
+            onClick={() => setActiveTool("select")}
+            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
+              activeTool === "select" ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow" : "text-[#94A3B8] hover:text-white"
+            }`}
+          >
+            <MousePointer className="w-4 h-4" />
+            <span>Select</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-tool-measure"
+            onClick={() => setShowDimensions((prev) => !prev)}
+            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
+              showDimensions ? "text-[#C48446] bg-[#C48446]/15" : "text-[#94A3B8] hover:text-white"
+            }`}
+          >
+            <Ruler className="w-4 h-4" />
+            <span>Measure</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-tool-structure"
+            onClick={() => {
+              setIsLeftPanelOpen((prev) => !prev);
+              if (isRightPanelOpen) setIsRightPanelOpen(false);
+            }}
+            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
+              isLeftPanelOpen ? "text-[#C48446] bg-[#C48446]/15" : "text-[#94A3B8] hover:text-white"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Structure</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-tool-landscape"
+            onClick={() => {
+              setActiveTool(activeTool === "furniture" ? "select" : "furniture");
+            }}
+            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
+              activeTool === "furniture" ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow" : "text-[#94A3B8] hover:text-white"
+            }`}
+          >
+            <Trees className="w-4 h-4" />
+            <span>Landscape</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-tool-more"
+            onClick={() => setIsMobileToolsOpen((prev) => !prev)}
+            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
+              isMobileToolsOpen ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow" : "text-[#94A3B8] hover:text-white"
+            }`}
+          >
+            <MoreHorizontal className="w-4 h-4" />
+            <span>More</span>
+          </button>
+        </div>
+
+        {/* MOBILE SECONDARY TOOLS BOTTOM SHEET */}
+        {isMobileToolsOpen && (
+          <div 
+            className="fixed inset-0 z-50 md:hidden flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsMobileToolsOpen(false)}
+          >
+            <div 
+              className="bg-[#16171B] border-t border-white/10 rounded-t-2xl p-4 shadow-2xl max-h-[75vh] overflow-y-auto space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="text-xs font-mono font-bold tracking-wider text-white uppercase flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-[#C48446]" />
+                  <span>Editor Tools & Panels</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileToolsOpen(false)}
+                  className="p-1 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Architectural Creation Tools */}
+              <div>
+                <span className="text-[10px] font-mono uppercase text-[#94A3B8] font-bold block mb-2">Draw & Place</span>
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    onClick={() => { setActiveTool("room"); setIsMobileToolsOpen(false); }}
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
+                      activeTool === "room" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <Square className="w-4 h-4" />
+                    <span className="text-[11px] font-mono">Room</span>
+                  </button>
+                  <button
+                    onClick={() => { setActiveTool("wall"); setIsMobileToolsOpen(false); }}
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
+                      activeTool === "wall" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <PenTool className="w-4 h-4" />
+                    <span className="text-[11px] font-mono">Wall</span>
+                  </button>
+                  <button
+                    onClick={() => { setActiveTool("door"); setIsMobileToolsOpen(false); }}
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
+                      activeTool === "door" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <DoorClosed className="w-4 h-4" />
+                    <span className="text-[11px] font-mono">Door</span>
+                  </button>
+                  <button
+                    onClick={() => { setActiveTool("window"); setIsMobileToolsOpen(false); }}
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
+                      activeTool === "window" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <AppWindow className="w-4 h-4" />
+                    <span className="text-[11px] font-mono">Window</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Workspace & AI */}
+              <div>
+                <span className="text-[10px] font-mono uppercase text-[#94A3B8] font-bold block mb-2">Workspace & AI</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setIsAiOpen(true); setIsMobileToolsOpen(false); }}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl bg-[#C48446]/20 border border-[#C48446]/40 text-[#E69F58] font-mono text-xs font-bold"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>AI Architect</span>
+                  </button>
+                  <button
+                    onClick={() => { 
+                      setIsRightPanelOpen((prev) => !prev);
+                      if (isLeftPanelOpen) setIsLeftPanelOpen(false);
+                      setIsMobileToolsOpen(false); 
+                    }}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-white font-mono text-xs"
+                  >
+                    <Sliders className="w-4 h-4" />
+                    <span>Properties</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions: Undo / Redo / Export */}
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={undo}
+                    disabled={!canUndo}
+                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/5 text-xs font-mono text-white disabled:opacity-30"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Undo</span>
+                  </button>
+                  <button
+                    onClick={redo}
+                    disabled={!canRedo}
+                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/5 text-xs font-mono text-white disabled:opacity-30"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>Redo</span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => { handleExportPNG(); setIsMobileToolsOpen(false); }}
+                  disabled={isExporting}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/10 text-xs font-mono text-white"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export PNG</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -5453,11 +5702,11 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   return (
     <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#030303]">
       {/* Presentation Top Bar */}
-      <div className="absolute top-4 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
+      <div className="absolute top-16 sm:top-5 left-3 sm:left-6 right-3 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto">
           <button
             onClick={() => router.push(`/project/${layout.id}/plan`)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#080F1C]/80 hover:bg-[#0D1526]/90 text-[#F5F5F5] border border-blue-500/20 backdrop-blur-md text-xs font-mono tracking-wider shadow-lg transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#080F1C]/80 hover:bg-[#0D1526]/90 text-[#F5F5F5] border border-blue-500/20 backdrop-blur-md text-xs font-mono tracking-wider shadow-lg transition-all"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
             <span>PLAN</span>
@@ -5503,8 +5752,12 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onDoubleClick={handleResetView}
-        className={`w-full h-full flex items-center justify-center p-4 ${
+        className={`w-full h-full flex items-center justify-center p-2 sm:p-4 select-none touch-none ${
           isPanning ? "cursor-grabbing" : isPanMode ? "cursor-grab" : "cursor-default"
         }`}
       >

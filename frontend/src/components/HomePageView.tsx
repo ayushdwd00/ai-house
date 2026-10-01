@@ -14,6 +14,8 @@ import {
   Upload,
 } from "lucide-react";
 
+import { GradualBlur } from "@/components/ui/GradualBlur";
+
 interface HomePageViewProps {
   onStartDesign: () => void;
   onOpenPlanMode: () => void;
@@ -37,60 +39,6 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
   onOpenUpload,
   onSelectPreset,
 }) => {
-  const cardRefs = React.useRef<(HTMLDivElement | null)[]>([]);
-  const [activeCardIndex, setActiveCardIndex] = React.useState(-1);
-
-  React.useEffect(() => {
-    const cards = cardRefs.current.filter((card): card is HTMLDivElement => card !== null);
-    if (cards.length === 0) return;
-
-    const scrollRoot = cards[0].closest("main");
-    let observer: IntersectionObserver;
-
-    const updateActiveCard = () => {
-      const topOffset = window.innerWidth >= 768 ? 104 : 92;
-      const rootTop = scrollRoot?.getBoundingClientRect().top ?? 0;
-      const stickyLine = rootTop + topOffset;
-      const nextActiveCardIndex = cards.reduce((activeIndex, card, index) => {
-        const bounds = card.getBoundingClientRect();
-        return bounds.top <= stickyLine + 1 && bounds.bottom > stickyLine
-          ? index
-          : activeIndex;
-      }, -1);
-
-      setActiveCardIndex((currentIndex) =>
-        currentIndex === nextActiveCardIndex ? currentIndex : nextActiveCardIndex
-      );
-    };
-
-    const observeCardsAtStickyOffset = () => {
-      observer?.disconnect();
-
-      const topOffset = window.innerWidth >= 768 ? 104 : 92;
-      const rootHeight = scrollRoot?.clientHeight ?? window.innerHeight;
-      const rootTop = Math.min(topOffset, rootHeight - 1);
-      const rootBottom = Math.max(0, rootHeight - rootTop - 1);
-      observer = new IntersectionObserver(updateActiveCard, {
-        root: scrollRoot,
-        rootMargin: `-${rootTop}px 0px -${rootBottom}px 0px`,
-        threshold: 0,
-      });
-
-      cards.forEach((card) => observer.observe(card));
-      updateActiveCard();
-    };
-
-    observeCardsAtStickyOffset();
-    window.addEventListener("resize", observeCardsAtStickyOffset);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", observeCardsAtStickyOffset);
-    };
-  }, []);
-
-  const getCardDepth = (index: number) =>
-    Math.min(Math.max(activeCardIndex - index, 0), 4);
 
   return (
     <div className="relative isolate w-full min-h-screen bg-[#030303] text-[#F5F5F5] overflow-x-clip selection:bg-[#2563EB]/40 selection:text-white">
@@ -210,13 +158,13 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
           </div>
         </section>
 
-        {/* ── 2. STACKING CARD STORYTELLING SECTION (REFERENCE 3, PHASE 10) ──
-            Real physical stacking deck using sticky cards in a tall container.
-            As user scrolls: Card 1 sticks -> Card 2 covers Card 1 -> Card 3 covers Card 2, etc.
-            Later cards sit above earlier cards with physical depth and shadows.
-            ──────────────────────────────────────────────────────── */}
-        <section className="relative w-full py-24 px-4 sm:px-8 md:px-16">
-          {/* Section Section Header */}
+        {/* ── 2. ARCHITECTURAL JOURNEY (WITH GRADUAL BLUR TRANSITIONS) ── */}
+        <section className="relative w-full py-20 sm:py-28 px-4 sm:px-8 md:px-16 overflow-hidden">
+          {/* Subtle progressive gradual blur along the top and bottom boundaries */}
+          <GradualBlur position="top" height="110px" strength={14} color="rgba(3,3,3,0.8)" />
+          <GradualBlur position="bottom" height="110px" strength={14} color="rgba(3,3,3,0.8)" />
+
+          {/* Section Header */}
           <div className="max-w-4xl mx-auto text-center mb-16">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(214,184,120,0.08)] border border-[rgba(214,184,120,0.18)] text-[10px] font-mono tracking-[0.24em] text-[#D6B878] uppercase mb-4">
               ARCHITECTURAL JOURNEY
@@ -225,18 +173,16 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
               From ritual to built structure.
             </h2>
             <p className="text-sm sm:text-base text-[rgba(255,255,255,0.64)] font-light mt-3 max-w-xl mx-auto">
-              Scroll through the architectural intelligence deck powering every residence.
+              Explore the architectural intelligence powering every bespoke residence.
             </p>
           </div>
 
-          {/* Stacking Deck Container */}
-          <div className="relative max-w-6xl mx-auto pb-[32vh]">
+          {/* Sequential Architectural Presentation Deck */}
+          <div className="relative max-w-6xl mx-auto space-y-12 sm:space-y-16">
 
             {/* ══ CARD 1: PHILOSOPHY // 01 ══ */}
             <div
-              ref={(el) => { cardRefs.current[0] = el; }}
-              data-stack-depth={getCardDepth(0)}
-              className={`stacking-card accent-architecture sticky top-[92px] md:top-[104px] z-10 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_30px_90px_rgba(0,0,0,0.85)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 0 ? " is-active" : ""}`}
+              className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(214,184,120,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(214,184,120,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
                 <span className="text-xs font-mono tracking-[0.22em] text-[#D6B878] uppercase font-semibold">
@@ -297,9 +243,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 2: PRECISION // 02 ══ */}
             <div
-              ref={(el) => { cardRefs.current[1] = el; }}
-              data-stack-depth={getCardDepth(1)}
-              className={`stacking-card accent-architecture sticky top-[92px] md:top-[104px] z-20 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_35px_100px_rgba(0,0,0,0.9),0_-15px_40px_rgba(0,0,0,0.6)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 1 ? " is-active" : ""}`}
+              className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(96,165,250,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(96,165,250,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
                 <span className="text-xs font-mono tracking-[0.22em] text-[#D6B878] uppercase font-semibold">
@@ -355,9 +299,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 3: INTELLIGENCE // 03 ══ */}
             <div
-              ref={(el) => { cardRefs.current[2] = el; }}
-              data-stack-depth={getCardDepth(2)}
-              className={`stacking-card accent-ai sticky top-[92px] md:top-[104px] z-30 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_40px_110px_rgba(0,0,0,0.92),0_-15px_40px_rgba(0,0,0,0.65)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 2 ? " is-active" : ""}`}
+              className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(167,139,250,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(167,139,250,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
                 <span className="text-xs font-mono tracking-[0.22em] text-[#06B6D4] uppercase font-semibold">
@@ -416,9 +358,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 4: IMMERSION // 04 ══ */}
             <div
-              ref={(el) => { cardRefs.current[3] = el; }}
-              data-stack-depth={getCardDepth(3)}
-              className={`stacking-card accent-landscape sticky top-[92px] md:top-[104px] z-40 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_45px_120px_rgba(0,0,0,0.95),0_-15px_40px_rgba(0,0,0,0.7)] backdrop-blur-[24px] flex flex-col justify-between mb-[32vh] overflow-hidden${activeCardIndex === 3 ? " is-active" : ""}`}
+              className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(120,168,135,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(120,168,135,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
                 <span className="text-xs font-mono tracking-[0.22em] text-[#78A887] uppercase font-semibold">
@@ -466,9 +406,7 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
 
             {/* ══ CARD 5: TYPOLOGIES // 05 ══ */}
             <div
-              ref={(el) => { cardRefs.current[4] = el; }}
-              data-stack-depth={getCardDepth(4)}
-              className={`stacking-card accent-architecture sticky top-[92px] md:top-[104px] z-50 w-full min-h-[72vh] md:min-h-[78vh] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10] border shadow-[0_50px_130px_rgba(0,0,0,0.98),0_-15px_40px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between mb-0 overflow-hidden${activeCardIndex === 4 ? " is-active" : ""}`}
+              className="relative w-full rounded-[24px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 bg-[#0B0D10]/95 border border-[rgba(214,184,120,0.18)] shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop-blur-[24px] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-[rgba(214,184,120,0.35)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
                 <span className="text-xs font-mono tracking-[0.22em] text-[#D6B878] uppercase font-semibold">

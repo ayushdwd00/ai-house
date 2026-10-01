@@ -491,7 +491,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
+    <div className="relative w-full max-w-full h-[100dvh] overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
 
       {/* ── Floating Nav ── */}
       {!isConsultationOpen && !(currentTab === "plan" && planEditMode === "edit") && (

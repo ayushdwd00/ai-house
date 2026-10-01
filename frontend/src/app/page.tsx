@@ -184,7 +184,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
+    <div className="relative w-full max-w-full h-[100dvh] overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
       {/* INITIAL WEBSITE NAVIGATION:
           When NO project workspace is active, shows strictly:
           ATELIER | HOME | PROJECTS | CREATE

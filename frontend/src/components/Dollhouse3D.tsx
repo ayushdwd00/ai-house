@@ -1907,7 +1907,7 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       {/* FLOATING SELECTED ROOM 3D DIMENSION CONTROLS */}
       {selectedRoom && selectedRoom.rect && (
         <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 p-2.5 px-4 rounded-2xl bg-[rgba(8,15,28,0.92)] backdrop-blur-[24px] border border-[#C48446]/40 shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_25px_rgba(196,132,70,0.15)] text-white pointer-events-auto"
+          className="absolute bottom-16 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 sm:gap-3 p-2.5 px-3 sm:px-4 rounded-2xl bg-[rgba(8,15,28,0.92)] backdrop-blur-[24px] border border-[#C48446]/40 shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_25px_rgba(196,132,70,0.15)] text-white pointer-events-auto max-w-[calc(100vw-24px)]"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1980,8 +1980,8 @@ export const Dollhouse3D: React.FC<Dollhouse3DProps> = ({
       )}
 
       {/* ORIENTATION COMPASS INDICATOR (BOTTOM RIGHT) */}
-      <div className="absolute bottom-6 right-6 z-10 flex items-center gap-2 p-2 px-3.5 rounded-full bg-[rgba(8,15,28,0.85)] backdrop-blur-[20px] border border-[rgba(96,165,250,0.2)] text-xs font-mono text-[rgba(255,255,255,0.64)] pointer-events-none shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
-        <Compass className="w-4 h-4 text-[#60A5FA]" />
+      <div className="absolute bottom-3 sm:bottom-6 right-3 sm:right-6 z-10 hidden xs:flex items-center gap-2 p-1.5 sm:p-2 px-2.5 sm:px-3.5 rounded-full bg-[rgba(8,15,28,0.85)] backdrop-blur-[20px] border border-[rgba(96,165,250,0.2)] text-[10px] sm:text-xs font-mono text-[rgba(255,255,255,0.64)] pointer-events-none shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
+        <Compass className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#60A5FA]" />
         <span>Road Facing: <strong className="text-white uppercase">{resolvedFacing}</strong></span>
       </div>
     </div>
