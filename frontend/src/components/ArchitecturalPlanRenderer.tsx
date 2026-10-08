@@ -2795,37 +2795,58 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     });
   };
 
+  // Unified Exit / Return to Plan helper
+  const exitEditToPlan = useCallback(
+    async (shouldSave = true) => {
+      // 1. Cancel in-progress drafting & measurements safely
+      if (drawingWall) {
+        setDrawingWall(null);
+        setCurrentSnap(null);
+      }
+      if (measureState) {
+        setMeasureState(null);
+      }
+
+      // 2. Commit required changes & preserve canonical HouseLayout
+      if (shouldSave) {
+        try {
+          const canonicalLayout = syncPrimaryFloor(layout);
+          const sanitizedLayout = validateAndSanitizeHouseLayout(canonicalLayout) || canonicalLayout;
+          await onSave?.(sanitizedLayout);
+          onUpdateLayout?.(sanitizedLayout);
+        } catch (e) {
+          console.warn("Save on exit error:", e);
+        }
+      }
+
+      // 3. Switch / navigate to PLAN
+      if (onBack) {
+        onBack();
+      } else {
+        const targetId = layout.id || (layout as any).project_id;
+        if (targetId) {
+          router.push(`/project/${targetId}/plan`);
+        } else {
+          router.push("/plan");
+        }
+      }
+    },
+    [drawingWall, measureState, layout, onSave, onUpdateLayout, onBack, router]
+  );
+
   // Done Editing: Save and Return to Plan
   const handleDone = async () => {
     setIsSaving(true);
     try {
-      const canonicalLayout = syncPrimaryFloor(layout);
-      const sanitizedLayout = validateAndSanitizeHouseLayout(canonicalLayout) || canonicalLayout;
-      await onSave?.(sanitizedLayout);
-      if (onBack) {
-        onBack();
-      } else {
-        router.push(`/project/${sanitizedLayout.id}/plan`);
-      }
-    } catch (e) {
-      console.warn("Save callback error", e);
-      if (onBack) {
-        onBack();
-      } else {
-        router.push(`/project/${layout.id}/plan`);
-      }
+      await exitEditToPlan(true);
     } finally {
       setIsSaving(false);
     }
   };
 
   // Exit Editor: Return to Plan
-  const handleExit = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      router.push(`/project/${layout.id}/plan`);
-    }
+  const handleExit = async () => {
+    await exitEditToPlan(true);
   };
 
   // AI Architect Quick Actions & Natural Language Refinement
@@ -5006,7 +5027,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               id="cad-btn-back"
               type="button"
               onClick={handleExit}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-[#E2E8F0] hover:text-white border border-white/5 transition-all shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-[#E2E8F0] hover:text-white border border-white/5 transition-all shrink-0 pointer-events-auto cursor-pointer"
               title="Return to Plan Overview"
             >
               <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />

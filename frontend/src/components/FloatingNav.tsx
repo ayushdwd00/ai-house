@@ -133,18 +133,18 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
     onNavigate("create");
   };
 
+  // Fail-safe: Edit mode must have a clean, isolated application shell without FloatingNav
+  if (currentView === "edit" || isPlanEditMode) {
+    return null;
+  }
+
   const renderEditModeToggle = () => (
     <button
       type="button"
       onClick={onTogglePlanEditMode}
-      aria-label={isPlanEditMode ? "Exit Edit Mode" : "Enter Edit Mode"}
-      aria-pressed={isPlanEditMode}
-      title={isPlanEditMode ? "Exit Edit Mode" : "Enter Edit Mode"}
-      className={`flex shrink-0 items-center justify-center whitespace-nowrap px-2.5 py-1.5 rounded-full transition-all text-[10px] tracking-[0.16em] font-mono ${
-        isPlanEditMode
-          ? "bg-[rgba(59,130,246,0.18)] text-[#93C5FD] border border-[#3B82F6]/40 shadow-[0_0_16px_rgba(59,130,246,0.25)]"
-          : "bg-white/5 hover:bg-white/10 text-[rgba(255,255,255,0.64)] hover:text-[#F5F5F5]"
-      }`}
+      aria-label="Enter CAD Edit Mode"
+      title="Enter CAD Edit Mode"
+      className="flex shrink-0 items-center justify-center whitespace-nowrap px-2.5 py-1.5 rounded-full transition-all text-[10px] tracking-[0.16em] font-mono bg-white/5 hover:bg-white/10 text-[rgba(255,255,255,0.64)] hover:text-[#F5F5F5]"
     >
       <span>EDIT MODE</span>
     </button>
@@ -158,14 +158,10 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
               isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
             }`
           : placement === "responsive"
-          ? `relative z-[100] w-full px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 pointer-events-none transition-all duration-300 ease-out lg:fixed lg:px-0 lg:pt-0 lg:pb-0 lg:left-1/2 lg:-translate-x-1/2 lg:z-[100] lg:max-w-[calc(100vw-16px)] ${
-              isPlanEditMode ? "lg:top-16" : "lg:top-6"
-            } ${
+          ? `relative z-[100] w-full px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 pointer-events-none transition-all duration-300 ease-out lg:fixed lg:top-6 lg:left-1/2 lg:-translate-x-1/2 lg:z-[100] lg:w-max lg:max-w-[calc(100vw-32px)] lg:px-0 lg:pt-0 lg:pb-0 ${
               isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
             }`
-          : `fixed transition-all duration-300 ease-out ${
-              isPlanEditMode ? "top-14 sm:top-16" : "top-4 sm:top-6"
-            } left-1/2 -translate-x-1/2 z-[100] pointer-events-none max-w-[calc(100vw-16px)] ${
+          : `fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[100] pointer-events-none max-w-[calc(100vw-16px)] transition-all duration-300 ease-out ${
               isVisible ? "translate-y-0 opacity-100" : "-translate-y-[calc(100%+2rem)] opacity-0"
             }`
       }
@@ -183,7 +179,11 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
           })`,
           transition: "transform 240ms cubic-bezier(0.23, 1, 0.32, 1), background 240ms ease, box-shadow 240ms ease",
         }}
-        className={`${placement === "responsive" ? "w-full justify-between rounded-2xl px-2 py-2 md:mx-auto md:w-max md:justify-center md:rounded-full md:px-3 md:py-2 lg:mx-0" : ""} ${
+        className={`${
+          placement === "responsive"
+            ? "w-full justify-between rounded-2xl px-2 py-2 md:mx-auto md:w-max md:justify-center md:rounded-full md:px-3 md:py-2"
+            : ""
+        } ${
           !isVisible ? "pointer-events-none" : "pointer-events-auto"
         } relative flex max-w-full items-center gap-1 sm:gap-2 border border-[rgba(96,165,250,0.15)] ${
           isScrolled
@@ -226,13 +226,9 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
             <button
               type="button"
               onClick={onTogglePlanEditMode}
-              className={`px-2 py-1 rounded-full text-[9px] font-mono tracking-wider transition-all ${
-                isPlanEditMode
-                  ? "bg-[#3B82F6]/30 text-[#93C5FD] border border-[#3B82F6]/40"
-                  : "bg-white/5 text-white/60 hover:text-white"
-              }`}
+              className="px-2 py-1 rounded-full text-[9px] font-mono tracking-wider transition-all bg-white/5 text-white/60 hover:text-white"
             >
-              {isPlanEditMode ? "EDITING" : "EDIT"}
+              EDIT
             </button>
           )}
         </div>

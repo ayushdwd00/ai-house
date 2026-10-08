@@ -157,11 +157,12 @@ body {
   }
 
   .edit-cad-header {
-    height: 3.25rem;
-    flex: 0 0 3.25rem;
+    min-height: calc(3.25rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+    flex: 0 0 auto;
     gap: 0.25rem;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
     z-index: var(--layer-header);
   }
 

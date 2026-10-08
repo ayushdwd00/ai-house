@@ -24,6 +24,7 @@ export interface FloorPlan2DProps {
   mode?: "view" | "edit";
   onUpdateLayout?: (newLayout: HouseLayout) => void;
   onSave?: (savedLayout: HouseLayout) => Promise<void> | void;
+  onBack?: () => void;
   showAtelierNav?: boolean;
   onStudioNavigate?: (view: NavView) => void;
   onToggleEditMode?: () => void;
@@ -54,6 +55,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
   mode = "view",
   onUpdateLayout,
   onSave,
+  onBack,
   showAtelierNav,
   onStudioNavigate,
   onToggleEditMode,
@@ -76,6 +78,7 @@ export const FloorPlan2D: React.FC<FloorPlan2DProps> = ({
       isRegenerating={isRegenerating}
       onUpdateLayout={onUpdateLayout}
       onSave={onSave}
+      onBack={onBack}
       showAtelierNav={showAtelierNav}
       onStudioNavigate={onStudioNavigate}
       onToggleEditMode={onToggleEditMode}

@@ -230,6 +230,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         setIsCreateChoiceOpen(true);
       } else if (view === "projects") {
         setIsProjectsOpen(true);
+      } else if (view === "edit") {
+        router.push(`/project/${projectId}/edit`);
       } else if (
         view === "plan" ||
         view === "model" ||
@@ -545,16 +547,16 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           hasProject
           onOpenVastuAudit={() => setIsVastuAuditOpen(true)}
           hasVastuResult={Boolean(layout?.scores?.vastu_result)}
-          isPlanEditMode={planEditMode === "edit"}
-          onTogglePlanEditMode={() =>
-            setPlanEditMode((mode) => (mode === "view" ? "edit" : "view"))
-          }
+          isPlanEditMode={false}
+          onTogglePlanEditMode={() => {
+            router.push(`/project/${projectId}/edit`);
+          }}
           placement="responsive"
         />
       )}
 
       {/* ── Optimization notice pill ── */}
-      {!isConsultationOpen && Boolean((layout as any)?.metadata?.optimization_note) && (
+      {!isConsultationOpen && planEditMode !== "edit" && Boolean((layout as any)?.metadata?.optimization_note) && (
         <div className="workspace-notice relative z-20 w-full shrink-0 px-3 py-1 lg:pointer-events-none lg:fixed lg:left-1/2 lg:top-[70px] lg:w-auto lg:-translate-x-1/2">
           <div className="flex w-full items-start gap-2 rounded-xl border border-amber-500/30 bg-[#12141A]/95 px-3 py-2 font-mono text-[11px] leading-4 text-amber-200 shadow-2xl backdrop-blur-md lg:w-auto lg:max-w-[calc(100vw-32px)] lg:items-center lg:rounded-full lg:py-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
@@ -609,10 +611,23 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   isDarkMode
                   mode={planEditMode}
                   onUpdateLayout={handleUpdateLayout}
-                  onSave={handleUpdateLayout}
+                  onSave={async (saved) => {
+                    handleUpdateLayout(saved);
+                    setPlanEditMode("view");
+                  }}
+                  onBack={() => {
+                    setPlanEditMode("view");
+                    router.push(`/project/${projectId}/plan`);
+                  }}
                   showAtelierNav={false}
                   onStudioNavigate={handleNavigate}
-                  onToggleEditMode={() => setPlanEditMode((mode) => (mode === "view" ? "edit" : "view"))}
+                  onToggleEditMode={() => {
+                    if (planEditMode === "edit") {
+                      setPlanEditMode("view");
+                    } else {
+                      router.push(`/project/${projectId}/edit`);
+                    }
+                  }}
                   onOpenVastuAudit={() => setIsVastuAuditOpen(true)}
                   hasVastuResult={Boolean(layout?.scores?.vastu_result)}
                   mepVisibility={mepVisibility}
