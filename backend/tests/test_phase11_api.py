@@ -1,7 +1,9 @@
+import json
 import time
 
 from fastapi.testclient import TestClient
 import main
+from models import HouseLayout
 from infrastructure.project_repository import JsonFileProjectRepository
 
 client = TestClient(main.app)
@@ -142,6 +144,48 @@ def test_projects_list_api_paginates_metadata(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"projects": [item], "total": 7, "limit": 5, "offset": 2}
     assert "rooms" not in response.json()["projects"][0]
+
+
+def test_project_repository_resolves_mismatched_project_ids(tmp_path):
+    repository = JsonFileProjectRepository(tmp_path)
+    project_dir = tmp_path / "legacy_directory_name"
+    project_dir.mkdir()
+    layout = HouseLayout(
+        id="canonical_project_id",
+        title="Canonical Project",
+        designer_rationale="Test project",
+        plot_width=30,
+        plot_length=40,
+        stats={
+            "total_area_sqft": 1200,
+            "living_area_sqft": 900,
+            "width_ft": 30,
+            "length_ft": 40,
+            "num_floors": 1,
+            "bedroom_count": 2,
+            "bathroom_count": 2.0,
+            "aspect_ratio": 1.33,
+        },
+        rooms=[],
+        floors=[],
+        walls=[],
+        exterior_walls=[],
+        interior_walls=[],
+        doors=[],
+        windows=[],
+    )
+    project_data = layout.model_dump(mode="json")
+    (project_dir / "project.json").write_text(json.dumps(project_data), encoding="utf-8")
+
+    stored = repository.get("canonical_project_id")
+    assert stored is not None
+    assert stored.id == "canonical_project_id"
+
+    projects, total = repository.list_projects(limit=10, offset=0)
+    assert total == 1
+    assert projects[0]["id"] == "canonical_project_id"
+    assert repository.delete("canonical_project_id") is True
+    assert not project_dir.exists()
 
 
 def test_delete_project_requires_existing_safe_id():

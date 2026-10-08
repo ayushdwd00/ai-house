@@ -74,14 +74,58 @@ class JsonFileProjectRepository(ProjectRepository):
             raise ValueError("Invalid project ID")
         return project_path
 
+    def _resolve_project_dir(self, project_id: str) -> Path:
+        lookup_id = str(project_id).strip()
+        if not lookup_id:
+            raise ValueError("Invalid project ID")
+        candidate = self._project_dir(lookup_id)
+        if candidate.exists():
+            return candidate
+        if not self.base_dir.exists():
+            return candidate
+        for path in sorted(self.base_dir.iterdir(), key=lambda item: item.name):
+            if not path.is_dir():
+                continue
+            project_file = path / "project.json"
+            if not project_file.is_file():
+                continue
+            try:
+                with project_file.open("r", encoding="utf-8") as file:
+                    data = json.load(file)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if data.get("project_id") == lookup_id or data.get("id") == lookup_id:
+                return path
+            metadata_file = path / "metadata.json"
+            if metadata_file.is_file():
+                try:
+                    with metadata_file.open("r", encoding="utf-8") as file:
+                        metadata = json.load(file)
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if metadata.get("id") == lookup_id or metadata.get("project_id") == lookup_id:
+                    return path
+        return candidate
+
     def _get_project_dir(self, project_id: str) -> Path:
         p_dir = self._project_dir(project_id)
         p_dir.mkdir(parents=True, exist_ok=True)
         (p_dir / "versions").mkdir(exist_ok=True)
         return p_dir
 
+    @staticmethod
+    def _canonical_project_id(project_id: Optional[str], data: Optional[Dict[str, Any]] = None) -> str:
+        for value in (project_id, data.get("project_id") if isinstance(data, dict) else None, data.get("id") if isinstance(data, dict) else None):
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return "project_default"
+
     def save(self, layout: HouseLayout, project_id: Optional[str] = None) -> Tuple[str, int]:
-        pid = project_id or layout.project_id or layout.id or "project_default"
+        pid = self._canonical_project_id(project_id or layout.project_id or layout.id or "project_default", layout.model_dump(mode="json"))
+        if not pid:
+            pid = "project_default"
+        layout.id = pid
+        layout.project_id = pid
         p_dir = self._get_project_dir(pid)
         versions_dir = p_dir / "versions"
 
@@ -114,8 +158,9 @@ class JsonFileProjectRepository(ProjectRepository):
     @staticmethod
     def _metadata_from_data(project_id: str, data: Dict[str, Any], project_file: Path) -> Dict[str, Any]:
         stats = data.get("stats") or {}
+        canonical_id = str(data.get("project_id") or data.get("id") or project_id or "project_default").strip() or project_id or "project_default"
         return {
-            "id": project_id,
+            "id": canonical_id,
             "title": data.get("title") or "Residential Design",
             "updatedAt": datetime.fromtimestamp(
                 project_file.stat().st_mtime, timezone.utc
@@ -134,7 +179,8 @@ class JsonFileProjectRepository(ProjectRepository):
         temporary_file.replace(metadata_file)
 
     def get(self, project_id: str) -> Optional[HouseLayout]:
-        cur_file = self._project_dir(project_id) / "project.json"
+        project_dir = self._resolve_project_dir(project_id)
+        cur_file = project_dir / "project.json"
         if not cur_file.exists():
             return None
         with open(cur_file, "r", encoding="utf-8") as f:
@@ -159,18 +205,20 @@ class JsonFileProjectRepository(ProjectRepository):
             project_file = project_dir / "project.json"
             try:
                 metadata_file = project_dir / "metadata.json"
+                with project_file.open("r", encoding="utf-8") as file:
+                    project_data = json.load(file)
                 if metadata_file.is_file():
                     with metadata_file.open("r", encoding="utf-8") as file:
                         metadata = json.load(file)
+                    metadata["id"] = str(project_data.get("project_id") or project_data.get("id") or metadata.get("id") or project_dir.name).strip() or project_dir.name
                     metadata["updatedAt"] = datetime.fromtimestamp(
                         project_file.stat().st_mtime, timezone.utc
                     ).isoformat()
                 else:
-                    with project_file.open("r", encoding="utf-8") as file:
-                        data = json.load(file)
-                    metadata = self._metadata_from_data(project_dir.name, data, project_file)
+                    canonical_id = str(project_data.get("project_id") or project_data.get("id") or project_dir.name).strip() or project_dir.name
+                    metadata = self._metadata_from_data(canonical_id, project_data, project_file)
                     try:
-                        self._write_metadata(project_dir.name, data, project_file)
+                        self._write_metadata(canonical_id, project_data, project_file)
                     except OSError as error:
                         logger.warning("Could not cache project metadata for %s: %s", project_dir.name, error)
                 projects.append(metadata)
@@ -179,7 +227,8 @@ class JsonFileProjectRepository(ProjectRepository):
         return projects, total
 
     def list_versions(self, project_id: str) -> List[Dict[str, Any]]:
-        versions_dir = self._project_dir(project_id) / "versions"
+        project_dir = self._resolve_project_dir(project_id)
+        versions_dir = project_dir / "versions"
         if not versions_dir.exists():
             return []
 
@@ -206,7 +255,7 @@ class JsonFileProjectRepository(ProjectRepository):
         return versions
 
     def restore_version(self, project_id: str, version_number: int) -> Optional[HouseLayout]:
-        project_dir = self._project_dir(project_id)
+        project_dir = self._resolve_project_dir(project_id)
         v_file = project_dir / "versions" / f"v{version_number}.json"
         if not v_file.exists():
             return None
@@ -228,7 +277,7 @@ class JsonFileProjectRepository(ProjectRepository):
 
     def delete(self, project_id: str) -> bool:
         import shutil
-        p_dir = self._project_dir(project_id)
+        p_dir = self._resolve_project_dir(project_id)
         if not p_dir.exists():
             return False
         try:
