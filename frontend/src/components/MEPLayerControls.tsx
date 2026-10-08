@@ -23,10 +23,10 @@ export const MEPLayerControls: React.FC<MEPLayerControlsProps> = ({ value, onCha
 
   return (
     <>
-      {/* ── Desktop Fixed Card (screens > 768px) ── */}
+      {/* ── Desktop Fixed Card (screens >= 1024px) ── */}
       <section
         aria-label="MEP layer controls"
-        className="hidden md:block fixed right-4 top-20 z-40 w-44 rounded-xl border border-white/10 bg-[#0F1117]/95 p-2.5 text-[#F5F3EF] shadow-xl backdrop-blur-md"
+        className="hidden lg:block fixed right-4 top-20 z-40 w-44 rounded-xl border border-white/10 bg-[#0F1117]/95 p-2.5 text-[#F5F3EF] shadow-xl backdrop-blur-md"
       >
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-[#C48446]">MEP Layers</span>
@@ -51,13 +51,13 @@ export const MEPLayerControls: React.FC<MEPLayerControlsProps> = ({ value, onCha
         </p>
       </section>
 
-      {/* ── Mobile Compact Trigger Button (screens <= 768px) ── */}
-      <div className="md:hidden fixed right-3 top-16 z-40">
+      {/* ── Compact Trigger Button (phones and tablets) ── */}
+      <div className="relative z-30 lg:hidden">
         <button
           type="button"
           onClick={() => setIsMobileOpen(true)}
           aria-label="Open MEP layer controls"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-white/10 bg-[#0F1117]/95 text-[10px] font-mono text-[#F5F3EF] shadow-xl backdrop-blur-md active:scale-95 transition-all"
+          className="flex min-h-10 items-center gap-1.5 rounded-full border border-white/10 bg-[#0F1117]/95 px-3 py-2 text-[10px] font-mono text-[#F5F3EF] shadow-xl backdrop-blur-md transition-all active:scale-95"
         >
           <Layers className="w-3.5 h-3.5 text-[#C48446]" />
           <span>MEP</span>
@@ -69,13 +69,13 @@ export const MEPLayerControls: React.FC<MEPLayerControlsProps> = ({ value, onCha
         </button>
       </div>
 
-      {/* ── Mobile Bottom Sheet Popover (screens <= 768px) ── */}
+      {/* ── Compact Bottom Sheet Popover (phones and tablets) ── */}
       {isMobileOpen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="MEP Layers"
-          className="md:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          className="lg:hidden fixed inset-0 z-[50] flex items-end justify-center bg-black/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm"
           onClick={() => setIsMobileOpen(false)}
         >
           <div

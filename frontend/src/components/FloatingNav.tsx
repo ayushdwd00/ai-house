@@ -24,7 +24,7 @@ interface FloatingNavProps {
   hasVastuResult?: boolean;
   isPlanEditMode?: boolean;
   onTogglePlanEditMode?: () => void;
-  placement?: "fixed" | "flow";
+  placement?: "fixed" | "flow" | "responsive";
 }
 
 // ============================================================
@@ -157,6 +157,12 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
           ? `relative z-[100] mx-auto flex w-full justify-center pt-2 pointer-events-none max-w-[calc(100vw-16px)] transition-all duration-300 ease-out ${
               isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
             }`
+          : placement === "responsive"
+          ? `relative z-[100] w-full px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 pointer-events-none transition-all duration-300 ease-out lg:fixed lg:px-0 lg:pt-0 lg:pb-0 lg:left-1/2 lg:-translate-x-1/2 lg:z-[100] lg:max-w-[calc(100vw-16px)] ${
+              isPlanEditMode ? "lg:top-16" : "lg:top-6"
+            } ${
+              isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+            }`
           : `fixed transition-all duration-300 ease-out ${
               isPlanEditMode ? "top-14 sm:top-16" : "top-4 sm:top-6"
             } left-1/2 -translate-x-1/2 z-[100] pointer-events-none max-w-[calc(100vw-16px)] ${
@@ -177,9 +183,9 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
           })`,
           transition: "transform 240ms cubic-bezier(0.23, 1, 0.32, 1), background 240ms ease, box-shadow 240ms ease",
         }}
-        className={`${
+        className={`${placement === "responsive" ? "w-full justify-between rounded-2xl px-2 py-2 md:mx-auto md:w-max md:justify-center md:rounded-full md:px-3 md:py-2 lg:mx-0" : ""} ${
           !isVisible ? "pointer-events-none" : "pointer-events-auto"
-        } relative flex w-max max-w-full items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-full border border-[rgba(96,165,250,0.15)] ${
+        } relative flex max-w-full items-center gap-1 sm:gap-2 border border-[rgba(96,165,250,0.15)] ${
           isScrolled
             ? "bg-[rgba(8,9,11,0.86)] shadow-[0_24px_70px_rgba(0,0,0,0.5),0_0_30px_rgba(37,99,235,0.12),0_0_22px_rgba(139,92,246,0.035)]"
             : "bg-[rgba(8,9,11,0.76)] shadow-[0_16px_50px_rgba(0,0,0,0.38),0_0_24px_rgba(37,99,235,0.08),0_0_18px_rgba(139,92,246,0.03)]"
@@ -204,7 +210,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
         </button>
 
         {/* ── Mobile Compact Navigation Control (<= 768px) ── */}
-        <div className="md:hidden flex items-center gap-1.5 pl-1">
+        <div className="lg:hidden flex items-center gap-1.5 pl-1">
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -232,7 +238,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
         </div>
 
         {/* ── Desktop Nav items (screens > 768px) ── */}
-        <div id="home-secondary-navigation" className="hidden md:contents">
+        <div id="home-secondary-navigation" className="hidden lg:contents">
           <AnimatePresence initial={false}>
             {navItems.length > 0 && (
               <motion.div
@@ -287,7 +293,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
             onClick={handleProjectsClick}
             aria-expanded={expandedNav === "projects"}
             aria-controls="home-secondary-navigation"
-            className={`hidden md:flex relative shrink-0 items-center whitespace-nowrap px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all duration-200 ${
+            className={`hidden lg:flex relative shrink-0 items-center whitespace-nowrap px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all duration-200 ${
               expandedNav === "projects"
                 ? "text-[#F5F5F5] font-medium"
                 : "text-[rgba(255,255,255,0.62)] hover:text-[#F5F5F5] hover:-translate-y-[1px]"
@@ -308,7 +314,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
         {isProjectWorkspace && onOpenVastuAudit && (
           <button
             onClick={onOpenVastuAudit}
-            className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 sm:py-1.5 rounded-full border border-[#06B6D4]/30 bg-[#06B6D4]/10 text-[#A5F3FC] text-[9px] sm:text-[10px] font-mono transition-all hover:bg-[#06B6D4]/20 hover:-translate-y-[1px] shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+            className="hidden lg:inline-flex items-center gap-1 px-2.5 py-1 sm:py-1.5 rounded-full border border-[#06B6D4]/30 bg-[#06B6D4]/10 text-[#A5F3FC] text-[9px] sm:text-[10px] font-mono transition-all hover:bg-[#06B6D4]/20 hover:-translate-y-[1px] shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
             title="View Vastu Compliance Audit"
           >
             <span>VASTU</span>
@@ -320,7 +326,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
           onClick={handleCreateClick}
           aria-expanded={!isProjectWorkspace && expandedNav === "create"}
           aria-controls="home-secondary-navigation"
-          className={`ml-1 sm:ml-2 flex shrink-0 items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-[11px] font-medium tracking-[0.2em] transition-all duration-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_25px_rgba(37,99,235,0.35)] hover:-translate-y-[1px] hover:brightness-110 active:translate-y-0 active:scale-[0.98] ${
+          className={`ml-1 sm:ml-2 hidden lg:flex shrink-0 items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-[11px] font-medium tracking-[0.2em] transition-all duration-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_25px_rgba(37,99,235,0.35)] hover:-translate-y-[1px] hover:brightness-110 active:translate-y-0 active:scale-[0.98] ${
             currentView === "create"
               ? "bg-[linear-gradient(135deg,#3B82F6,#06B6D4)] text-white shadow-[0_0_25px_rgba(59,130,246,0.5)]"
               : "bg-[linear-gradient(135deg,#2563EB,#06B6D4)] text-white"
@@ -339,7 +345,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="md:hidden pointer-events-auto mt-2 w-[min(280px,calc(100vw-32px))] rounded-2xl border border-[rgba(96,165,250,0.24)] bg-[rgba(8,12,22,0.96)] backdrop-blur-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(37,99,235,0.18)] p-2 text-xs font-mono tracking-wider space-y-1 mx-auto"
+            className="lg:hidden pointer-events-auto absolute right-2 top-full mt-1 w-[min(280px,calc(100vw-32px))] rounded-2xl border border-[rgba(96,165,250,0.24)] bg-[rgba(8,12,22,0.96)] backdrop-blur-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(37,99,235,0.18)] p-2 text-xs font-mono tracking-wider space-y-1"
           >
             {(isProjectWorkspace ? projectNavItems : [{ id: "home" as NavView, label: "HOME" }]).map((item) => {
               const isActive = currentView === item.id;
@@ -388,6 +394,18 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
                 <span className="text-[10px] text-[#06B6D4]">HARMONY</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                handleCreateClick();
+              }}
+              className="flex w-full items-center justify-between px-3 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all"
+            >
+              <span>CREATE</span>
+              <Sparkles className="h-3.5 w-3.5 text-[#60A5FA]" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

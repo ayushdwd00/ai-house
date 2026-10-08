@@ -674,6 +674,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
   const [alignmentGuides, setAlignmentGuides] = useState<Array<{ type: "h" | "v"; pos: number }>>([]);
+  const [isAiOpen, setIsAiOpen] = useState(false);
 
   // Overlays
   const [showStructure, setShowStructure] = useState(false);
@@ -684,8 +685,19 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 767px)").matches) return;
+    const hasSelection = Boolean(selectedWallId || selectedDoorId || selectedWindowId || selectedRoomId || selectedFurnitureId);
+    // Controlled selections need to open the mobile inspector.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsRightPanelOpen(hasSelection);
+    if (hasSelection) {
+      setIsLeftPanelOpen(false);
+      setIsAiOpen(false);
+    }
+  }, [selectedWallId, selectedDoorId, selectedWindowId, selectedRoomId, selectedFurnitureId]);
+
   // AI Architect Popover
-  const [isAiOpen, setIsAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
@@ -1230,6 +1242,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
   }, []);
 
+  const isCadUiTarget = useCallback(
+    (target: EventTarget | null) =>
+      target instanceof Element &&
+      Boolean(target.closest("[data-cad-ui], button, input, select, textarea, [role='dialog']")),
+    []
+  );
+
   const handleSvgMouseDownCapture = (event: React.MouseEvent<SVGSVGElement>) => {
     if (mode !== "edit" || event.button !== 0) return;
     const point = getModelPoint(event.clientX, event.clientY);
@@ -1439,7 +1458,11 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const handleWheelNative = useCallback(
     (e: WheelEvent) => {
       const container = containerRef.current;
-      if (!container || !isPointerInsideCadViewport(e.clientX, e.clientY)) {
+      if (
+        !container ||
+        isCadUiTarget(e.target) ||
+        !isPointerInsideCadViewport(e.clientX, e.clientY)
+      ) {
         return;
       }
 
@@ -1470,7 +1493,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         return nextZoom;
       });
     },
-    [isPointerInsideCadViewport]
+    [isCadUiTarget, isPointerInsideCadViewport]
   );
 
   const setContainerRef = useCallback(
@@ -1621,7 +1644,12 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     const el = containerRef.current;
     if (!el) return;
     const handleNativeTouchMove = (e: TouchEvent) => {
-      if (e.touches.length >= 2) {
+      if (
+        e.touches.length >= 2 &&
+        svgRef.current &&
+        e.target instanceof Node &&
+        svgRef.current.contains(e.target)
+      ) {
         e.preventDefault();
       }
     };
@@ -1630,6 +1658,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isCadUiTarget(e.target)) return;
     if (e.touches.length === 2) {
       const t1 = e.touches[0];
       const t2 = e.touches[1];
@@ -1658,6 +1687,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (isCadUiTarget(e.target)) return;
     if (e.touches.length === 2 && pinchStartRef.current) {
       const t1 = e.touches[0];
       const t2 = e.touches[1];
@@ -1710,6 +1740,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
   // Global Mouse Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isCadUiTarget(e.target)) return;
     // 1. Middle mouse button -> ALWAYS pan
     if (e.button === 1) {
       e.preventDefault();
@@ -4966,9 +4997,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // -------------------------------------------------------------
   if (mode === "edit") {
     return (
-      <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#07080A] text-[#F3F4F6] font-sans">
+      <div className="edit-cad-shell relative w-full h-full min-h-0 flex flex-col select-none overflow-hidden bg-[#07080A] text-[#F3F4F6] font-sans">
         {/* COMPACT SHAPR3D-INSPIRED CAD HEADER */}
-        <header className="h-11 sm:h-12 border-b border-[#1E2028] bg-[#0E0F13] flex items-center justify-between px-3 sm:px-4 z-40 shrink-0 select-none">
+        <header data-cad-ui className="edit-cad-header relative h-11 sm:h-12 border-b border-[#1E2028] bg-[#0E0F13] flex items-center justify-between px-3 sm:px-4 z-40 shrink-0 select-none">
           {/* Left: Back to Plan, Title, small EDIT badge, floor switcher */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
@@ -4985,7 +5016,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             <div className="h-4 w-px bg-white/10 shrink-0" />
 
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-semibold text-white/90 truncate max-w-[120px] sm:max-w-[180px] md:max-w-[260px]">
+              <span className="max-md:hidden text-xs font-semibold text-white/90 truncate max-w-[120px] sm:max-w-[180px] md:max-w-[260px]">
                 {layout.title || "Architectural Floor Plan"}
               </span>
               <span className="px-1.5 py-0.5 rounded bg-[#C48446]/20 text-[#E69F58] font-mono text-[9px] uppercase font-bold tracking-widest border border-[#C48446]/30 shrink-0">
@@ -5015,7 +5046,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           </div>
 
           {/* Center: Minimal tool state / active operation indicator */}
-          <div className="hidden md:flex items-center justify-center pointer-events-none">
+          <div className="hidden lg:flex items-center justify-center pointer-events-none">
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-[11px] font-mono text-[#94A3B8]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C48446] animate-pulse" />
               <span className="text-white/80 font-medium">
@@ -5047,7 +5078,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               type="button"
               onClick={undo}
               disabled={!canUndo}
-              className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              className="edit-header-icon p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
               title="Undo (Ctrl+Z)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -5057,7 +5088,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               type="button"
               onClick={redo}
               disabled={!canRedo}
-              className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              className="edit-header-icon p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
               title="Redo (Ctrl+Y)"
             >
               <RotateCw className="w-3.5 h-3.5" />
@@ -5069,8 +5100,12 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             <button
               id="cad-btn-ai-architect"
               type="button"
-              onClick={() => setIsAiOpen((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
+              onClick={() => {
+                setIsAiOpen((prev) => !prev);
+                setIsLeftPanelOpen(false);
+                setIsRightPanelOpen(false);
+              }}
+              className={`edit-header-action flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
                 isAiOpen
                   ? "bg-[#C48446] text-[#0A0B0E] shadow"
                   : "bg-[#C48446]/15 hover:bg-[#C48446]/25 text-[#E69F58] border border-[#C48446]/30"
@@ -5082,12 +5117,22 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               <span className="sm:hidden">AI</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => setIsMobileToolsOpen((open) => !open)}
+              aria-label="More editor controls"
+              aria-expanded={isMobileToolsOpen}
+              className="edit-header-icon flex lg:hidden rounded-lg text-[#94A3B8] hover:bg-white/5 hover:text-white"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+
             {/* Layers / Structure Drawer Toggle */}
             <button
               id="cad-btn-layers"
               type="button"
               onClick={() => setIsLeftPanelOpen((prev) => !prev)}
-              className={`p-1.5 rounded-lg transition-all ${
+              className={`edit-header-icon hidden lg:flex rounded-lg transition-all ${
                 isLeftPanelOpen
                   ? "bg-[#C48446] text-[#0A0B0E] shadow"
                   : "text-[#94A3B8] hover:text-white hover:bg-white/5"
@@ -5102,7 +5147,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               id="cad-btn-properties"
               type="button"
               onClick={() => setIsRightPanelOpen((prev) => !prev)}
-              className={`p-1.5 rounded-lg transition-all ${
+              className={`edit-header-icon hidden lg:flex rounded-lg transition-all ${
                 isRightPanelOpen
                   ? "bg-[#C48446] text-[#0A0B0E] shadow"
                   : "text-[#94A3B8] hover:text-white hover:bg-white/5"
@@ -5120,13 +5165,58 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               type="button"
               onClick={handleDone}
               disabled={isSaving}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs font-mono tracking-wider shadow transition-all"
+              className="edit-header-action flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs font-mono tracking-wider shadow transition-all"
               title="Save & Return to Plan"
             >
               {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
               <span>DONE</span>
             </button>
           </div>
+
+          {isMobileToolsOpen && (
+            <div data-cad-ui className="edit-mobile-menu absolute right-2 top-full z-[60] mt-1 w-52 rounded-xl border border-white/10 bg-[#12141A]/98 p-2 shadow-2xl lg:hidden">
+              {layout.floors && layout.floors.length > 1 && (
+                <div className="mb-1 border-b border-white/10 pb-2">
+                  <div className="px-2 py-1 text-[9px] font-mono uppercase text-white/50">Floor</div>
+                  {layout.floors.map((floor, index) => (
+                    <button
+                      key={floor.floor_number}
+                      type="button"
+                      onClick={() => {
+                        onSelectFloor?.(index);
+                        setIsMobileToolsOpen(false);
+                      }}
+                      className="min-h-11 w-full rounded-lg px-2 text-left text-xs text-white/80 hover:bg-white/5"
+                    >
+                      {floor.floor_name || `Floor ${floor.floor_number}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLeftPanelOpen((open) => !open);
+                  setIsRightPanelOpen(false);
+                  setIsMobileToolsOpen(false);
+                }}
+                className="min-h-11 w-full rounded-lg px-2 text-left text-xs text-white/80 hover:bg-white/5"
+              >
+                {isLeftPanelOpen ? "Close layers" : "Open layers"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRightPanelOpen((open) => !open);
+                  setIsLeftPanelOpen(false);
+                  setIsMobileToolsOpen(false);
+                }}
+                className="min-h-11 w-full rounded-lg px-2 text-left text-xs text-white/80 hover:bg-white/5"
+              >
+                {isRightPanelOpen ? "Close properties" : "Open properties"}
+              </button>
+            </div>
+          )}
         </header>
 
         {/* WORKBENCH BODY: Left Panel + Dominant Canvas + Right Inspector Panel */}
@@ -5140,7 +5230,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           )}
           {/* LEFT PANEL: LAYERS / STRUCTURE (FLOATING DRAWER) */}
           {isLeftPanelOpen && (
-            <aside className={`absolute top-3 left-3 bottom-20 md:bottom-6 w-72 bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col z-35 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-150 ${isAiOpen ? "max-md:hidden" : ""}`}>
+            <aside data-cad-ui className={`edit-layer-panel absolute top-3 left-3 bottom-20 md:bottom-6 w-72 bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col z-35 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-150 ${isAiOpen ? "max-md:hidden" : ""}`}>
               {/* Floor switcher */}
               <div className="p-3 border-b border-[#23252B]">
                 <div className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8] mb-2 flex items-center justify-between">
@@ -5245,7 +5335,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
             onDoubleClick={handleResetView}
-            className={`w-full h-full relative overflow-hidden bg-[#07080A] flex items-center justify-center select-none touch-none ${
+            className={`edit-cad-viewport w-full h-full min-w-0 relative overflow-hidden bg-[#07080A] flex items-center justify-center select-none ${
               isPanning ? "cursor-grabbing" : isPanMode || isSpacePressed ? "cursor-grab" : "cursor-default"
             }`}
           >
@@ -5256,13 +5346,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 transformOrigin: "center center",
                 transition: isWheelZooming || isPanning || draggingRoom || draggingFurniture || resizingRoom || draggingWall || resizingWallEndpoint || draggingOpening ? "none" : "transform 0.1s cubic-bezier(0.16, 1, 0.3, 1)",
               }}
-              className="flex items-center justify-center pointer-events-auto"
+              className="cad-drawing-surface flex items-center justify-center pointer-events-auto touch-none"
             >
               {renderSvgSheet()}
             </div>
 
             {/* FLOATING CAD CONTEXTUAL TOOLBAR */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto max-w-[calc(100vw-32px)]">
+            <div data-cad-ui className="edit-cad-toolbar absolute bottom-6 md:left-1/2 md:-translate-x-1/2 z-30 pointer-events-auto max-w-[calc(100vw-32px)]">
               <CadContextualToolbar
                 activeTool={activeTool as any}
                 onSelectTool={(tool) => setActiveTool(tool)}
@@ -5307,7 +5397,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
             {/* INLINE DIMENSION EDIT MODAL */}
             {editingDimension && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 pointer-events-auto">
+              <div data-cad-ui role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 pointer-events-auto">
                 <div className="w-full max-w-xs bg-[#16171B] border border-[#C48446]/40 rounded-2xl p-4 shadow-2xl space-y-3">
                   <div className="flex items-center justify-between pb-1 border-b border-white/10">
                     <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E69F58]">
@@ -5400,15 +5490,15 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
             {/* INVALID OPERATION WARNING BANNER */}
             {invalidMoveNotice && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full bg-red-950/90 text-red-200 border border-red-500/40 shadow-2xl text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
+              <div data-cad-ui className="cad-inline-alert absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full bg-red-950/90 text-red-200 border border-red-500/40 shadow-2xl text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
                 <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{invalidMoveNotice}</span>
+                <span className="min-w-0 break-words">{invalidMoveNotice}</span>
               </div>
             )}
 
             {/* EDIT NOTICE / CONSTRAINT WARNING BANNER */}
             {editNotice && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-[#12141A]/95 border border-[#C48446]/60 shadow-2xl text-xs font-mono text-[#F5F3EF] flex items-center gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <div data-cad-ui className="cad-inline-alert absolute top-4 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-[#12141A]/95 border border-[#C48446]/60 shadow-2xl text-xs font-mono text-[#F5F3EF] flex items-center gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
                 <Info className="w-4 h-4 text-[#C48446] shrink-0" />
                 <span>{editNotice}</span>
                 <button
@@ -5422,7 +5512,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
             {/* AI ARCHITECT POPOVER CARD */}
             {isAiOpen && (
-              <div className="absolute bottom-16 right-4 z-40 w-[min(20rem,calc(100%-2rem))] max-h-[calc(100%-5rem)] overflow-y-auto p-4 rounded-2xl bg-[#16171B]/95 backdrop-blur-md border border-[#C48446]/30 shadow-2xl text-[#F5F3EF] animate-in fade-in slide-in-from-left-2 duration-200">
+              <>
+              <div className="edit-ai-backdrop fixed inset-0 z-35 bg-black/50 md:hidden" onClick={() => setIsAiOpen(false)} />
+              <div data-cad-ui className="edit-ai-panel absolute bottom-16 right-4 z-40 w-[min(20rem,calc(100%-2rem))] max-h-[calc(100%-5rem)] overflow-y-auto p-4 rounded-2xl bg-[#16171B]/95 backdrop-blur-md border border-[#C48446]/30 shadow-2xl text-[#F5F3EF] animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center justify-between pb-2 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-[#C48446]" />
@@ -5514,10 +5606,11 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   </button>
                 </div>
               </div>
+              </>
             )}
 
             {/* BOTTOM-RIGHT FLOATING ZOOM/PAN CONTROLS */}
-            <div className="absolute bottom-16 md:bottom-4 right-3 sm:right-4 z-30 flex items-center gap-1 p-1 rounded-xl bg-[#16171B]/95 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#94A3B8]">
+            {!isAiOpen && <div data-cad-ui className="edit-zoom-controls absolute bottom-16 md:bottom-4 right-3 sm:right-4 z-30 flex items-center gap-1 p-1 rounded-xl bg-[#16171B]/95 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#94A3B8]">
               <button
                 onClick={() => setZoom((z) => Math.max(0.4, z * 0.85))}
                 className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white"
@@ -5550,7 +5643,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               >
                 <Hand className="w-3.5 h-3.5" />
               </button>
-            </div>
+            </div>}
           </main>
 
           {/* Mobile backdrop for Right Panel */}
@@ -5562,7 +5655,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           )}
           {/* RIGHT PANEL: PROPERTIES / INSPECTOR (FLOATING DRAWER) */}
           {isRightPanelOpen && (
-            <aside className={`absolute top-3 right-3 bottom-20 md:bottom-6 w-80 max-w-[calc(100vw-24px)] bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col z-35 shadow-2xl overflow-y-auto animate-in fade-in slide-in-from-right-2 duration-150 ${isAiOpen ? "max-md:hidden" : ""}`}>
+            <aside data-cad-ui className={`edit-properties-panel absolute top-3 right-3 bottom-20 md:bottom-6 w-80 max-w-[calc(100vw-24px)] bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col z-35 shadow-2xl overflow-y-auto animate-in fade-in slide-in-from-right-2 duration-150 ${isAiOpen ? "max-md:hidden" : ""}`}>
               {/* Inspector Header */}
               <div className="p-3 border-b border-[#23252B] flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8]">
@@ -6083,13 +6176,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // 2. PRESENTATION VIEW MODE (when mode === 'view')
   // -------------------------------------------------------------
   return (
-    <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#030303]">
+    <div className="plan-presentation-shell relative w-full h-full min-h-0 flex flex-col select-none overflow-hidden bg-[#030303]">
       {/* Presentation Top Bar */}
-      <div className="absolute top-16 sm:top-5 left-3 sm:left-6 right-3 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
+      <div className="plan-presentation-toolbar absolute top-16 sm:top-5 left-3 sm:left-6 right-3 sm:right-6 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto">
           <button
             onClick={() => router.push(`/project/${layout.id}/plan`)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#080F1C]/80 hover:bg-[#0D1526]/90 text-[#F5F5F5] border border-blue-500/20 backdrop-blur-md text-xs font-mono tracking-wider shadow-lg transition-all"
+            className="hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#080F1C]/80 hover:bg-[#0D1526]/90 text-[#F5F5F5] border border-blue-500/20 backdrop-blur-md text-xs font-mono tracking-wider shadow-lg transition-all sm:flex"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
             <span>PLAN</span>
@@ -6140,7 +6233,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         onDoubleClick={handleResetView}
-        className={`w-full h-full flex items-center justify-center p-2 sm:p-4 select-none touch-none ${
+        className={`plan-canvas-viewport relative min-h-0 w-full flex-1 flex items-center justify-center p-2 sm:p-4 select-none ${
           isPanning ? "cursor-grabbing" : isPanMode ? "cursor-grab" : "cursor-default"
         }`}
       >
@@ -6150,14 +6243,14 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             transformOrigin: "center center",
             transition: isPanning || isWheelZooming || draggingRoom || draggingFurniture || resizingRoom ? "none" : "transform 0.12s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
-          className="flex items-center justify-center"
+          className="cad-drawing-surface flex items-center justify-center touch-none"
         >
           {renderSvgSheet()}
         </div>
       </div>
 
       {/* Minimal Bottom Zoom Controls */}
-      <div className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 z-30 flex items-center p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
+      <div data-cad-ui className="plan-zoom-controls absolute bottom-4 sm:bottom-6 right-4 sm:right-6 z-30 flex items-center p-1 rounded-full bg-[#12141A]/90 backdrop-blur-md border border-white/10 shadow-2xl text-[11px] font-mono text-[#9E9C98]">
         <button
           onClick={() => setZoom((z) => Math.min(3.5, z * 1.15))}
           className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
