@@ -651,6 +651,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
   // Parametric CAD Interactive Tools & State
   const [activeTool, setActiveTool] = useState<"select" | "room" | "wall" | "door" | "window" | "furniture" | "dimension" | "measure">("select");
+  useEffect(() => {
+    if (mode !== "edit") return;
+    setActiveTool((currentTool) => {
+      if (currentTool === "select") return currentTool;
+      return "select";
+    });
+  }, [mode]);
   const [showDimensions, setShowDimensions] = useState(true);
   const [currentSnap, setCurrentSnap] = useState<SnapResult | null>(null);
   const [measureState, setMeasureState] = useState<{ p1: { x: number; y: number } | null; p2: { x: number; y: number } | null; isConfirmed: boolean } | null>(null);
@@ -1216,10 +1223,30 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     return nearestDistance <= 0.75 ? nearest : null;
   };
 
+  const isPointerInsideCadViewport = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return false;
+    const rect = svg.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  }, []);
+
   const handleSvgMouseDownCapture = (event: React.MouseEvent<SVGSVGElement>) => {
     if (mode !== "edit" || event.button !== 0) return;
     const point = getModelPoint(event.clientX, event.clientY);
     if (!point) return;
+
+    const wallAtPoint = findWallAtPoint(point);
+    if (activeTool === "wall" && wallAtPoint) {
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectedWallId(wallAtPoint.id);
+      setSelectedDoorId(null);
+      setSelectedWindowId(null);
+      handleSelectRoom(null);
+      handleSelectFurniture(null);
+      setActiveTool("select");
+      return;
+    }
 
     if (activeTool === "measure") {
       event.preventDefault();
@@ -1411,10 +1438,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // Wheel Zoom (Cursor-Centered Math, Non-Passive Listener, Trackpad Support)
   const handleWheelNative = useCallback(
     (e: WheelEvent) => {
+      const container = containerRef.current;
+      if (!container || !isPointerInsideCadViewport(e.clientX, e.clientY)) {
+        return;
+      }
+
       e.preventDefault();
       e.stopPropagation();
-      const container = containerRef.current;
-      if (!container) return;
 
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left - rect.width / 2;
@@ -1440,7 +1470,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         return nextZoom;
       });
     },
-    []
+    [isPointerInsideCadViewport]
   );
 
   const setContainerRef = useCallback(
@@ -2738,15 +2768,23 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const handleDone = async () => {
     setIsSaving(true);
     try {
-      await onSave?.(layout);
+      const canonicalLayout = syncPrimaryFloor(layout);
+      const sanitizedLayout = validateAndSanitizeHouseLayout(canonicalLayout) || canonicalLayout;
+      await onSave?.(sanitizedLayout);
+      if (onBack) {
+        onBack();
+      } else {
+        router.push(`/project/${sanitizedLayout.id}/plan`);
+      }
     } catch (e) {
       console.warn("Save callback error", e);
-    }
-    setIsSaving(false);
-    if (onBack) {
-      onBack();
-    } else {
-      router.push(`/project/${layout.id}/plan`);
+      if (onBack) {
+        onBack();
+      } else {
+        router.push(`/project/${layout.id}/plan`);
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
