@@ -3,7 +3,8 @@
 import React, { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { FloatingNav, NavView } from "@/components/FloatingNav";
+import { PillNav } from "@/components/PillNav";
+import type { NavView } from "@/components/FloatingNav";
 import { HomePageView } from "@/components/HomePageView";
 import { CreateChoiceModal } from "@/components/CreateChoiceModal";
 import { ProjectsModal } from "@/components/ProjectsModal";
@@ -204,13 +205,15 @@ export default function HomePage() {
         <HomePageView
           scrollRoot={homeScrollRoot}
           navbar={!isConsultationOpen ? (
-            <FloatingNav
-              currentView="home"
-              onNavigate={handleNavigate}
-              isProjectWorkspace={false}
-              hasProject={Boolean(projectId)}
+            <PillNav
+              activeHref="/"
+              onNavigateHome={() => {
+                if (homeScrollRoot.current) {
+                  homeScrollRoot.current.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
               onOpenProjects={() => setIsProjectsOpen(true)}
-              placement="flow"
+              onCreate={() => setIsCreateChoiceOpen(true)}
             />
           ) : null}
           onStartDesign={() => setIsCreateChoiceOpen(true)}

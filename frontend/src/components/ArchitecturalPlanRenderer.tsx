@@ -13,7 +13,7 @@ import {
 } from "@/utils/blueprint2D";
 import { refineHouseLayout, editRoomLayoutFull, reviewLayoutWithGemini } from "@/utils/api";
 import { validateAndSanitizeHouseLayout } from "@/utils/layoutValidator";
-import { FloatingNav, NavView } from "./FloatingNav";
+import type { NavView } from "./FloatingNav";
 import {
   generateCanonicalWallNetwork,
   synchronizeOpeningsWithWalls,
