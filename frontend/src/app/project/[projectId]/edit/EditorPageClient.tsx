@@ -80,7 +80,7 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
 
   if (loading || !isHydrated) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#07080A] text-[#F5F3EF]">
+      <div className="w-full max-w-full h-[100dvh] flex flex-col items-center justify-center bg-[#07080A] text-[#F5F3EF]">
         <div className="flex items-center gap-3">
           <Loader2 className="w-6 h-6 animate-spin text-[#C48446]" />
           <span className="text-xs font-mono tracking-widest uppercase">
@@ -93,7 +93,7 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
 
   if (!layout) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center gap-5 bg-[#07080A] text-[#F5F3EF]">
+      <div className="w-full max-w-full h-[100dvh] flex flex-col items-center justify-center gap-5 bg-[#07080A] text-[#F5F3EF]">
         <p className="max-w-md px-6 text-center text-sm text-neutral-400" role="alert">
           {loadError || "This project could not be loaded."}
         </p>

@@ -493,7 +493,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // ─────────────────────────────────────────────────────────
   if (!isHydrated || isLoadingProject) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#0A0B0E] text-[#F5F3EF]">
+      <div className="w-full max-w-full h-[100dvh] flex flex-col items-center justify-center bg-[#0A0B0E] text-[#F5F3EF]">
         <Loader2 className="w-6 h-6 animate-spin text-[#C48446] mb-3" />
         <span className="text-xs font-mono tracking-widest uppercase">Loading Studio…</span>
       </div>
@@ -502,7 +502,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   if (!layout) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center gap-5 bg-[#0A0B0E] text-[#F5F3EF]">
+      <div className="w-full max-w-full h-[100dvh] flex flex-col items-center justify-center gap-5 bg-[#0A0B0E] text-[#F5F3EF]">
         <p className="max-w-md px-6 text-center text-sm text-[#A0A5B5]" role="alert">
           {projectLoadError || "This project could not be loaded."}
         </p>
@@ -534,7 +534,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────
   return (
-    <div className="relative w-full max-w-full h-[100dvh] overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
+    <div className="workspace-shell relative flex w-full min-w-0 max-w-full h-[100dvh] flex-col overflow-hidden bg-[#0A0B0E] text-[#F5F3EF]">
 
       {/* ── Floating Nav ── */}
       {!isConsultationOpen && !(currentTab === "plan" && planEditMode === "edit") && (
@@ -549,21 +549,33 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           onTogglePlanEditMode={() =>
             setPlanEditMode((mode) => (mode === "view" ? "edit" : "view"))
           }
+          placement="responsive"
         />
       )}
 
       {/* ── Optimization notice pill ── */}
       {!isConsultationOpen && Boolean((layout as any)?.metadata?.optimization_note) && (
-        <div className="fixed top-14 sm:top-[70px] left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#12141A]/95 text-amber-200 border border-amber-500/30 text-[11px] font-mono shadow-2xl backdrop-blur-md max-w-[calc(100vw-32px)]">
+        <div className="workspace-notice relative z-20 w-full shrink-0 px-3 py-1 lg:pointer-events-none lg:fixed lg:left-1/2 lg:top-[70px] lg:w-auto lg:-translate-x-1/2">
+          <div className="flex w-full items-start gap-2 rounded-xl border border-amber-500/30 bg-[#12141A]/95 px-3 py-2 font-mono text-[11px] leading-4 text-amber-200 shadow-2xl backdrop-blur-md lg:w-auto lg:max-w-[calc(100vw-32px)] lg:items-center lg:rounded-full lg:py-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span className="truncate">{String((layout as any)?.metadata?.optimization_note)}</span>
+            <span className="min-w-0 break-words lg:truncate">{String((layout as any)?.metadata?.optimization_note)}</span>
           </div>
         </div>
       )}
 
+      {currentTab === "plan" && planEditMode === "view" && !isConsultationOpen && (
+        <div className="workspace-mep-slot relative z-20 flex w-full shrink-0 items-center justify-end gap-2 px-3 pb-1 lg:contents">
+          <MEPLayerControls value={mepVisibility} onChange={handleMepVisibilityChange} />
+          {mepError && (
+            <div role="alert" className="max-w-full min-w-0 rounded-lg border border-red-400/25 bg-[#171015]/95 px-3 py-2 text-[10px] leading-4 text-red-200 shadow-lg break-words lg:fixed lg:right-3 lg:top-[13.5rem] lg:z-40 lg:max-w-56">
+              {mepError}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Main viewport ── */}
-      <main className="w-full h-full relative overflow-hidden">
+      <main className="workspace-main relative w-full min-h-0 flex-1 overflow-hidden lg:h-full">
         <AnimatePresence mode="wait">
 
           {/* ── 1. PLAN (2D only — 3D never loaded here) ── */}
@@ -692,17 +704,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
         </AnimatePresence>
       </main>
-
-      {currentTab === "plan" && planEditMode === "view" && !isConsultationOpen && (
-        <>
-          <MEPLayerControls value={mepVisibility} onChange={handleMepVisibilityChange} />
-          {mepError && (
-            <div role="alert" className="fixed right-3 top-[13.5rem] z-40 max-w-56 rounded-lg border border-red-400/25 bg-[#171015]/95 px-3 py-2 text-[10px] text-red-200 shadow-lg">
-              {mepError}
-            </div>
-          )}
-        </>
-      )}
 
       {/* ── Floating AI Command Bar (plan & model only) ── */}
       {((currentTab === "plan" && planEditMode !== "edit") || currentTab === "model") && !isConsultationOpen && (

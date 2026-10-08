@@ -105,14 +105,19 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
   const positionClass =
     context === "model"
       ? "bottom-[max(1.5rem,env(safe-area-inset-bottom))] max-[640px]:bottom-[max(4.5rem,calc(env(safe-area-inset-bottom)+3rem))] left-[max(1rem,env(safe-area-inset-left))]"
-      : "max-md:bottom-[max(1rem,env(safe-area-inset-bottom))] max-md:left-3 md:top-[max(5.5rem,calc(env(safe-area-inset-top)+4.8rem))] md:left-[max(1rem,env(safe-area-inset-left))]";
+      : "max-lg:left-[max(0.75rem,env(safe-area-inset-left))] lg:top-[max(5.5rem,calc(env(safe-area-inset-top)+4.8rem))] lg:left-[max(1rem,env(safe-area-inset-left))]";
+  const mobileBottomClass = context === "model"
+    ? ""
+    : isExpanded
+    ? "max-lg:bottom-[calc(4.25rem+env(safe-area-inset-bottom))]"
+    : "max-lg:bottom-[max(0.5rem,env(safe-area-inset-bottom))]";
 
   return (
     <>
       {/* Mobile backdrop when expanded */}
       {isExpanded && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-xs"
+          className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-xs"
           onClick={() => setIsExpanded(false)}
         />
       )}
@@ -120,9 +125,10 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
       <div
         className={`fixed ${
           isExpanded
-            ? "max-md:fixed max-md:inset-x-3 max-md:bottom-3 max-md:top-auto max-md:w-auto max-md:max-h-[80dvh] " + positionClass
-            : positionClass
-        } z-40 w-[min(21rem,calc(100vw-2rem))] max-h-[calc(100dvh-7rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] pointer-events-auto`}
+            ? "max-lg:fixed max-lg:inset-x-3 max-lg:top-auto max-lg:w-auto max-lg:max-h-[min(50dvh,24rem)]"
+            : ""
+        } ${positionClass} ${mobileBottomClass} z-40 w-[min(21rem,calc(100vw-2rem))] max-h-[calc(100dvh-7rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] pointer-events-auto`}
+        data-cad-ui
       >
         {!isExpanded ? (
           <button
@@ -130,11 +136,12 @@ export const FloatingAICommandBar: React.FC<FloatingAICommandBarProps> = ({
             onClick={() => setIsExpanded(true)}
             aria-label="Open AI Architect"
             aria-expanded={false}
-            className="flex items-center gap-2.5 rounded-full border border-[rgba(96,165,250,0.22)] bg-[rgba(8,14,26,0.92)] px-3.5 py-2 text-[#93C5FD] shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(6,182,212,0.18)] backdrop-blur-2xl transition-all hover:bg-[rgba(12,20,38,0.96)] hover:border-[rgba(96,165,250,0.4)] hover:-translate-y-0.5 active:scale-95"
+            className="flex min-h-11 items-center gap-2 rounded-full border border-[rgba(96,165,250,0.22)] bg-[rgba(8,14,26,0.92)] px-3 py-2 text-[#93C5FD] shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(6,182,212,0.18)] backdrop-blur-2xl transition-all hover:bg-[rgba(12,20,38,0.96)] hover:border-[rgba(96,165,250,0.4)] hover:-translate-y-0.5 active:scale-95"
           >
             <div className="w-2 h-2 rounded-full bg-[linear-gradient(135deg,#3B82F6,#06B6D4)] shadow-[0_0_8px_#06B6D4] animate-pulse" />
             <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.2em] text-[#F5F5F5]">
-              AI Architect
+              <span className="max-[380px]:hidden">AI Architect</span>
+              <span className="hidden max-[380px]:inline">AI ✦</span>
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-[#93C5FD]" />
           </button>
