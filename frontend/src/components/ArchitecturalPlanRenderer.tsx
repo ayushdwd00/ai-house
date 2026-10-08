@@ -62,6 +62,20 @@ import {
   PenTool,
   MoreHorizontal,
 } from "lucide-react";
+import {
+  distanceWorld,
+  angleWorld,
+  screenToWorld,
+} from "@/utils/cadCoordinates";
+import { CadSnapEngine, SnapResult } from "@/utils/cadSnapEngine";
+import {
+  applyWallMovementTopology,
+  checkWallDeleteDependencies,
+  createCanonicalWall,
+  WallDeleteDependencyCheck,
+} from "@/utils/cadTopology";
+import { CadContextualToolbar } from "./CadContextualToolbar";
+import { executeLocalCadAiCommand } from "@/utils/cadAiCommands";
 
 export type PlanMode = "view" | "edit";
 
@@ -199,6 +213,7 @@ interface DraggingWallState {
   initialWalls: Wall[];
   initialDoors: Door[];
   initialWindows: Window[];
+  initialFloor: FloorPlan;
 }
 
 interface ResizingWallEndpointState {
@@ -616,6 +631,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   const [isPanMode, setIsPanMode] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isWheelZooming, setIsWheelZooming] = useState(false);
+  const wheelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStateRef = useRef<{
     initialDist: number | null;
     initialZoom: number;
@@ -632,11 +649,22 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     startPanY: 0,
   });
 
-  // Figma-Style Editor Panels & Tools
-  const [activeTool, setActiveTool] = useState<"select" | "room" | "wall" | "door" | "window" | "furniture" | "dimension">("select");
+  // Parametric CAD Interactive Tools & State
+  const [activeTool, setActiveTool] = useState<"select" | "room" | "wall" | "door" | "window" | "furniture" | "dimension" | "measure">("select");
   const [showDimensions, setShowDimensions] = useState(true);
-  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(() => (typeof window !== "undefined" && window.innerWidth <= 768 ? false : true));
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(() => (typeof window !== "undefined" && window.innerWidth <= 768 ? false : true));
+  const [currentSnap, setCurrentSnap] = useState<SnapResult | null>(null);
+  const [measureState, setMeasureState] = useState<{ p1: { x: number; y: number } | null; p2: { x: number; y: number } | null; isConfirmed: boolean } | null>(null);
+  const [pendingWallDelete, setPendingWallDelete] = useState<WallDeleteDependencyCheck | null>(null);
+  const [editingDimension, setEditingDimension] = useState<{
+    type: "wall" | "room_width" | "room_length";
+    id: string;
+    label: string;
+    currentValue: number;
+  } | null>(null);
+  const [ghostOpening, setGhostOpening] = useState<{ kind: "door" | "window"; geom: { x1: number; y1: number; x2: number; y2: number; width: number }; wall: Wall } | null>(null);
+
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
   const [alignmentGuides, setAlignmentGuides] = useState<Array<{ type: "h" | "v"; pos: number }>>([]);
 
@@ -735,6 +763,23 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     return (currentFloor.windows || []).find((w) => w.id === selectedWindowId) || null;
   }, [currentFloor.windows, selectedWindowId]);
 
+  const selectedEntityPayload = useMemo(() => {
+    if (selectedWallId && selectedWall) {
+      return { type: "wall" as const, id: selectedWallId, wall: selectedWall };
+    }
+    if (selectedDoorId && selectedDoor) {
+      return { type: "door" as const, id: selectedDoorId, door: selectedDoor };
+    }
+    if (selectedWindowId && selectedWindow) {
+      return { type: "window" as const, id: selectedWindowId, window: selectedWindow };
+    }
+    if (selectedRoomId) {
+      const rm = (currentFloor.rooms || []).find((r) => r.id === selectedRoomId);
+      if (rm) return { type: "room" as const, id: selectedRoomId, room: rm };
+    }
+    return { type: null };
+  }, [selectedWallId, selectedWall, selectedDoorId, selectedDoor, selectedWindowId, selectedWindow, selectedRoomId, currentFloor.rooms]);
+
   const handleToggleWallThickness = () => {
     if (!selectedWall) return;
     const newThickness = selectedWall.thickness > 0.5 ? 0.375 : 0.75;
@@ -752,18 +797,124 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       setTimeout(() => setInvalidMoveNotice(null), 3000);
       return;
     }
+    const check = checkWallDeleteDependencies(currentFloor, selectedWall.id);
+    if (check && !check.canDeleteDirectly) {
+      setPendingWallDelete(check);
+      return;
+    }
+    commitWallDeletion(selectedWall.id);
+  };
+
+  const commitWallDeletion = (wallId: string) => {
     const doors = (currentFloor.doors || []).filter(
-      (opening) => (opening.host_wall_id || opening.wall_id) !== selectedWall.id
+      (opening) => (opening.host_wall_id || opening.wall_id) !== wallId
     );
     const windows = (currentFloor.windows || []).filter(
-      (opening) => (opening.host_wall_id || opening.wall_id) !== selectedWall.id
+      (opening) => (opening.host_wall_id || opening.wall_id) !== wallId
     );
     commitFloorUpdate({
-      interior_walls: (currentFloor.interior_walls || []).filter((wall) => wall.id !== selectedWall.id),
+      interior_walls: (currentFloor.interior_walls || []).filter((wall) => wall.id !== wallId),
       doors,
       windows,
     });
     setSelectedWallId(null);
+  };
+
+  const handleApplyInlineDimension = (newValStr: string) => {
+    if (!editingDimension) return;
+    const targetVal = parseArchitecturalDimension(newValStr);
+    if (targetVal === null) {
+      setInvalidMoveNotice("Invalid dimension entered (e.g. 14'-6\" or 14.5).");
+      setTimeout(() => setInvalidMoveNotice(null), 3000);
+      setEditingDimension(null);
+      return;
+    }
+
+    if (editingDimension.type === "wall") {
+      const allWalls = [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])];
+      const wall = allWalls.find((w) => w.id === editingDimension.id);
+      if (!wall) {
+        setEditingDimension(null);
+        return;
+      }
+      const currentLen = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+      const delta = targetVal - currentLen;
+      if (targetVal < 2.5) {
+        setInvalidMoveNotice("Wall length cannot be less than 2.5 feet.");
+        setTimeout(() => setInvalidMoveNotice(null), 3000);
+        setEditingDimension(null);
+        return;
+      }
+      const dx = wall.x2 - wall.x1;
+      const dy = wall.y2 - wall.y1;
+      const len = currentLen || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+
+      const newX2 = Math.round((wall.x2 + ux * delta) * 4) / 4;
+      const newY2 = Math.round((wall.y2 + uy * delta) * 4) / 4;
+
+      const updateWall = (w: Wall): Wall =>
+        w.id === wall.id ? { ...w, x2: newX2, y2: newY2, end: { x: newX2, y: newY2 } } : w;
+
+      commitFloorUpdate({
+        exterior_walls: (currentFloor.exterior_walls || []).map(updateWall),
+        interior_walls: (currentFloor.interior_walls || []).map(updateWall),
+      });
+    } else if (editingDimension.type === "room_width") {
+      const rm = (currentFloor.rooms || []).find((r) => r.id === editingDimension.id);
+      if (rm && rm.rect) {
+        const deltaW = targetVal - rm.rect.width;
+        const rightEdge = rm.rect.x + rm.rect.width;
+        const allWalls = [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])];
+        const rightWall = allWalls.find(
+          (w) => Math.abs(w.x1 - rightEdge) < 0.35 && Math.abs(w.x2 - rightEdge) < 0.35
+        );
+        if (rightWall) {
+          const topo = applyWallMovementTopology(currentFloor, rightWall.id, deltaW, 0, layout.plot_width, layout.plot_length);
+          if (topo.isValid) {
+            commitFloorUpdate(topo.updatedFloor);
+          } else {
+            setInvalidMoveNotice(topo.errorMessage || "Cannot resize room.");
+            setTimeout(() => setInvalidMoveNotice(null), 3000);
+          }
+        } else {
+          const newW = Math.max(3.5, targetVal);
+          commitFloorUpdate({
+            rooms: (currentFloor.rooms || []).map((r) =>
+              r.id === rm.id ? { ...r, rect: { ...r.rect, width: newW }, area_sqft: Math.round(newW * r.rect.length) } : r
+            ),
+          });
+        }
+      }
+    } else if (editingDimension.type === "room_length") {
+      const rm = (currentFloor.rooms || []).find((r) => r.id === editingDimension.id);
+      if (rm && rm.rect) {
+        const deltaL = targetVal - rm.rect.length;
+        const bottomEdge = rm.rect.y + rm.rect.length;
+        const allWalls = [...(currentFloor.exterior_walls || []), ...(currentFloor.interior_walls || [])];
+        const bottomWall = allWalls.find(
+          (w) => Math.abs(w.y1 - bottomEdge) < 0.35 && Math.abs(w.y2 - bottomEdge) < 0.35
+        );
+        if (bottomWall) {
+          const topo = applyWallMovementTopology(currentFloor, bottomWall.id, 0, deltaL, layout.plot_width, layout.plot_length);
+          if (topo.isValid) {
+            commitFloorUpdate(topo.updatedFloor);
+          } else {
+            setInvalidMoveNotice(topo.errorMessage || "Cannot resize room.");
+            setTimeout(() => setInvalidMoveNotice(null), 3000);
+          }
+        } else {
+          const newL = Math.max(3.5, targetVal);
+          commitFloorUpdate({
+            rooms: (currentFloor.rooms || []).map((r) =>
+              r.id === rm.id ? { ...r, rect: { ...r.rect, length: newL }, area_sqft: Math.round(r.rect.width * newL) } : r
+            ),
+          });
+        }
+      }
+    }
+    setEditingDimension(null);
   };
 
   const handleSetWallThickness = (thickness: number) => {
@@ -1069,24 +1220,47 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     if (mode !== "edit" || event.button !== 0) return;
     const point = getModelPoint(event.clientX, event.clientY);
     if (!point) return;
+
+    if (activeTool === "measure") {
+      event.preventDefault();
+      event.stopPropagation();
+      const snapResult = CadSnapEngine.snap(point, canonicalWallNet.walls, currentFloor.rooms);
+      setCurrentSnap(snapResult);
+      const snapped = snapResult.point;
+      if (!measureState || !measureState.p1 || measureState.isConfirmed) {
+        setMeasureState({ p1: snapped, p2: snapped, isConfirmed: false });
+      } else {
+        setMeasureState({ ...measureState, p2: snapped, isConfirmed: true });
+      }
+      return;
+    }
+
     if (activeTool === "wall") {
       event.preventDefault();
       event.stopPropagation();
-      const snapped = snapWallPoint(point);
-      setDrawingWall({ start: snapped, end: snapped });
+      const snapResult = CadSnapEngine.snap(point, canonicalWallNet.walls, currentFloor.rooms);
+      setCurrentSnap(snapResult);
+      const snapped = snapResult.point;
+      if (!drawingWall) {
+        setDrawingWall({ start: snapped, end: snapped });
+      } else {
+        finishWallDrawing();
+      }
       return;
     }
+
     if (activeTool !== "door" && activeTool !== "window") return;
     event.preventDefault();
     event.stopPropagation();
-    const wall = findWallAtPoint(point);
+    const proj = CadSnapEngine.projectToNearestWall(point, canonicalWallNet.walls, 1.5);
+    const wall = proj?.wall || findWallAtPoint(point);
     if (!wall) {
       setInvalidMoveNotice("Select a valid wall to place an opening.");
       setTimeout(() => setInvalidMoveNotice(null), 2500);
       return;
     }
     const kind = activeTool;
-    const width = kind === "door" ? 3 : 4;
+    const width = kind === "door" ? 3.0 : 4.0;
     const openingGeometry = projectOpeningToWall(wall, point, width);
     if (!openingGeometry) return;
     const id = `${kind === "door" ? "d" : "win"}_${crypto.randomUUID()}`;
@@ -1135,12 +1309,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     setSelectedWallId(null);
     handleSelectRoom(null);
     handleSelectFurniture(null);
+    setActiveTool("select");
   };
 
   const handleSvgClickCapture = (event: React.MouseEvent<SVGSVGElement>) => {
     if (
       mode === "edit" &&
-      (activeTool === "wall" || activeTool === "door" || activeTool === "window")
+      (activeTool === "wall" || activeTool === "door" || activeTool === "window" || activeTool === "measure")
     ) {
       event.stopPropagation();
     }
@@ -1150,46 +1325,31 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     if (!drawingWall) return;
     const { start, end } = drawingWall;
     setDrawingWall(null);
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const constrainedEnd = Math.abs(dx) >= Math.abs(dy)
-      ? { x: end.x, y: start.y }
-      : { x: start.x, y: end.y };
-    const wallId = `wall_${crypto.randomUUID()}`;
-    const wall: Wall = {
-      id: wallId,
-      wall_id: wallId,
-      start,
-      end: constrainedEnd,
-      x1: start.x,
-      y1: start.y,
-      x2: constrainedEnd.x,
-      y2: constrainedEnd.y,
-      thickness: 0.375,
-      height: 9.5,
-      wall_type: "partition",
-      is_exterior: false,
-      adjacent_room_ids: [],
-      room_ids: [],
-      connected_room_ids: [],
-      wall_direction: Math.abs(start.y - constrainedEnd.y) < 0.05 ? "horizontal" : "vertical",
-    };
-    const walls = [...canonicalWallNet.walls, wall];
-    if (Math.hypot(dx, dy) < 2 || !hasValidWallGeometry(walls, layout.plot_width, layout.plot_length)) {
+    setCurrentSnap(null);
+    const len = Math.hypot(end.x - start.x, end.y - start.y);
+    if (len < 1.5) {
+      setInvalidMoveNotice("Wall is too short (minimum 1.5 ft).");
+      setTimeout(() => setInvalidMoveNotice(null), 2500);
+      return;
+    }
+    const newWall = createCanonicalWall(start, end, 0.375, false, 9.5);
+    const updatedWalls = [...canonicalWallNet.walls, newWall];
+    if (!hasValidWallGeometry(updatedWalls, layout.plot_width, layout.plot_length)) {
       setInvalidMoveNotice("Wall geometry is invalid or overlaps an existing wall.");
       setTimeout(() => setInvalidMoveNotice(null), 3000);
       return;
     }
     commitFloorUpdate({
       exterior_walls: currentFloor.exterior_walls || [],
-      interior_walls: [...(currentFloor.interior_walls || []), wall],
-      walls,
+      interior_walls: [...(currentFloor.interior_walls || []), newWall],
+      walls: updatedWalls,
     });
-    setSelectedWallId(wallId);
+    setSelectedWallId(newWall.id);
     setSelectedDoorId(null);
     setSelectedWindowId(null);
     handleSelectRoom(null);
     handleSelectFurniture(null);
+    setActiveTool("select");
   };
 
   // Synchronize doors and windows so they are physically embedded into host walls
@@ -1248,10 +1408,11 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     [layout.plot_width, layout.plot_length, SCALE]
   );
 
-  // Wheel Zoom
-  const handleWheel = useCallback(
+  // Wheel Zoom (Cursor-Centered Math, Non-Passive Listener, Trackpad Support)
+  const handleWheelNative = useCallback(
     (e: WheelEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       const container = containerRef.current;
       if (!container) return;
 
@@ -1259,9 +1420,19 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       const mouseX = e.clientX - rect.left - rect.width / 2;
       const mouseY = e.clientY - rect.top - rect.height / 2;
 
-      const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+      // Trackpad pinch emits wheel with ctrlKey=true
+      const zoomFactor = e.ctrlKey
+        ? Math.exp(-e.deltaY * 0.01)
+        : e.deltaY < 0
+        ? 1.14
+        : 0.88;
+
+      setIsWheelZooming(true);
+      if (wheelTimeoutRef.current) clearTimeout(wheelTimeoutRef.current);
+      wheelTimeoutRef.current = setTimeout(() => setIsWheelZooming(false), 140);
+
       setZoom((prevZoom) => {
-        const nextZoom = Math.min(3.5, Math.max(0.4, prevZoom * zoomFactor));
+        const nextZoom = Math.min(5.0, Math.max(0.2, prevZoom * zoomFactor));
         setPan((prevPan) => ({
           x: mouseX - (mouseX - prevPan.x) * (nextZoom / prevZoom),
           y: mouseY - (mouseY - prevPan.y) * (nextZoom / prevZoom),
@@ -1272,12 +1443,27 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     []
   );
 
+  const setContainerRef = useCallback(
+    (node: HTMLElement | null) => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener("wheel", handleWheelNative);
+      }
+      containerRef.current = node as HTMLDivElement;
+      if (node) {
+        node.addEventListener("wheel", handleWheelNative, { passive: false });
+      }
+    },
+    [handleWheelNative]
+  );
+
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", handleWheelNative, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", handleWheelNative);
+    };
+  }, [handleWheelNative, mode]);
 
   // Reset / Zoom-to-fit Canvas View (Center Floor Plan with Padding)
   const handleResetView = useCallback(() => {
@@ -1494,35 +1680,109 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
   // Global Mouse Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only pan if middle click or pan mode active or space pressed or background left click
+    // 1. Middle mouse button -> ALWAYS pan
+    if (e.button === 1) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
+    }
+
+    // 2. Space + Left mouse -> ALWAYS pan
+    if (isSpacePressed && e.button === 0) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
+    }
+
+    // 3. Dedicated pan mode (Hand tool) -> Pan
+    if (isPanMode && e.button === 0) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
+    }
+
+    // 4. In "view" mode -> Left click on canvas background pans
+    if (mode === "view" && e.button === 0) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
+    }
+
+    // 5. In "edit" mode: Left click ONLY pans if in "select" tool AND NOT interacting with an object
     if (
-      e.button === 1 ||
-      isPanMode ||
-      isSpacePressed ||
-      (e.button === 0 &&
-        !draggingRoom &&
-        !draggingFurniture &&
-        !resizingRoom &&
-        !draggingWall &&
-        !resizingWallEndpoint)
+      mode === "edit" &&
+      activeTool === "select" &&
+      e.button === 0 &&
+      !draggingRoom &&
+      !draggingFurniture &&
+      !resizingRoom &&
+      !draggingWall &&
+      !resizingWallEndpoint &&
+      !draggingOpening
     ) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning && !draggingRoom && !draggingFurniture && !resizingRoom && !draggingWall && !resizingWallEndpoint) {
+    if (
+      isPanning &&
+      !draggingRoom &&
+      !draggingFurniture &&
+      !resizingRoom &&
+      !draggingWall &&
+      !resizingWallEndpoint &&
+      !draggingOpening
+    ) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
       return;
     }
 
     if (mode !== "edit") return;
 
+    const currentPoint = getModelPoint(e.clientX, e.clientY);
+
+    // Live snap feedback & hover tracking
+    if (currentPoint) {
+      if (activeTool === "measure") {
+        const snapRes = CadSnapEngine.snap(currentPoint, canonicalWallNet.walls, currentFloor.rooms, {
+          referencePoint: measureState?.p1 || undefined,
+        });
+        setCurrentSnap(snapRes);
+        if (measureState?.p1 && !measureState.isConfirmed) {
+          setMeasureState((prev) => (prev ? { ...prev, p2: snapRes.point } : null));
+        }
+        return;
+      }
+
+      if ((activeTool === "door" || activeTool === "window") && !draggingOpening && !drawingWall) {
+        const proj = CadSnapEngine.projectToNearestWall(currentPoint, canonicalWallNet.walls, 1.5);
+        if (proj) {
+          const width = activeTool === "door" ? 3.0 : 4.0;
+          const geom = projectOpeningToWall(proj.wall, currentPoint, width);
+          if (geom) {
+            setGhostOpening({ kind: activeTool, geom, wall: proj.wall });
+          } else {
+            setGhostOpening(null);
+          }
+        } else {
+          setGhostOpening(null);
+        }
+      }
+    }
+
     if (drawingWall) {
-      const point = getModelPoint(e.clientX, e.clientY);
-      if (!point) return;
-      const snapped = snapWallPoint(point);
+      if (!currentPoint) return;
+      const snapRes = CadSnapEngine.snap(currentPoint, canonicalWallNet.walls, currentFloor.rooms, {
+        referencePoint: drawingWall.start,
+      });
+      setCurrentSnap(snapRes);
+      const snapped = snapRes.point;
       const dx = snapped.x - drawingWall.start.x;
       const dy = snapped.y - drawingWall.start.y;
       setDrawingWall({
@@ -1535,10 +1795,10 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     }
 
     if (draggingOpening) {
-      const point = getModelPoint(e.clientX, e.clientY);
+      if (!currentPoint) return;
       const wall = canonicalWallNet.walls.find((candidate) => candidate.id === draggingOpening.wallId);
-      if (!point || !wall) return;
-      const openingGeometry = projectOpeningToWall(wall, point, draggingOpening.initialOpening.width);
+      if (!wall) return;
+      const openingGeometry = projectOpeningToWall(wall, currentPoint, draggingOpening.initialOpening.width);
       if (!openingGeometry) return;
       setLayout((prev) => {
         const floors = [...(prev.floors || [])];
@@ -1566,7 +1826,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       return;
     }
 
-    // 1. Wall Dragging (Direct Manipulation with Relationship Updates)
+    // 1. Wall Dragging: Real-time Parametric CAD Topology Preservation
     if (draggingWall) {
       const deltaXFeet = (e.clientX - draggingWall.startMouseX) / (SCALE * zoom);
       const deltaYFeet = (e.clientY - draggingWall.startMouseY) / (SCALE * zoom);
@@ -1577,114 +1837,41 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       const snappedDeltaX = isHorizontal ? 0 : snapDelta(deltaXFeet);
       const snappedDeltaY = isHorizontal ? snapDelta(deltaYFeet) : 0;
 
-      setLayout((prev) => {
-        const nextFloors = prev.floors ? [...prev.floors] : [];
-        if (nextFloors[activeFloorIndex]) {
-          const floor = nextFloors[activeFloorIndex];
+      const topo = applyWallMovementTopology(
+        draggingWall.initialFloor,
+        draggingWall.wallId,
+        snappedDeltaX,
+        snappedDeltaY,
+        layout.plot_width,
+        layout.plot_length
+      );
 
-          const updateWallCoords = (w: Wall) => {
-            if (w.id === draggingWall.wallId) {
-              const x1 = draggingWall.initialX1 + snappedDeltaX;
-              const y1 = draggingWall.initialY1 + snappedDeltaY;
-              const x2 = draggingWall.initialX2 + snappedDeltaX;
-              const y2 = draggingWall.initialY2 + snappedDeltaY;
-              return {
-                ...w,
-                x1,
-                y1,
-                x2,
-                y2,
-                start: { x: x1, y: y1 },
-                end: { x: x2, y: y2 },
-              };
-            }
-            return w;
-          };
-
-          // Adjust affected rooms bound by this wall
-          const updatedRooms = (floor.rooms || []).map((rm) => {
-            const initRm = draggingWall.initialRooms.find((r) => r.id === rm.id);
-            if (!initRm || !initRm.rect) return rm;
-
-            let rx = initRm.rect.x;
-            let ry = initRm.rect.y;
-            let rw = initRm.rect.width;
-            let rl = initRm.rect.length;
-
-            if (isHorizontal) {
-              const wallY = draggingWall.initialY1;
-              if (Math.abs((initRm.rect.y + initRm.rect.length) - wallY) < 0.4) {
-                rl = Math.max(2, initRm.rect.length + snappedDeltaY);
-              } else if (Math.abs(initRm.rect.y - wallY) < 0.4) {
-                ry = initRm.rect.y + snappedDeltaY;
-                rl = Math.max(2, initRm.rect.length - snappedDeltaY);
-              }
-            } else {
-              const wallX = draggingWall.initialX1;
-              if (Math.abs((initRm.rect.x + initRm.rect.width) - wallX) < 0.4) {
-                rw = Math.max(2, initRm.rect.width + snappedDeltaX);
-              } else if (Math.abs(initRm.rect.x - wallX) < 0.4) {
-                rx = initRm.rect.x + snappedDeltaX;
-                rw = Math.max(2, initRm.rect.width - snappedDeltaX);
-              }
-            }
-            return constrainFurnitureToRoom({
-              ...rm,
-              rect: { x: rx, y: ry, width: rw, length: rl },
-              area_sqft: Math.round(rw * rl),
-            });
-          });
-
-          // Move attached doors & windows
-          const updatedDoors = (floor.doors || []).map((d) => {
-            const initD = draggingWall.initialDoors.find((od) => od.id === d.id);
-            if (!initD || (d.wall_id !== draggingWall.wallId && d.host_wall_id !== draggingWall.wallId)) return d;
-            return {
-              ...d,
-              x1: initD.x1 + snappedDeltaX,
-              y1: initD.y1 + snappedDeltaY,
-              x2: initD.x2 + snappedDeltaX,
-              y2: initD.y2 + snappedDeltaY,
-            };
-          });
-
-          const updatedWindows = (floor.windows || []).map((w) => {
-            const initW = draggingWall.initialWindows.find((ow) => ow.id === w.id);
-            if (!initW || (w.wall_id !== draggingWall.wallId && w.host_wall_id !== draggingWall.wallId)) return w;
-            return {
-              ...w,
-              x1: initW.x1 + snappedDeltaX,
-              y1: initW.y1 + snappedDeltaY,
-              x2: initW.x2 + snappedDeltaX,
-              y2: initW.y2 + snappedDeltaY,
-            };
-          });
-
-          nextFloors[activeFloorIndex] = {
-            ...floor,
-            exterior_walls: (floor.exterior_walls || []).map(updateWallCoords),
-            interior_walls: (floor.interior_walls || []).map(updateWallCoords),
-            rooms: updatedRooms,
-            doors: updatedDoors,
-            windows: updatedWindows,
-          };
-          return { ...prev, floors: nextFloors };
-        }
-        return prev;
-      });
+      if (topo.isValid) {
+        setLayout((prev) => {
+          const nextFloors = prev.floors ? [...prev.floors] : [];
+          nextFloors[activeFloorIndex] = topo.updatedFloor;
+          return syncPrimaryFloor({ ...prev, floors: nextFloors });
+        });
+      }
       return;
     }
 
-    // 2. Wall Endpoint Resizing (Extend / Shorten)
+    // 2. Wall Endpoint Resizing (Extend / Shorten with Snapping)
     if (resizingWallEndpoint) {
+      if (!currentPoint) return;
       const isHorizontal = Math.abs(resizingWallEndpoint.initialY1 - resizingWallEndpoint.initialY2) < 0.2;
-      const point = getModelPoint(e.clientX, e.clientY);
-      if (!point) return;
       const endpoint = resizingWallEndpoint.endpoint;
       const excludedEndpoint = endpoint === "start"
         ? { x: resizingWallEndpoint.initialX1, y: resizingWallEndpoint.initialY1 }
         : { x: resizingWallEndpoint.initialX2, y: resizingWallEndpoint.initialY2 };
-      const snapped = snapWallPoint(point, resizingWallEndpoint.wallId, excludedEndpoint);
+
+      const snapRes = CadSnapEngine.snap(currentPoint, canonicalWallNet.walls, currentFloor.rooms, {
+        referencePoint: excludedEndpoint,
+        excludedWallId: resizingWallEndpoint.wallId,
+        excludedEndpoint,
+      });
+      setCurrentSnap(snapRes);
+      const snapped = snapRes.point;
 
       setLayout((prev) => {
         const nextFloors = prev.floors ? [...prev.floors] : [];
@@ -1959,17 +2146,18 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       return;
     }
 
-    // Wall Dragging Completion: Validate and Update Canonical Model
+    // Wall Dragging Completion: Direct Parametric CAD Topology Commit
     if (draggingWall) {
       const activeDrag = draggingWall;
       setDraggingWall(null);
+      setCurrentSnap(null);
 
       const currentRooms = currentFloor.rooms || [];
       const hasInvalidRoom = currentRooms.some((r) => {
         if (!r.rect) return false;
         return (
-          r.rect.width < 4.0 ||
-          r.rect.length < 4.0 ||
+          r.rect.width < 3.5 ||
+          r.rect.length < 3.5 ||
           r.rect.x < 0 ||
           r.rect.y < 0 ||
           r.rect.x + r.rect.width > layout.plot_width ||
@@ -1978,13 +2166,13 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
       });
 
       if (hasInvalidRoom) {
-        setInvalidMoveNotice("Wall can't be moved here.");
+        setInvalidMoveNotice("Wall movement violates room boundary constraints.");
         setTimeout(() => setInvalidMoveNotice(null), 3000);
         // Revert to initial
         setLayout((prev) => {
           const nextFloors = prev.floors ? [...prev.floors] : [];
           if (nextFloors[activeFloorIndex]) {
-            nextFloors[activeFloorIndex] = {
+            nextFloors[activeFloorIndex] = activeDrag.initialFloor || {
               ...nextFloors[activeFloorIndex],
               exterior_walls: activeDrag.initialWalls.filter((wall) => wall.is_exterior),
               interior_walls: activeDrag.initialWalls.filter((wall) => !wall.is_exterior),
@@ -1992,61 +2180,15 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               doors: activeDrag.initialDoors,
               windows: activeDrag.initialWindows,
             };
-            return { ...prev, floors: nextFloors };
+            return syncPrimaryFloor({ ...prev, floors: nextFloors });
           }
           return prev;
         });
         return;
       }
 
-      if (activeDrag.affectedRoomIds.length === 0) {
-        const walls = [
-          ...(currentFloor.exterior_walls || []),
-          ...(currentFloor.interior_walls || []),
-        ];
-        if (!hasValidWallGeometry(walls, layout.plot_width, layout.plot_length)) {
-          commitFloorUpdate({
-            exterior_walls: activeDrag.initialWalls.filter((wall) => wall.is_exterior),
-            interior_walls: activeDrag.initialWalls.filter((wall) => !wall.is_exterior),
-            rooms: activeDrag.initialRooms,
-            doors: activeDrag.initialDoors,
-            windows: activeDrag.initialWindows,
-          });
-          setInvalidMoveNotice("Wall geometry is invalid; the previous geometry was restored.");
-          setTimeout(() => setInvalidMoveNotice(null), 3000);
-          return;
-        }
-        commitFloorUpdate({
-          exterior_walls: currentFloor.exterior_walls || [],
-          interior_walls: currentFloor.interior_walls || [],
-          doors: currentFloor.doors || [],
-          windows: currentFloor.windows || [],
-        });
-        return;
-      }
-
-      // Valid: Synchronize canonical wall network and openings
-      const { exteriorWalls, interiorWalls, doors: syncedDoors, windows: syncedWindows } = regenerateFloorGeometry(
-        currentRooms,
-        currentFloor.doors || [],
-        currentFloor.windows || []
-      );
-      const movedWall = [
-        ...(currentFloor.exterior_walls || []),
-        ...(currentFloor.interior_walls || []),
-      ].find((wall) => wall.id === activeDrag.wallId);
-      setSelectedWallId(
-        movedWall
-          ? findCanonicalWallMatch([...exteriorWalls, ...interiorWalls], movedWall)?.id || null
-          : null
-      );
-
-      commitFloorUpdate({
-        exterior_walls: exteriorWalls,
-        interior_walls: interiorWalls,
-        doors: syncedDoors,
-        windows: syncedWindows,
-      });
+      // Commit canonical floor layout with undo snapshot
+      pushSnapshot(layout);
       return;
     }
 
@@ -2623,6 +2765,25 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
     setIsAiProcessing(true);
     setAiNotice(null);
 
+    // 1. Deterministic Local CAD AI Command first (preserves canonical model locally)
+    const activeEntityId = selectedWallId || selectedDoorId || selectedWindowId || selectedRoomId;
+    const localResult = executeLocalCadAiCommand(
+      layout,
+      activeFloorIndex,
+      promptText,
+      activeEntityId
+    );
+
+    if (localResult && localResult.success && localResult.layout) {
+      const sanitized = validateAndSanitizeHouseLayout(localResult.layout) || localResult.layout;
+      pushSnapshot(sanitized);
+      setAiNotice(localResult.message || `Locally executed: "${promptText}"`);
+      setAiPrompt("");
+      setIsAiProcessing(false);
+      return;
+    }
+
+    // 2. Fall back to backend refinement if not handled locally
     try {
       const refined = await refineHouseLayout(layout, promptText, selectedRoomId);
       const sanitized = validateAndSanitizeHouseLayout(refined) || refined;
@@ -3934,6 +4095,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                           initialY1: wall.y1,
                           initialX2: wall.x2,
                           initialY2: wall.y2,
+                          initialFloor: JSON.parse(JSON.stringify(currentFloor)),
                           affectedRoomIds: wall.adjacent_room_ids || [],
                           initialRooms: JSON.parse(JSON.stringify(currentFloor.rooms || [])),
                           initialWalls: JSON.parse(
@@ -3948,9 +4110,10 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                       }}
                     />
 
-                    {/* Endpoint Handles when Selected: Extend / Shorten */}
+                    {/* Endpoint & Midpoint Handles when Selected: Extend / Shorten / Move */}
                     {isSelected && (
                       <g pointerEvents="all">
+                        {/* Start Endpoint Handle */}
                         <circle
                           cx={wx1}
                           cy={wy1}
@@ -3980,6 +4143,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                             });
                           }}
                         />
+
+                        {/* End Endpoint Handle */}
                         <circle
                           cx={wx2}
                           cy={wy2}
@@ -4009,6 +4174,98 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                             });
                           }}
                         />
+
+                        {/* Midpoint Move Handle and Interactive Dimension Badge */}
+                        {(() => {
+                          const midX = (wx1 + wx2) / 2;
+                          const midY = (wy1 + wy2) / 2;
+                          const wallLen = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+                          const dx = wx2 - wx1;
+                          const dy = wy2 - wy1;
+                          const lenPx = Math.hypot(dx, dy) || 1;
+                          const normX = -dy / lenPx;
+                          const normY = dx / lenPx;
+                          const badgeX = midX + normX * 22;
+                          const badgeY = midY + normY * 22;
+
+                          return (
+                            <g>
+                              {/* Midpoint translation grip handle */}
+                              <circle
+                                cx={midX}
+                                cy={midY}
+                                r={7}
+                                fill="#C48446"
+                                stroke="#FFFFFF"
+                                strokeWidth={2}
+                                className="cursor-move hover:scale-125 transition-transform"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  setDraggingWall({
+                                    wallId: wall.id,
+                                    startMouseX: e.clientX,
+                                    startMouseY: e.clientY,
+                                    initialX1: wall.x1,
+                                    initialY1: wall.y1,
+                                    initialX2: wall.x2,
+                                    initialY2: wall.y2,
+                                    initialFloor: JSON.parse(JSON.stringify(currentFloor)),
+                                    affectedRoomIds: wall.adjacent_room_ids || [],
+                                    initialRooms: JSON.parse(JSON.stringify(currentFloor.rooms || [])),
+                                    initialWalls: JSON.parse(
+                                      JSON.stringify([
+                                        ...(currentFloor.exterior_walls || []),
+                                        ...(currentFloor.interior_walls || []),
+                                      ])
+                                    ),
+                                    initialDoors: JSON.parse(JSON.stringify(currentFloor.doors || [])),
+                                    initialWindows: JSON.parse(JSON.stringify(currentFloor.windows || [])),
+                                  });
+                                }}
+                              />
+                              <circle cx={midX} cy={midY} r={2.5} fill="#FFFFFF" pointerEvents="none" />
+
+                              {/* Interactive Dimension Badge on Selected Wall */}
+                              <g
+                                transform={`translate(${badgeX}, ${badgeY})`}
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingDimension({
+                                    type: "wall",
+                                    id: wall.id,
+                                    label: "Wall Length",
+                                    currentValue: wallLen,
+                                  });
+                                }}
+                              >
+                                <rect
+                                  x={-30}
+                                  y={-11}
+                                  width={60}
+                                  height={22}
+                                  rx={5}
+                                  fill="#16171B"
+                                  stroke="#C48446"
+                                  strokeWidth={1.2}
+                                  className="hover:fill-[#202227] transition-colors"
+                                />
+                                <text
+                                  x={0}
+                                  y={4}
+                                  textAnchor="middle"
+                                  fill="#F5F3EF"
+                                  fontSize={11}
+                                  fontFamily="monospace"
+                                  fontWeight="bold"
+                                  pointerEvents="none"
+                                >
+                                  {feetToArchitectural(wallLen)}
+                                </text>
+                              </g>
+                            </g>
+                          );
+                        })()}
                       </g>
                     )}
                   </g>
@@ -4467,6 +4724,202 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                   })}
               </g>
             )}
+
+            {/* REAL-TIME WALL DRAWING PREVIEW */}
+            {drawingWall && (
+              <g pointerEvents="none">
+                <line
+                  x1={drawingWall.start.x * SCALE}
+                  y1={drawingWall.start.y * SCALE}
+                  x2={drawingWall.end.x * SCALE}
+                  y2={drawingWall.end.y * SCALE}
+                  stroke="#C48446"
+                  strokeWidth={3}
+                  strokeDasharray="6 3"
+                />
+                <circle
+                  cx={drawingWall.start.x * SCALE}
+                  cy={drawingWall.start.y * SCALE}
+                  r={5}
+                  fill="#C48446"
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                />
+                <circle
+                  cx={drawingWall.end.x * SCALE}
+                  cy={drawingWall.end.y * SCALE}
+                  r={5}
+                  fill="#C48446"
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                />
+                {(() => {
+                  const mx = ((drawingWall.start.x + drawingWall.end.x) / 2) * SCALE;
+                  const my = ((drawingWall.start.y + drawingWall.end.y) / 2) * SCALE - 14;
+                  const len = distanceWorld(drawingWall.start, drawingWall.end);
+                  const ang = Math.round(angleWorld(drawingWall.start, drawingWall.end));
+                  return (
+                    <g transform={`translate(${mx}, ${my})`}>
+                      <rect
+                        x={-35}
+                        y={-10}
+                        width={70}
+                        height={20}
+                        rx={4}
+                        fill="#16171B"
+                        stroke="#C48446"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={0}
+                        y={3.5}
+                        textAnchor="middle"
+                        fill="#F5F3EF"
+                        fontSize={9.5}
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        {feetToArchitectural(len)} ∠{ang}°
+                      </text>
+                    </g>
+                  );
+                })()}
+              </g>
+            )}
+
+            {/* GHOST OPENING HOVER PREVIEW */}
+            {ghostOpening && (
+              <g pointerEvents="none">
+                <line
+                  x1={ghostOpening.geom.x1 * SCALE}
+                  y1={ghostOpening.geom.y1 * SCALE}
+                  x2={ghostOpening.geom.x2 * SCALE}
+                  y2={ghostOpening.geom.y2 * SCALE}
+                  stroke={ghostOpening.kind === "door" ? "#C48446" : "#38BDF8"}
+                  strokeWidth={4}
+                  strokeDasharray="4 2"
+                />
+                <circle
+                  cx={ghostOpening.geom.x1 * SCALE}
+                  cy={ghostOpening.geom.y1 * SCALE}
+                  r={3.5}
+                  fill={ghostOpening.kind === "door" ? "#C48446" : "#38BDF8"}
+                />
+                <circle
+                  cx={ghostOpening.geom.x2 * SCALE}
+                  cy={ghostOpening.geom.y2 * SCALE}
+                  r={3.5}
+                  fill={ghostOpening.kind === "door" ? "#C48446" : "#38BDF8"}
+                />
+              </g>
+            )}
+
+            {/* MEASURE TOOL OVERLAY */}
+            {measureState?.p1 && (
+              <g pointerEvents="none">
+                <circle
+                  cx={measureState.p1.x * SCALE}
+                  cy={measureState.p1.y * SCALE}
+                  r={4.5}
+                  fill="#38BDF8"
+                  stroke="#FFFFFF"
+                  strokeWidth={1.5}
+                />
+                {measureState.p2 && (
+                  <>
+                    <line
+                      x1={measureState.p1.x * SCALE}
+                      y1={measureState.p1.y * SCALE}
+                      x2={measureState.p2.x * SCALE}
+                      y2={measureState.p2.y * SCALE}
+                      stroke="#38BDF8"
+                      strokeWidth={2}
+                      strokeDasharray="5 3"
+                    />
+                    <circle
+                      cx={measureState.p2.x * SCALE}
+                      cy={measureState.p2.y * SCALE}
+                      r={4.5}
+                      fill="#38BDF8"
+                      stroke="#FFFFFF"
+                      strokeWidth={1.5}
+                    />
+                    {(() => {
+                      const mx = ((measureState.p1.x + measureState.p2.x) / 2) * SCALE;
+                      const my = ((measureState.p1.y + measureState.p2.y) / 2) * SCALE - 14;
+                      const dist = distanceWorld(measureState.p1, measureState.p2);
+                      return (
+                        <g transform={`translate(${mx}, ${my})`}>
+                          <rect
+                            x={-34}
+                            y={-10}
+                            width={68}
+                            height={20}
+                            rx={4}
+                            fill="#0F172A"
+                            stroke="#38BDF8"
+                            strokeWidth={1}
+                          />
+                          <text
+                            x={0}
+                            y={3.5}
+                            textAnchor="middle"
+                            fill="#38BDF8"
+                            fontSize={10}
+                            fontFamily="monospace"
+                            fontWeight="bold"
+                          >
+                            {feetToArchitectural(dist)}
+                          </text>
+                        </g>
+                      );
+                    })()}
+                  </>
+                )}
+              </g>
+            )}
+
+            {/* CAD SNAP INDICATOR */}
+            {currentSnap?.snapped && currentSnap.type && (
+              <g
+                pointerEvents="none"
+                transform={`translate(${currentSnap.point.x * SCALE}, ${currentSnap.point.y * SCALE})`}
+              >
+                <rect
+                  x={-5}
+                  y={-5}
+                  width={10}
+                  height={10}
+                  fill="none"
+                  stroke="#38BDF8"
+                  strokeWidth={1.8}
+                  transform={currentSnap.type === "midpoint" ? "rotate(45)" : undefined}
+                />
+                <circle cx={0} cy={0} r={1.5} fill="#38BDF8" />
+                <rect
+                  x={8}
+                  y={-14}
+                  width={(currentSnap.type || "").length * 6 + 10}
+                  height={15}
+                  rx={3}
+                  fill="#0F172A"
+                  fillOpacity={0.9}
+                  stroke="#38BDF8"
+                  strokeWidth={0.8}
+                />
+                <text
+                  x={(currentSnap.type || "").length * 3 + 13}
+                  y={-3.5}
+                  textAnchor="middle"
+                  fill="#38BDF8"
+                  fontSize={8}
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  {(currentSnap.type || "").toUpperCase()}
+                </text>
+              </g>
+            )}
           </svg>
   );
 
@@ -4475,203 +4928,161 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
   // -------------------------------------------------------------
   if (mode === "edit") {
     return (
-      <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#0F1014] text-[#F3F4F6] font-sans">
-        {/* TOP DOCKED HEADER & TOOLBAR */}
-        <header className="h-12 border-b border-[#23252B] bg-[#16171B] flex items-center justify-between px-2 sm:px-3 z-40 shrink-0 gap-2">
-          {/* Left: Exit, Layers Toggle & Project Title */}
-          <div className="flex items-center gap-2">
+      <div className="relative w-full h-full flex flex-col select-none overflow-hidden bg-[#07080A] text-[#F3F4F6] font-sans">
+        {/* COMPACT SHAPR3D-INSPIRED CAD HEADER */}
+        <header className="h-11 sm:h-12 border-b border-[#1E2028] bg-[#0E0F13] flex items-center justify-between px-3 sm:px-4 z-40 shrink-0 select-none">
+          {/* Left: Back to Plan, Title, small EDIT badge, floor switcher */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
-              id="btn-exit"
+              id="cad-btn-back"
+              type="button"
               onClick={handleExit}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-[#E2E8F0] hover:text-white border border-white/5 transition-all shrink-0"
-              title="Back to Plan Overview"
+              title="Return to Plan Overview"
             >
               <ArrowLeft className="w-3.5 h-3.5 text-[#C48446]" />
-              <span className="font-semibold hidden xs:inline">BACK</span>
+              <span className="font-semibold text-[11px] tracking-wider hidden xs:inline">PLAN</span>
             </button>
-            <button
-              id="btn-toggle-layers"
-              onClick={() => setIsLeftPanelOpen((prev) => !prev)}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                isLeftPanelOpen
-                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Toggle Structure / Layers Panel (L)"
-            >
-              <Layers className="w-4 h-4" />
-            </button>
-            <div className="h-4 w-px bg-white/10 hidden sm:block" />
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-xs font-semibold text-white/90 truncate max-w-[160px] lg:max-w-[240px]">
+
+            <div className="h-4 w-px bg-white/10 shrink-0" />
+
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-semibold text-white/90 truncate max-w-[120px] sm:max-w-[180px] md:max-w-[260px]">
                 {layout.title || "Architectural Floor Plan"}
               </span>
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[#E69F58] font-mono text-[9px] uppercase font-bold tracking-wider border border-amber-500/30">
-                EDITOR
+              <span className="px-1.5 py-0.5 rounded bg-[#C48446]/20 text-[#E69F58] font-mono text-[9px] uppercase font-bold tracking-widest border border-[#C48446]/30 shrink-0">
+                CAD EDIT
+              </span>
+            </div>
+
+            {/* Floor Level Switcher if multi-floor */}
+            {layout.floors && layout.floors.length > 1 && onSelectFloor && (
+              <div className="hidden lg:flex items-center p-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-mono text-[#94A3B8]">
+                {layout.floors.map((fl, idx) => (
+                  <button
+                    key={fl.floor_number}
+                    type="button"
+                    onClick={() => onSelectFloor(idx)}
+                    className={`px-2 py-0.5 rounded transition-all ${
+                      activeFloorIndex === idx
+                        ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow-xs"
+                        : "hover:text-white"
+                    }`}
+                  >
+                    {fl.floor_name ? fl.floor_name.replace(" Floor", "").toUpperCase() : `L${fl.floor_number}`}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Center: Minimal tool state / active operation indicator */}
+          <div className="hidden md:flex items-center justify-center pointer-events-none">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-[11px] font-mono text-[#94A3B8]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C48446] animate-pulse" />
+              <span className="text-white/80 font-medium">
+                {selectedEntityPayload.type === "wall" && selectedEntityPayload.wall
+                  ? `WALL // ${feetToArchitectural(Math.hypot(selectedEntityPayload.wall.x2 - selectedEntityPayload.wall.x1, selectedEntityPayload.wall.y2 - selectedEntityPayload.wall.y1))}`
+                  : selectedEntityPayload.type === "door" && selectedEntityPayload.door
+                  ? `DOOR // ${feetToArchitectural(selectedEntityPayload.door.width || 3.0)} (${selectedEntityPayload.door.swing_direction || "inward"})`
+                  : selectedEntityPayload.type === "window" && selectedEntityPayload.window
+                  ? `WINDOW // ${feetToArchitectural(selectedEntityPayload.window.width || 4.0)}`
+                  : selectedEntityPayload.type === "room" && selectedEntityPayload.room
+                  ? `ROOM // ${selectedEntityPayload.room.name.toUpperCase()}`
+                  : activeTool === "wall"
+                  ? (drawingWall ? "DRAWING WALL // Click end point" : "WALL TOOL // Click start point to draw")
+                  : activeTool === "door"
+                  ? "DOOR TOOL // Click a wall to place door"
+                  : activeTool === "window"
+                  ? "WINDOW TOOL // Click a wall to place window"
+                  : activeTool === "measure"
+                  ? (measureState?.p1 ? "MEASURE // Click second point" : "MEASURE // Click first point")
+                  : "SELECT TOOL // Direct manipulation active"}
               </span>
             </div>
           </div>
 
-          {/* Center: Minimal Icon-Based Toolbar (Desktop) */}
-          <div className="hidden md:flex items-center gap-0.5 sm:gap-1 bg-[#202227] p-1 rounded-xl border border-white/5 shadow-inner overflow-x-auto">
+          {/* Right: Undo, Redo, AI Architect, Layers, Properties, Done */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             <button
-              id="tool-select"
+              id="cad-btn-undo"
               type="button"
-              onClick={() => setActiveTool("select")}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                activeTool === "select"
-                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Select & Move (V)"
+              onClick={undo}
+              disabled={!canUndo}
+              className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              title="Undo (Ctrl+Z)"
             >
-              <MousePointer className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
             <button
-              id="tool-room"
+              id="cad-btn-redo"
               type="button"
-              onClick={() => setActiveTool("room")}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                activeTool === "room"
-                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Room Tool (R)"
+              onClick={redo}
+              disabled={!canRedo}
+              className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              title="Redo (Ctrl+Y)"
             >
-              <Square className="w-4 h-4" />
+              <RotateCw className="w-3.5 h-3.5" />
             </button>
+
+            <div className="h-4 w-px bg-white/10 mx-0.5 hidden xs:block" />
+
+            {/* AI Architect Assistant */}
             <button
-              id="tool-wall"
-              type="button"
-              onClick={() => setActiveTool("wall")}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                activeTool === "wall"
-                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Wall Tool (W)"
-            >
-              <PenTool className="w-4 h-4" />
-            </button>
-            <button
-              id="tool-door"
-              type="button"
-              onClick={() => setActiveTool("door")}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                activeTool === "door"
-                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Door Tool (D)"
-            >
-              <DoorClosed className="w-4 h-4" />
-            </button>
-            <button
-              id="tool-window"
-              type="button"
-              onClick={() => setActiveTool("window")}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                activeTool === "window"
-                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Window Tool (O)"
-            >
-              <AppWindow className="w-4 h-4" />
-            </button>
-            <button
-              id="tool-furniture"
-              type="button"
-              onClick={() => setActiveTool("furniture")}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                activeTool === "furniture"
-                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Furniture Tool (F)"
-            >
-              <Armchair className="w-4 h-4" />
-            </button>
-            <button
-              id="tool-dimensions"
-              type="button"
-              onClick={() => setShowDimensions((prev) => !prev)}
-              className={`p-1.5 rounded-lg transition-all shrink-0 ${
-                showDimensions
-                  ? "text-[#C48446] bg-[#C48446]/10"
-                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-              }`}
-              title="Toggle Dimensions (M)"
-            >
-              <Ruler className="w-4 h-4" />
-            </button>
-            <div className="h-4 w-px bg-white/10 mx-0.5 sm:mx-1 shrink-0" />
-            {/* Integrated AI Architect accent button */}
-            <button
-              id="tool-ai-architect"
+              id="cad-btn-ai-architect"
               type="button"
               onClick={() => setIsAiOpen((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all shrink-0 ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
                 isAiOpen
                   ? "bg-[#C48446] text-[#0A0B0E] shadow"
                   : "bg-[#C48446]/15 hover:bg-[#C48446]/25 text-[#E69F58] border border-[#C48446]/30"
               }`}
-              title="AI Architectural Assistant"
+              title="AI Architectural CAD Assistant"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">✦ AI ARCHITECT</span>
-              <span className="sm:hidden">✦ AI</span>
+              <span className="hidden sm:inline">AI ARCHITECT</span>
+              <span className="sm:hidden">AI</span>
             </button>
-          </div>
 
-          {/* Right: Properties Toggle & Undo / Redo / Done / Export */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            {/* Layers / Structure Drawer Toggle */}
             <button
-              id="btn-toggle-properties"
+              id="cad-btn-layers"
+              type="button"
+              onClick={() => setIsLeftPanelOpen((prev) => !prev)}
+              className={`p-1.5 rounded-lg transition-all ${
+                isLeftPanelOpen
+                  ? "bg-[#C48446] text-[#0A0B0E] shadow"
+                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
+              }`}
+              title="Toggle Structure & Layers (L)"
+            >
+              <Layers className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Properties Drawer Toggle */}
+            <button
+              id="cad-btn-properties"
+              type="button"
               onClick={() => setIsRightPanelOpen((prev) => !prev)}
               className={`p-1.5 rounded-lg transition-all ${
                 isRightPanelOpen
                   ? "bg-[#C48446] text-[#0A0B0E] shadow"
                   : "text-[#94A3B8] hover:text-white hover:bg-white/5"
               }`}
-              title="Toggle Properties / Inspector Panel (P)"
+              title="Toggle Properties Panel (P)"
             >
-              <Sliders className="w-4 h-4" />
+              <Sliders className="w-3.5 h-3.5" />
             </button>
-            <div className="h-4 w-px bg-white/10 mx-0.5 hidden xs:block" />
+
+            <div className="h-4 w-px bg-white/10 mx-0.5" />
+
+            {/* Done Button */}
             <button
-              id="btn-undo"
-              onClick={undo}
-              disabled={!canUndo}
-              className="p-1.5 sm:p-2 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
-              title="Undo (Ctrl+Z)"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-            <button
-              id="btn-redo"
-              onClick={redo}
-              disabled={!canRedo}
-              className="p-1.5 sm:p-2 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
-              title="Redo (Ctrl+Y)"
-            >
-              <RotateCw className="w-3.5 h-3.5" />
-            </button>
-            <div className="h-4 w-px bg-white/10 mx-0.5 hidden sm:block" />
-            <button
-              id="btn-export"
-              onClick={handleExportPNG}
-              disabled={isExporting}
-              className="p-1.5 sm:p-2 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-40 transition-colors hidden xs:block"
-              title="Export Architectural Drawing (PNG)"
-            >
-              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              id="btn-done"
+              id="cad-btn-done"
+              type="button"
               onClick={handleDone}
               disabled={isSaving}
-              className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs font-mono tracking-wider shadow transition-all"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs font-mono tracking-wider shadow transition-all"
               title="Save & Return to Plan"
             >
               {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
@@ -4679,20 +5090,6 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             </button>
           </div>
         </header>
-
-        {showAtelierNav && onStudioNavigate && (
-          <FloatingNav
-            currentView="plan"
-            onNavigate={onStudioNavigate}
-            isProjectWorkspace
-            hasProject
-            onOpenVastuAudit={onOpenVastuAudit}
-            hasVastuResult={hasVastuResult}
-            isPlanEditMode
-            onTogglePlanEditMode={onToggleEditMode}
-            placement="flow"
-          />
-        )}
 
         {/* WORKBENCH BODY: Left Panel + Dominant Canvas + Right Inspector Panel */}
         <div className="flex-1 flex overflow-hidden relative">
@@ -4703,9 +5100,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               onClick={() => setIsLeftPanelOpen(false)}
             />
           )}
-          {/* LEFT PANEL: LAYERS / STRUCTURE */}
+          {/* LEFT PANEL: LAYERS / STRUCTURE (FLOATING DRAWER) */}
           {isLeftPanelOpen && (
-            <aside className={`fixed md:static inset-y-12 left-0 w-64 bg-[#16171B] border-r border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none ${isAiOpen ? "max-md:hidden" : ""}`}>
+            <aside className={`absolute top-3 left-3 bottom-20 md:bottom-6 w-72 bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col z-35 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-150 ${isAiOpen ? "max-md:hidden" : ""}`}>
               {/* Floor switcher */}
               <div className="p-3 border-b border-[#23252B]">
                 <div className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8] mb-2 flex items-center justify-between">
@@ -4800,7 +5197,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
           {/* CENTER HERO CANVAS */}
           <main
-            ref={containerRef}
+            ref={setContainerRef}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -4810,7 +5207,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
             onDoubleClick={handleResetView}
-            className={`flex-1 h-full relative overflow-hidden bg-[#0D0E11] flex items-center justify-center select-none touch-none ${
+            className={`w-full h-full relative overflow-hidden bg-[#07080A] flex items-center justify-center select-none touch-none ${
               isPanning ? "cursor-grabbing" : isPanMode || isSpacePressed ? "cursor-grab" : "cursor-default"
             }`}
           >
@@ -4819,12 +5216,149 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               style={{
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                 transformOrigin: "center center",
-                transition: isPanning || draggingRoom || draggingFurniture || resizingRoom ? "none" : "transform 0.12s cubic-bezier(0.16, 1, 0.3, 1)",
+                transition: isWheelZooming || isPanning || draggingRoom || draggingFurniture || resizingRoom || draggingWall || resizingWallEndpoint || draggingOpening ? "none" : "transform 0.1s cubic-bezier(0.16, 1, 0.3, 1)",
               }}
-              className="flex items-center justify-center"
+              className="flex items-center justify-center pointer-events-auto"
             >
               {renderSvgSheet()}
             </div>
+
+            {/* FLOATING CAD CONTEXTUAL TOOLBAR */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto max-w-[calc(100vw-32px)]">
+              <CadContextualToolbar
+                activeTool={activeTool as any}
+                onSelectTool={(tool) => setActiveTool(tool)}
+                selectedEntity={selectedEntityPayload}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={undo}
+                onRedo={redo}
+                showDimensions={showDimensions}
+                onToggleDimensions={() => setShowDimensions((p) => !p)}
+                onDeselect={() => {
+                  setSelectedWallId(null);
+                  setSelectedDoorId(null);
+                  setSelectedWindowId(null);
+                  handleSelectRoom(null);
+                  handleSelectFurniture(null);
+                  setActiveTool("select");
+                }}
+                onDeleteSelected={handleDeleteSelected}
+                onToggleWallThickness={() => {
+                  if (selectedWall) handleSetWallThickness(selectedWall.thickness === 0.75 ? 0.375 : 0.75);
+                }}
+                onSetWallThickness={handleSetWallThickness}
+                onSplitWall={handleSplitSelectedWall}
+                onEditDimension={(type, id, val) => {
+                  setEditingDimension({
+                    type,
+                    id,
+                    label: type === "wall" ? "Wall Length" : type === "room_width" ? "Room Width" : "Room Length",
+                    currentValue: parseFloat(val) || 0,
+                  });
+                }}
+                onFlipDoorSwing={handleFlipDoorSwing}
+                onResizeDoorWidth={(delta) => resizeOpeningWidth("door", delta)}
+                onResizeWindowWidth={(delta) => resizeOpeningWidth("window", delta)}
+                onResetMeasure={() => setMeasureState(null)}
+                measureDistance={measureState?.p1 && measureState?.p2 ? distanceWorld(measureState.p1, measureState.p2) : null}
+                onDone={handleExit}
+                isSaving={isSaving}
+              />
+            </div>
+
+            {/* INLINE DIMENSION EDIT MODAL */}
+            {editingDimension && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 pointer-events-auto">
+                <div className="w-full max-w-xs bg-[#16171B] border border-[#C48446]/40 rounded-2xl p-4 shadow-2xl space-y-3">
+                  <div className="flex items-center justify-between pb-1 border-b border-white/10">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E69F58]">
+                      Edit {editingDimension.label}
+                    </span>
+                    <button
+                      onClick={() => setEditingDimension(null)}
+                      className="p-1 rounded text-[#94A3B8] hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono uppercase text-[#94A3B8]">
+                      Dimension (e.g. 14&apos;-6&quot; or 14.5)
+                    </label>
+                    <input
+                      autoFocus
+                      id="inline-dimension-input"
+                      type="text"
+                      defaultValue={feetToArchitectural(editingDimension.currentValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleApplyInlineDimension((e.target as HTMLInputElement).value);
+                        } else if (e.key === "Escape") {
+                          setEditingDimension(null);
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-[#C48446]"
+                      placeholder="e.g. 16'-0&quot;"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      onClick={() => setEditingDimension(null)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-mono text-[#94A3B8] hover:text-white hover:bg-white/5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById("inline-dimension-input") as HTMLInputElement | null;
+                        if (input) handleApplyInlineDimension(input.value);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-mono text-xs font-bold shadow"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DELETE WALL CONFIRMATION MODAL */}
+            {pendingWallDelete && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 pointer-events-auto">
+                <div className="w-full max-w-sm bg-[#16171B] border border-red-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-red-500/10 text-red-400 shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white font-sans">Delete Wall Dependencies</h3>
+                      <p className="text-xs text-[#94A3B8] mt-1 font-mono leading-relaxed">
+                        {pendingWallDelete.summaryMessage}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                    <button
+                      onClick={() => setPendingWallDelete(null)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-mono text-[#94A3B8] hover:text-white hover:bg-white/5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        const wallId = pendingWallDelete.wall.id;
+                        setPendingWallDelete(null);
+                        commitWallDeletion(wallId);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold shadow"
+                    >
+                      Delete Wall + Openings
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* INVALID OPERATION WARNING BANNER */}
             {invalidMoveNotice && (
@@ -4957,8 +5491,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
                 {Math.round(zoom * 100)}%
               </span>
               <button
-                onClick={() => setZoom((z) => Math.min(3.5, z * 1.15))}
-                className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white"
+                onClick={() => setZoom((z) => Math.min(5.0, z * 1.15))}
+                className="p-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-colors"
                 title="Zoom In (+)"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
@@ -4966,14 +5500,14 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               <div className="h-4 w-px bg-white/10 mx-0.5" />
               <button
                 onClick={handleResetView}
-                className="px-2 py-1 rounded-lg hover:bg-white/5 hover:text-white text-[10px]"
+                className="px-2 py-1 rounded-xl hover:bg-white/10 hover:text-white text-[10px] font-bold tracking-wider"
                 title="Fit to Screen"
               >
                 FIT
               </button>
               <button
                 onClick={() => setIsPanMode((prev) => !prev)}
-                className={`p-1.5 rounded-lg ${isPanMode ? "bg-[#C48446] text-[#0A0B0E]" : "hover:bg-white/5 hover:text-white"}`}
+                className={`p-1.5 rounded-xl transition-colors ${isPanMode ? "bg-[#C48446] text-[#0A0B0E]" : "hover:bg-white/10 hover:text-white"}`}
                 title="Pan Tool (Hand)"
               >
                 <Hand className="w-3.5 h-3.5" />
@@ -4988,9 +5522,9 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
               onClick={() => setIsRightPanelOpen(false)}
             />
           )}
-          {/* RIGHT PANEL: PROPERTIES / INSPECTOR */}
+          {/* RIGHT PANEL: PROPERTIES / INSPECTOR (FLOATING DRAWER) */}
           {isRightPanelOpen && (
-            <aside className={`fixed md:static inset-y-12 right-0 w-72 bg-[#16171B] border-l border-[#23252B] flex flex-col z-30 shrink-0 shadow-2xl md:shadow-none overflow-y-auto ${isAiOpen ? "max-md:hidden" : ""}`}>
+            <aside className={`absolute top-3 right-3 bottom-20 md:bottom-6 w-80 max-w-[calc(100vw-24px)] bg-[#12141A]/95 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col z-35 shadow-2xl overflow-y-auto animate-in fade-in slide-in-from-right-2 duration-150 ${isAiOpen ? "max-md:hidden" : ""}`}>
               {/* Inspector Header */}
               <div className="p-3 border-b border-[#23252B] flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#94A3B8]">
@@ -5503,195 +6037,6 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           </aside>
         )}
         </div>
-
-        {/* MOBILE DOCKED TOOLBAR (<= 768px): Select | Measure | Structure | Landscape | More */}
-        <div className="md:hidden fixed bottom-3 left-3 right-3 z-40 flex items-center justify-between px-3 py-2 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl">
-          <button
-            type="button"
-            id="mobile-tool-select"
-            onClick={() => setActiveTool("select")}
-            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
-              activeTool === "select" ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow" : "text-[#94A3B8] hover:text-white"
-            }`}
-          >
-            <MousePointer className="w-4 h-4" />
-            <span>Select</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-tool-measure"
-            onClick={() => setShowDimensions((prev) => !prev)}
-            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
-              showDimensions ? "text-[#C48446] bg-[#C48446]/15" : "text-[#94A3B8] hover:text-white"
-            }`}
-          >
-            <Ruler className="w-4 h-4" />
-            <span>Measure</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-tool-structure"
-            onClick={() => {
-              setIsLeftPanelOpen((prev) => !prev);
-              if (isRightPanelOpen) setIsRightPanelOpen(false);
-            }}
-            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
-              isLeftPanelOpen ? "text-[#C48446] bg-[#C48446]/15" : "text-[#94A3B8] hover:text-white"
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>Structure</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-tool-landscape"
-            onClick={() => {
-              setActiveTool(activeTool === "furniture" ? "select" : "furniture");
-            }}
-            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
-              activeTool === "furniture" ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow" : "text-[#94A3B8] hover:text-white"
-            }`}
-          >
-            <Trees className="w-4 h-4" />
-            <span>Landscape</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-tool-more"
-            onClick={() => setIsMobileToolsOpen((prev) => !prev)}
-            className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-medium transition-all ${
-              isMobileToolsOpen ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow" : "text-[#94A3B8] hover:text-white"
-            }`}
-          >
-            <MoreHorizontal className="w-4 h-4" />
-            <span>More</span>
-          </button>
-        </div>
-
-        {/* MOBILE SECONDARY TOOLS BOTTOM SHEET */}
-        {isMobileToolsOpen && (
-          <div 
-            className="fixed inset-0 z-50 md:hidden flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setIsMobileToolsOpen(false)}
-          >
-            <div 
-              className="bg-[#16171B] border-t border-white/10 rounded-t-2xl p-4 shadow-2xl max-h-[75vh] overflow-y-auto space-y-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <div className="text-xs font-mono font-bold tracking-wider text-white uppercase flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-[#C48446]" />
-                  <span>Editor Tools & Panels</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMobileToolsOpen(false)}
-                  className="p-1 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/10"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Architectural Creation Tools */}
-              <div>
-                <span className="text-[10px] font-mono uppercase text-[#94A3B8] font-bold block mb-2">Draw & Place</span>
-                <div className="grid grid-cols-4 gap-2">
-                  <button
-                    onClick={() => { setActiveTool("room"); setIsMobileToolsOpen(false); }}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
-                      activeTool === "room" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <Square className="w-4 h-4" />
-                    <span className="text-[11px] font-mono">Room</span>
-                  </button>
-                  <button
-                    onClick={() => { setActiveTool("wall"); setIsMobileToolsOpen(false); }}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
-                      activeTool === "wall" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <PenTool className="w-4 h-4" />
-                    <span className="text-[11px] font-mono">Wall</span>
-                  </button>
-                  <button
-                    onClick={() => { setActiveTool("door"); setIsMobileToolsOpen(false); }}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
-                      activeTool === "door" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <DoorClosed className="w-4 h-4" />
-                    <span className="text-[11px] font-mono">Door</span>
-                  </button>
-                  <button
-                    onClick={() => { setActiveTool("window"); setIsMobileToolsOpen(false); }}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${
-                      activeTool === "window" ? "bg-[#C48446] text-[#0A0B0E] border-[#C48446]" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <AppWindow className="w-4 h-4" />
-                    <span className="text-[11px] font-mono">Window</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Workspace & AI */}
-              <div>
-                <span className="text-[10px] font-mono uppercase text-[#94A3B8] font-bold block mb-2">Workspace & AI</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => { setIsAiOpen(true); setIsMobileToolsOpen(false); }}
-                    className="flex items-center justify-center gap-2 p-3 rounded-xl bg-[#C48446]/20 border border-[#C48446]/40 text-[#E69F58] font-mono text-xs font-bold"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>AI Architect</span>
-                  </button>
-                  <button
-                    onClick={() => { 
-                      setIsRightPanelOpen((prev) => !prev);
-                      if (isLeftPanelOpen) setIsLeftPanelOpen(false);
-                      setIsMobileToolsOpen(false); 
-                    }}
-                    className="flex items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-white font-mono text-xs"
-                  >
-                    <Sliders className="w-4 h-4" />
-                    <span>Properties</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Actions: Undo / Redo / Export */}
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={undo}
-                    disabled={!canUndo}
-                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/5 text-xs font-mono text-white disabled:opacity-30"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Undo</span>
-                  </button>
-                  <button
-                    onClick={redo}
-                    disabled={!canRedo}
-                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/5 text-xs font-mono text-white disabled:opacity-30"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                    <span>Redo</span>
-                  </button>
-                </div>
-                <button
-                  onClick={() => { handleExportPNG(); setIsMobileToolsOpen(false); }}
-                  disabled={isExporting}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/10 text-xs font-mono text-white"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export PNG</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -5747,7 +6092,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
       {/* Main Drafting SVG Canvas */}
       <div
-        ref={containerRef}
+        ref={setContainerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -5765,7 +6110,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "center center",
-            transition: isPanning || draggingRoom || draggingFurniture || resizingRoom ? "none" : "transform 0.12s cubic-bezier(0.16, 1, 0.3, 1)",
+            transition: isPanning || isWheelZooming || draggingRoom || draggingFurniture || resizingRoom ? "none" : "transform 0.12s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
           className="flex items-center justify-center"
         >

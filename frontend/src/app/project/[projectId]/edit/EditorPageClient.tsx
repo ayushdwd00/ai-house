@@ -80,11 +80,11 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
 
   if (loading || !isHydrated) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#ECEEF2] text-[#0F172A]">
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#07080A] text-[#F5F3EF]">
         <div className="flex items-center gap-3">
           <Loader2 className="w-6 h-6 animate-spin text-[#C48446]" />
           <span className="text-xs font-mono tracking-widest uppercase">
-            Loading Architectural Editor...
+            Loading Architectural CAD Workspace...
           </span>
         </div>
       </div>
@@ -93,8 +93,8 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
 
   if (!layout) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center gap-5 bg-[#ECEEF2] text-[#0F172A]">
-        <p className="max-w-md px-6 text-center text-sm text-slate-600" role="alert">
+      <div className="w-screen h-screen flex flex-col items-center justify-center gap-5 bg-[#07080A] text-[#F5F3EF]">
+        <p className="max-w-md px-6 text-center text-sm text-neutral-400" role="alert">
           {loadError || "This project could not be loaded."}
         </p>
         <div className="flex items-center gap-3">
@@ -105,14 +105,14 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
               setLoading(true);
               setLoadAttempt((attempt) => attempt + 1);
             }}
-            className="rounded-lg bg-[#C48446] px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white"
+            className="rounded-lg bg-[#C48446] px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-[#d69352] transition-colors"
           >
             Retry
           </button>
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-700"
+            className="rounded-lg border border-neutral-700 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-300 hover:bg-neutral-800 transition-colors"
           >
             Back to Atelier
           </button>
@@ -122,7 +122,7 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
   }
 
   return (
-    <div className="w-full max-w-full h-[100dvh] overflow-hidden bg-[#ECEEF2]">
+    <div className="w-full max-w-full h-[100dvh] overflow-hidden bg-[#07080A]">
       <ArchitecturalPlanRenderer
         layout={layout}
         mode="edit"
@@ -133,7 +133,7 @@ export const EditorPageClient: React.FC<EditorPageClientProps> = ({ projectId })
           handleLayoutUpdate(saved);
         }}
         onBack={() => router.push(`/project/${projectId}/plan`)}
-        showAtelierNav
+        showAtelierNav={false}
         hasVastuResult={Boolean(layout.scores?.vastu_result)}
         onStudioNavigate={(view: NavView) => {
           if (view === "home" || view === "create") {

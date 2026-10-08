@@ -19,6 +19,7 @@ import { DesignSchemeSelectionModal } from "@/components/DesignSchemeSelectionMo
 import { useProject } from "@/context/ProjectContext";
 import { validateAndSanitizeHouseLayout, validateAndSanitizeHouseLayoutDetailed } from "@/utils/layoutValidator";
 import { generateHouseLayout, editRoomLayout, applyProjectEdit, previewProjectEditIntent, generateMepPlan, generateDesignSchemes, saveProjectToServer, DesignScheme, EditStage, GenerationProgress } from "@/utils/api";
+import { executeLocalCadAiCommand } from "@/utils/cadAiCommands";
 import { Loader2 } from "lucide-react";
 
 // ── Code-split heavy components (3D only loads on MODEL tab) ──
@@ -412,6 +413,33 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       setLastInstruction(instruction);
 
       try {
+        // 1. First, attempt deterministic client-side CAD command execution
+        const localCad = executeLocalCadAiCommand(
+          layout,
+          activeFloorIndex,
+          instruction,
+          selectedEntityId || selectedRoomId || undefined
+        );
+
+        if (localCad && localCad.handledLocally) {
+          if (localCad.success && localCad.layout) {
+            setEditStages([
+              { stage: "understanding_change", status: "ok", label: `CAD Command: ${localCad.message}` },
+              { stage: "validating_change", status: "ok", label: "Parametric geometry constraints satisfied" },
+              { stage: "applying_geometry", status: "ok", label: "Direct geometry update committed" },
+            ]);
+            const sanitized = validateAndSanitizeHouseLayout(localCad.layout) || localCad.layout;
+            handleUpdateLayout(sanitized);
+            await saveProjectToServer(sanitized);
+            setEditDone(true);
+            return;
+          } else {
+            setEditRejectionReason(localCad.message);
+            setEditDone(true);
+            return;
+          }
+        }
+
         if (!await saveProjectToServer(layout)) {
           throw new Error("The current canonical layout could not be saved before editing.");
         }
@@ -570,7 +598,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   mode={planEditMode}
                   onUpdateLayout={handleUpdateLayout}
                   onSave={handleUpdateLayout}
-                  showAtelierNav={currentTab === "plan" && planEditMode === "edit"}
+                  showAtelierNav={false}
                   onStudioNavigate={handleNavigate}
                   onToggleEditMode={() => setPlanEditMode((mode) => (mode === "view" ? "edit" : "view"))}
                   onOpenVastuAudit={() => setIsVastuAuditOpen(true)}
@@ -677,7 +705,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       )}
 
       {/* ── Floating AI Command Bar (plan & model only) ── */}
-      {(currentTab === "plan" || currentTab === "model") && !isConsultationOpen && (
+      {((currentTab === "plan" && planEditMode !== "edit") || currentTab === "model") && !isConsultationOpen && (
         <FloatingAICommandBar
           onApplyInstruction={handleApplyInstruction}
           isLoading={isRefining}
