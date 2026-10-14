@@ -82,8 +82,8 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
     const thicknessInches = Math.round(wall.thickness * 12);
 
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold">
+      <div className="flex max-w-[calc(100vw-24px)] overflow-x-auto items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold shrink-0">
           <PenTool className="w-3.5 h-3.5" />
           <span>WALL</span>
         </div>
@@ -155,8 +155,8 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
     const swingDir = door.swing_direction || "inward";
 
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold">
+      <div className="flex max-w-[calc(100vw-24px)] overflow-x-auto items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold shrink-0">
           <DoorClosed className="w-3.5 h-3.5" />
           <span>DOOR</span>
         </div>
@@ -226,8 +226,8 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
     const winHeight = win.height || 4.0;
 
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold">
+      <div className="flex max-w-[calc(100vw-24px)] overflow-x-auto items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold shrink-0">
           <AppWindow className="w-3.5 h-3.5" />
           <span>WINDOW</span>
         </div>
@@ -291,8 +291,8 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
     const areaSqFt = room.area_sqft || Math.round(room.rect.width * room.rect.length);
 
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold">
+      <div className="flex max-w-[calc(100vw-24px)] overflow-x-auto items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-[#C48446] font-bold shrink-0">
           <span>{room.name.toUpperCase()}</span>
         </div>
 
@@ -370,12 +370,12 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
 
   // 6. DEFAULT CAD PALETTE: Select | Wall | Door | Window | Measure
   return (
-    <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none">
+    <div className="flex max-w-[calc(100vw-24px)] overflow-x-auto items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-2xl bg-[#16171B]/95 backdrop-blur-xl border border-white/10 shadow-2xl text-xs font-mono text-white select-none">
       <button
         id="cad-tool-select"
         type="button"
         onClick={() => onSelectTool("select")}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all shrink-0 ${
           activeTool === "select"
             ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow"
             : "text-[#94A3B8] hover:text-white hover:bg-white/5"
@@ -383,14 +383,14 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
         title="Select & Direct Manipulate (V)"
       >
         <MousePointer className="w-4 h-4" />
-        <span>Select</span>
+        <span className="hidden sm:inline">Select</span>
       </button>
 
       <button
         id="cad-tool-wall"
         type="button"
         onClick={() => onSelectTool("wall")}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all shrink-0 ${
           activeTool === "wall"
             ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow"
             : "text-[#94A3B8] hover:text-white hover:bg-white/5"
@@ -398,14 +398,14 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
         title="Draw Wall (W)"
       >
         <PenTool className="w-4 h-4" />
-        <span>Wall</span>
+        <span className="hidden sm:inline">Wall</span>
       </button>
 
       <button
         id="cad-tool-door"
         type="button"
         onClick={() => onSelectTool("door")}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all shrink-0 ${
           activeTool === "door"
             ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow"
             : "text-[#94A3B8] hover:text-white hover:bg-white/5"
@@ -413,14 +413,14 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
         title="Place Door (D)"
       >
         <DoorClosed className="w-4 h-4" />
-        <span>Door</span>
+        <span className="hidden sm:inline">Door</span>
       </button>
 
       <button
         id="cad-tool-window"
         type="button"
         onClick={() => onSelectTool("window")}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all shrink-0 ${
           activeTool === "window"
             ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow"
             : "text-[#94A3B8] hover:text-white hover:bg-white/5"
@@ -428,14 +428,14 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
         title="Place Window (O)"
       >
         <AppWindow className="w-4 h-4" />
-        <span>Window</span>
+        <span className="hidden sm:inline">Window</span>
       </button>
 
       <button
         id="cad-tool-measure"
         type="button"
         onClick={() => onSelectTool("measure")}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all shrink-0 ${
           (activeTool as string) === "measure"
             ? "bg-[#C48446] text-[#0A0B0E] font-bold shadow"
             : "text-[#94A3B8] hover:text-white hover:bg-white/5"
@@ -443,17 +443,17 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
         title="Measure Distance (M)"
       >
         <Ruler className="w-4 h-4" />
-        <span>Measure</span>
+        <span className="hidden sm:inline">Measure</span>
       </button>
 
-      <div className="h-4 w-px bg-white/10 mx-1 hidden sm:block" />
+      <div className="h-4 w-px bg-white/10 mx-1 hidden sm:block shrink-0" />
 
       {/* Undo / Redo */}
       <button
         type="button"
         onClick={onUndo}
         disabled={!canUndo}
-        className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors hidden sm:flex items-center justify-center"
+        className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors hidden sm:flex items-center justify-center shrink-0"
         title="Undo (Ctrl+Z)"
       >
         <RotateCcw className="w-3.5 h-3.5" />
@@ -462,7 +462,7 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
         type="button"
         onClick={onRedo}
         disabled={!canRedo}
-        className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors hidden sm:flex items-center justify-center"
+        className="p-1.5 rounded-lg hover:bg-white/5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors hidden sm:flex items-center justify-center shrink-0"
         title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
       >
         <RotateCw className="w-3.5 h-3.5" />
@@ -471,16 +471,16 @@ export const CadContextualToolbar: React.FC<CadContextualToolbarProps> = ({
       {/* Done Button */}
       {onDone && (
         <>
-          <div className="h-4 w-px bg-white/10 mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-white/10 mx-1 hidden sm:block shrink-0" />
           <button
             type="button"
             onClick={onDone}
             disabled={isSaving}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs transition-colors shadow"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#C48446] hover:bg-[#D49456] text-[#0A0B0E] font-bold text-xs transition-colors shadow shrink-0"
             title="Save & Return to Plan"
           >
             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Done</span>
+            <span className="hidden xs:inline">Done</span>
           </button>
         </>
       )}

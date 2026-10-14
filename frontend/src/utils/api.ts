@@ -1,4 +1,5 @@
 import { HouseLayout, IntakeRequest, Rect } from "@/types/house";
+import { getAuthHeaders } from "./supabase";
 
 /**
  * Resolves the backend API base URL with support for development and production environments.
@@ -155,6 +156,22 @@ export async function fetchWithBackendFallback(
     urlsToTry.push(primaryUrl.replace("127.0.0.1:8000", "localhost:8000"));
   }
 
+  const authHeaders = getAuthHeaders();
+  const mergedHeaders: Record<string, string> = { ...authHeaders };
+  if (init?.headers) {
+    if (init.headers instanceof Headers) {
+      init.headers.forEach((value, key) => {
+        mergedHeaders[key] = value;
+      });
+    } else if (Array.isArray(init.headers)) {
+      for (const [k, v] of init.headers) {
+        mergedHeaders[k] = v;
+      }
+    } else {
+      Object.assign(mergedHeaders, init.headers);
+    }
+  }
+
   let lastError: unknown = null;
 
   for (let i = 0; i < urlsToTry.length; i++) {
@@ -165,6 +182,7 @@ export async function fetchWithBackendFallback(
     try {
       const res = await fetch(targetUrl, {
         ...init,
+        headers: mergedHeaders,
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -304,16 +322,15 @@ export async function uploadFloorPlanImage(
   file: File,
   calibrationWidth: number = 38.0
 ): Promise<{ layout: HouseLayout; vision_analysis?: Record<string, unknown> }> {
-  const url = `${API_BASE_URL}/api/upload-floorplan`;
   try {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("calibration_width", String(calibrationWidth));
 
-    const res = await fetch(url, {
+    const { res, url } = await fetchWithBackendFallback("/api/upload-floorplan", {
       method: "POST",
       body: formData,
-    });
+    }, 90000);
 
     if (!res.ok) {
       let detail = `Upload processing failed (HTTP ${res.status})`;
@@ -326,7 +343,7 @@ export async function uploadFloorPlanImage(
 
     return await res.json();
   } catch (err) {
-    console.error("[API ERROR] uploadFloorPlanImage failed:", { url, error: err });
+    console.error("[API ERROR] uploadFloorPlanImage failed:", { error: err });
     throw new Error(formatApiError(err));
   }
 }
@@ -335,9 +352,8 @@ export async function uploadFloorPlanImage(
  * Fetch a saved project by ID from the backend.
  */
 export async function fetchProjectById(projectId: string): Promise<HouseLayout | null> {
-  const url = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`;
   try {
-    const res = await fetch(url);
+    const { res } = await fetchWithBackendFallback(`/api/projects/${encodeURIComponent(projectId)}`, { method: "GET" }, 15000);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -371,13 +387,12 @@ export async function fetchProjectSummaries(): Promise<ServerProjectSummary[]> {
  * Persist a project layout to the backend server.
  */
 export async function saveProjectToServer(layout: HouseLayout): Promise<HouseLayout | null> {
-  const url = `${API_BASE_URL}/api/projects`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(layout),
-    });
+    }, 20000);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -411,9 +426,8 @@ export async function refineHouseLayout(
   instruction: string,
   targetRoomId?: string | null
 ): Promise<HouseLayout> {
-  const url = `${API_BASE_URL}/api/refine`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback("/api/refine", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -421,12 +435,12 @@ export async function refineHouseLayout(
         edit_instruction: instruction,
         target_room_id: targetRoomId || null,
       }),
-    });
+    }, 60000);
 
     if (!res.ok) throw new Error(`Refinement failed with HTTP status ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.error("[API ERROR] refineHouseLayout failed:", { url, error: err });
+    console.error("[API ERROR] refineHouseLayout failed:", { error: err });
     throw new Error(formatApiError(err));
   }
 }
@@ -450,9 +464,8 @@ export async function editRoomLayoutFull(
   proposedRect: Rect,
   pushAdjacent: boolean = true
 ): Promise<import("@/types/house").EditRoomResult | null> {
-  const url = `${API_BASE_URL}/api/edit-room`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback("/api/edit-room", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -461,7 +474,7 @@ export async function editRoomLayoutFull(
         proposed_rect: proposedRect,
         push_adjacent: pushAdjacent,
       }),
-    });
+    }, 20000);
 
     if (res.ok) {
       const result = await res.json();
@@ -469,7 +482,7 @@ export async function editRoomLayoutFull(
     }
     return null;
   } catch (err) {
-    console.error("[API ERROR] editRoomLayout failed:", { url, error: err });
+    console.error("[API ERROR] editRoomLayout failed:", { error: err });
     return null;
   }
 }
@@ -480,20 +493,19 @@ export async function editRoomLayoutFull(
 export async function recommendDimensions(
   req: import("@/types/house").DimensionRecommendationRequest
 ): Promise<import("@/types/house").DimensionRecommendationResponse | null> {
-  const url = `${API_BASE_URL}/api/recommend-dimensions`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback("/api/recommend-dimensions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
-    });
+    }, 25000);
 
     if (res.ok) {
       return await res.json();
     }
     return null;
   } catch (err) {
-    console.error("[API ERROR] recommendDimensions failed:", { url, error: err });
+    console.error("[API ERROR] recommendDimensions failed:", { error: err });
     return null;
   }
 }
@@ -510,20 +522,19 @@ export async function interpretDreamHomePrompt(
   missing_critical_fields: string[];
   clarification_prompt?: string | null;
 }> {
-  const url = `${API_BASE_URL}/api/dream-home/interpret`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback("/api/dream-home/interpret", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, context }),
-    });
+    }, 45000);
 
     if (!res.ok) {
       throw new Error(`Failed to interpret dream home prompt (HTTP ${res.status})`);
     }
     return await res.json();
   } catch (err) {
-    console.error("[API ERROR] interpretDreamHomePrompt failed:", { url, error: err });
+    console.error("[API ERROR] interpretDreamHomePrompt failed:", { error: err });
     throw new Error(formatApiError(err));
   }
 }
@@ -551,16 +562,15 @@ export async function reviewLayoutWithGemini(
   strengths?: string[];
   vastu_compliance?: Record<string, unknown>;
 } | null> {
-  const url = `${API_BASE_URL}/api/architectural-review`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback("/api/architectural-review", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         layout,
         vastu_compliant: vastuEnabled,
       }),
-    });
+    }, 40000);
 
     if (res.ok) {
       return await res.json();
@@ -612,13 +622,12 @@ export async function previewProjectEditIntent(
   projectId: string,
   req: ProjectEditRequest
 ): Promise<ProjectEditIntentPreview> {
-  const url = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/edit-intent`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback(`/api/projects/${encodeURIComponent(projectId)}/edit-intent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
-    });
+    }, 30000);
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.detail || data.message || `Edit intent failed (HTTP ${res.status})`);
@@ -638,13 +647,12 @@ export async function applyProjectEdit(
   projectId: string,
   req: ProjectEditRequest
 ): Promise<ProjectEditResult> {
-  const url = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/edit`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback(`/api/projects/${encodeURIComponent(projectId)}/edit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
-    });
+    }, 60000);
     // 422 = rejected but with data — parse it
     if (!res.ok && res.status !== 422) {
       const errData = await res.json().catch(() => ({}));
@@ -658,13 +666,12 @@ export async function applyProjectEdit(
 }
 
 export async function generateMepPlan(layout: HouseLayout): Promise<HouseLayout> {
-  const url = `${API_BASE_URL}/api/mep/plan`;
   try {
-    const res = await fetch(url, {
+    const { res } = await fetchWithBackendFallback("/api/mep/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(layout),
-    });
+    }, 30000);
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.detail || data.message || `MEP planning failed (HTTP ${res.status})`);

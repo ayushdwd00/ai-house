@@ -96,7 +96,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8)] border border-blue-500/20 bg-[#080D1A]/95 text-[#F5F5F5] overflow-hidden backdrop-blur-2xl transition-colors"
+        className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-3xl p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8)] border border-blue-500/20 bg-[#080D1A]/95 text-[#F5F5F5] backdrop-blur-2xl transition-colors my-auto"
       >
         <button
           onClick={onClose}

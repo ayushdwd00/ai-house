@@ -29,7 +29,7 @@ export const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-          className="relative w-full max-w-xl bg-[rgba(8,14,26,0.96)] border border-[rgba(96,165,250,0.22)] rounded-[32px] p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8),0_0_50px_rgba(37,99,235,0.15)] overflow-hidden max-h-[90vh] overflow-y-auto backdrop-blur-[24px] text-[#F5F5F5]"
+          className="relative w-full max-w-xl bg-[rgba(8,14,26,0.96)] border border-[rgba(96,165,250,0.22)] rounded-[32px] p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8),0_0_50px_rgba(37,99,235,0.15)] overflow-hidden max-h-[90dvh] overflow-y-auto backdrop-blur-[24px] text-[#F5F5F5]"
         >
           {/* Subtle Ambient Glow */}
           <div className="pointer-events-none absolute -top-24 -right-24 w-64 h-64 rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.16)_0%,transparent_70%)] blur-[70px]" />

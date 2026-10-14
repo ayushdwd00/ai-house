@@ -30,7 +30,7 @@ export const DesignSchemeSelectionModal: React.FC<DesignSchemeSelectionModalProp
       role="dialog"
       aria-modal="true"
       aria-labelledby="scheme-selection-title"
-      className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-white/10 bg-[#111319] p-5 text-[#F5F3EF] shadow-2xl sm:p-7"
+      className="max-h-[92dvh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-white/10 bg-[#111319] p-5 text-[#F5F3EF] shadow-2xl sm:p-7"
     >
       <header className="mb-5 flex items-start justify-between gap-4">
         <div>

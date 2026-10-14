@@ -24,37 +24,37 @@ class ProjectRepository(ABC):
     """Abstract interface for HouseLayout persistence and version snapshots."""
 
     @abstractmethod
-    def save(self, layout: HouseLayout, project_id: Optional[str] = None) -> Tuple[str, int]:
+    def save(self, layout: HouseLayout, project_id: Optional[str] = None, user_id: Optional[str] = None) -> Tuple[str, int]:
         """Saves current state and appends an immutable version snapshot. Returns (project_id, version_number)."""
         pass
 
     @abstractmethod
-    def get(self, project_id: str) -> Optional[HouseLayout]:
+    def get(self, project_id: str, user_id: Optional[str] = None) -> Optional[HouseLayout]:
         """Retrieves active project layout."""
         pass
 
     @abstractmethod
-    def list_projects(self, limit: int, offset: int) -> Tuple[List[Dict[str, Any]], int]:
+    def list_projects(self, limit: int = 100, offset: int = 0, user_id: Optional[str] = None) -> Tuple[List[Dict[str, Any]], int]:
         """Lists lightweight project metadata and total count."""
         pass
 
     @abstractmethod
-    def list_versions(self, project_id: str) -> List[Dict[str, Any]]:
+    def list_versions(self, project_id: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lists saved version snapshots with metadata."""
         pass
 
     @abstractmethod
-    def restore_version(self, project_id: str, version_number: int) -> Optional[HouseLayout]:
+    def restore_version(self, project_id: str, version_number: int, user_id: Optional[str] = None) -> Optional[HouseLayout]:
         """Restores a past version snapshot as active."""
         pass
 
     @abstractmethod
-    def undo(self, project_id: str) -> Optional[HouseLayout]:
+    def undo(self, project_id: str, user_id: Optional[str] = None) -> Optional[HouseLayout]:
         """Reverts to preceding version snapshot."""
         pass
 
     @abstractmethod
-    def delete(self, project_id: str) -> bool:
+    def delete(self, project_id: str, user_id: Optional[str] = None) -> bool:
         """Deletes project and its version history from repository."""
         pass
 
@@ -120,12 +120,14 @@ class JsonFileProjectRepository(ProjectRepository):
                 return value.strip()
         return "project_default"
 
-    def save(self, layout: HouseLayout, project_id: Optional[str] = None) -> Tuple[str, int]:
+    def save(self, layout: HouseLayout, project_id: Optional[str] = None, user_id: Optional[str] = None) -> Tuple[str, int]:
         pid = self._canonical_project_id(project_id or layout.project_id or layout.id or "project_default", layout.model_dump(mode="json"))
         if not pid:
             pid = "project_default"
         layout.id = pid
         layout.project_id = pid
+        if user_id:
+            layout.user_id = user_id
         p_dir = self._get_project_dir(pid)
         versions_dir = p_dir / "versions"
 
@@ -140,6 +142,8 @@ class JsonFileProjectRepository(ProjectRepository):
         layout_dict = layout.model_dump(mode="json")
         layout_dict["version_number"] = next_version
         layout_dict["project_id"] = pid
+        if layout.user_id:
+            layout_dict["user_id"] = layout.user_id
 
         v_file = versions_dir / f"v{next_version}.json"
         with open(v_file, "w", encoding="utf-8") as f:
@@ -178,19 +182,22 @@ class JsonFileProjectRepository(ProjectRepository):
             json.dump(metadata, file)
         temporary_file.replace(metadata_file)
 
-    def get(self, project_id: str) -> Optional[HouseLayout]:
+    def get(self, project_id: str, user_id: Optional[str] = None) -> Optional[HouseLayout]:
         project_dir = self._resolve_project_dir(project_id)
         cur_file = project_dir / "project.json"
         if not cur_file.exists():
             return None
         with open(cur_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return HouseLayout.model_validate(data)
+        layout = HouseLayout.model_validate(data)
+        if user_id and layout.user_id and user_id != "dev_local_user" and layout.user_id != user_id:
+            return None
+        return layout
 
-    def list_projects(self, limit: int, offset: int) -> Tuple[List[Dict[str, Any]], int]:
+    def list_projects(self, limit: int = 100, offset: int = 0, user_id: Optional[str] = None) -> Tuple[List[Dict[str, Any]], int]:
         if not self.base_dir.exists():
             return [], 0
-        project_dirs = sorted(
+        all_dirs = sorted(
             (
                 path for path in self.base_dir.iterdir()
                 if path.is_dir() and PROJECT_ID_PATTERN.fullmatch(path.name)
@@ -199,9 +206,26 @@ class JsonFileProjectRepository(ProjectRepository):
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )
-        total = len(project_dirs)
+
+        filtered_dirs = []
+        for p_dir in all_dirs:
+            if user_id and user_id != "dev_local_user":
+                meta_f = p_dir / "metadata.json"
+                p_owner = None
+                if meta_f.is_file():
+                    try:
+                        with meta_f.open("r", encoding="utf-8") as mf:
+                            m_data = json.load(mf)
+                            p_owner = m_data.get("user_id")
+                    except Exception:
+                        pass
+                if p_owner and p_owner != user_id:
+                    continue
+            filtered_dirs.append(p_dir)
+
+        total = len(filtered_dirs)
         projects: List[Dict[str, Any]] = []
-        for project_dir in project_dirs[offset:offset + limit]:
+        for project_dir in filtered_dirs[offset:offset + limit]:
             project_file = project_dir / "project.json"
             try:
                 metadata_file = project_dir / "metadata.json"
@@ -214,9 +238,13 @@ class JsonFileProjectRepository(ProjectRepository):
                     metadata["updatedAt"] = datetime.fromtimestamp(
                         project_file.stat().st_mtime, timezone.utc
                     ).isoformat()
+                    if project_data.get("user_id"):
+                        metadata["user_id"] = project_data.get("user_id")
                 else:
                     canonical_id = str(project_data.get("project_id") or project_data.get("id") or project_dir.name).strip() or project_dir.name
                     metadata = self._metadata_from_data(canonical_id, project_data, project_file)
+                    if project_data.get("user_id"):
+                        metadata["user_id"] = project_data.get("user_id")
                     try:
                         self._write_metadata(canonical_id, project_data, project_file)
                     except OSError as error:
@@ -226,7 +254,7 @@ class JsonFileProjectRepository(ProjectRepository):
                 logger.warning("Could not read project metadata for %s: %s", project_dir.name, error)
         return projects, total
 
-    def list_versions(self, project_id: str) -> List[Dict[str, Any]]:
+    def list_versions(self, project_id: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         project_dir = self._resolve_project_dir(project_id)
         versions_dir = project_dir / "versions"
         if not versions_dir.exists():
@@ -254,7 +282,7 @@ class JsonFileProjectRepository(ProjectRepository):
                 })
         return versions
 
-    def restore_version(self, project_id: str, version_number: int) -> Optional[HouseLayout]:
+    def restore_version(self, project_id: str, version_number: int, user_id: Optional[str] = None) -> Optional[HouseLayout]:
         project_dir = self._resolve_project_dir(project_id)
         v_file = project_dir / "versions" / f"v{version_number}.json"
         if not v_file.exists():
@@ -262,21 +290,27 @@ class JsonFileProjectRepository(ProjectRepository):
         with open(v_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         layout = HouseLayout.model_validate(data)
+        if user_id and layout.user_id and user_id != "dev_local_user" and layout.user_id != user_id:
+            return None
         # Overwrite current active file
         cur_file = project_dir / "project.json"
         with open(cur_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         return layout
 
-    def undo(self, project_id: str) -> Optional[HouseLayout]:
-        versions = self.list_versions(project_id)
+    def undo(self, project_id: str, user_id: Optional[str] = None) -> Optional[HouseLayout]:
+        versions = self.list_versions(project_id, user_id=user_id)
         if len(versions) <= 1:
             return None
         prev_ver = versions[-2]["version"]
-        return self.restore_version(project_id, prev_ver)
+        return self.restore_version(project_id, prev_ver, user_id=user_id)
 
-    def delete(self, project_id: str) -> bool:
+    def delete(self, project_id: str, user_id: Optional[str] = None) -> bool:
         import shutil
+        if user_id and user_id != "dev_local_user":
+            active_layout = self.get(project_id)
+            if active_layout and active_layout.user_id and active_layout.user_id != user_id:
+                return False
         p_dir = self._resolve_project_dir(project_id)
         if not p_dir.exists():
             return False

@@ -424,7 +424,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
   return (
     <div className="relative w-full h-full flex flex-col md:flex-row overflow-hidden bg-[#030303] text-[#F5F5F5] select-none">
       {/* 1. TOP DRAFTING CONTROLS TOOLBAR */}
-      <div className="fixed top-16 sm:top-20 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain">
+      <div className="fixed top-16 sm:top-20 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain">
         {/* Left: View Mode Toggle & Floor Selector */}
         <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-[rgba(8,15,28,0.88)] backdrop-blur-[24px] border border-[rgba(96,165,250,0.2)] shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(37,99,235,0.1)] text-xs font-mono text-[rgba(255,255,255,0.64)]">
           {/* 2D / 3D Switch */}
@@ -1080,7 +1080,7 @@ export const StructureView: React.FC<StructureViewProps> = ({
       </div>
 
       {/* 3. STRUCTURE INFORMATION & COLUMN INSPECTION PANEL */}
-      <aside className="w-full md:w-80 lg:w-96 bg-[rgba(8,14,26,0.95)] border-t md:border-t-0 md:border-l border-[rgba(96,165,250,0.18)] backdrop-blur-[24px] p-4 sm:p-5 flex flex-col justify-between overflow-y-auto max-h-[45vh] md:max-h-full shadow-2xl z-20 text-[#F5F5F5]">
+      <aside className="w-full md:w-80 lg:w-96 bg-[rgba(8,14,26,0.95)] border-t md:border-t-0 md:border-l border-[rgba(96,165,250,0.18)] backdrop-blur-[24px] p-4 sm:p-5 flex flex-col justify-between overflow-y-auto max-h-[45dvh] md:max-h-full shadow-2xl z-20 text-[#F5F5F5]">
         <div className="space-y-4">
           {/* Panel Header */}
           <div className="flex items-center justify-between border-b border-white/10 pb-3">

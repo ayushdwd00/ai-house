@@ -53,7 +53,7 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
         transition={{ duration: 0.28, ease: "easeOut" }}
-        className="relative w-full max-w-lg bg-[#12141A] border border-white/10 rounded-3xl p-8 sm:p-10 shadow-2xl text-center flex flex-col items-center overflow-hidden z-10"
+        className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto bg-[#12141A] border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl text-center flex flex-col items-center z-10"
       >
         {/* Dynamic Architectural Wireframe Skeleton Box */}
         <div className="relative w-full h-24 mb-6 rounded-2xl bg-[#0A0B0E] border border-white/10 p-3 overflow-hidden flex items-center justify-center">

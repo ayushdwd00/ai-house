@@ -1173,6 +1173,7 @@ class MEPPlan(BaseModel):
 class HouseLayout(BaseModel):
     id: str
     project_id: Optional[str] = None
+    user_id: Optional[str] = None
     version_number: int = 1
     revision_id: Optional[str] = None
     parent_revision_id: Optional[str] = None

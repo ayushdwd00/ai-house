@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { HouseLayout, Room } from "@/types/house";
+import { fetchWithBackendFallback } from "@/utils/api";
 import {
   Layers,
   Box,
@@ -521,11 +522,11 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
     const fetchAdvisor = async () => {
       setIsLoadingAdvisor(true);
       try {
-        const res = await fetch("http://localhost:8000/api/estimate/advisor", {
+        const { res } = await fetchWithBackendFallback("/api/estimate/advisor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(layout),
-        });
+        }, 20000);
         if (res.ok) {
           const data = await res.json();
           if (!isCancelled) setAiAdvisor(data);
@@ -928,7 +929,7 @@ export const EstimateView: React.FC<EstimateViewProps> = ({ layout }) => {
                 {/* Category Table */}
                 {isExpanded && (
                   <div className="border-t border-white/5 overflow-x-auto">
-                    <table className="w-full text-xs font-mono text-left">
+                    <table className="w-full min-w-[500px] text-xs font-mono text-left">
                       <thead>
                         <tr className="border-b border-white/5 bg-[rgba(6,10,20,0.5)] text-[10px] text-[rgba(255,255,255,0.45)] uppercase tracking-wider">
                           <th className="py-2.5 px-4 font-normal">Item Description</th>

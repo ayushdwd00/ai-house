@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request, Path as FastPath, Header
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request, Path as FastPath, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, PlainTextResponse
 from typing import Optional, List, Dict, Any, Callable
@@ -47,33 +47,115 @@ from ai.groq_service import (
     generate_construction_advice_with_groq
 )
 from ai.gemini_architect import review_layout_with_gemini
+from infrastructure.rate_limiter import enforce_rate_limit
+from infrastructure.auth import AuthenticatedUser, get_current_user, get_optional_user, verify_project_ownership
 
-app = FastAPI(title="AI House Design Generator Professional Architectural Backend", version="2.5.0")
+docs_url = "/docs" if os.getenv("ENABLE_API_DOCS", "true").lower() == "true" else None
+redoc_url = "/redoc" if os.getenv("ENABLE_API_DOCS", "true").lower() == "true" else None
+
+app = FastAPI(
+    title="AI House Design Generator Professional Architectural Backend",
+    version="2.5.0",
+    docs_url=docs_url,
+    redoc_url=redoc_url,
+)
 generation_logger = logging.getLogger("generation")
+
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25MB cap to prevent memory exhaustion
+
+async def read_upload_capped(file: UploadFile, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
+    """Reads uploaded file stream in 64KB chunks up to max_bytes to prevent RAM exhaustion."""
+    chunks = []
+    total = 0
+    chunk_size = 64 * 1024
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Uploaded file exceeds maximum limit of {max_bytes // (1024 * 1024)}MB."
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 # Global structured error handler
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
+    req_id = getattr(request.state, "request_id", str(uuid.uuid4()))
     detail = exc.detail
     if isinstance(detail, dict):
         content = detail
     else:
         content = {"detail": str(detail), "message": str(detail)}
-    return JSONResponse(status_code=exc.status_code, content=content)
+    if "request_id" not in content:
+        content["request_id"] = req_id
+    headers = dict(exc.headers) if exc.headers else {}
+    headers["X-Request-ID"] = req_id
+    return JSONResponse(status_code=exc.status_code, content=content, headers=headers)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    error_msg = str(exc) or "An error occurred during architectural generation."
+    req_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+    is_debug = os.getenv("DEBUG", "false").lower() == "true"
+    generation_logger.exception("[ERROR] Unhandled exception request_id=%s path=%s", req_id, request.url.path)
+    error_msg = str(exc) if is_debug else "An unexpected error occurred during architectural synthesis."
     return JSONResponse(
         status_code=500,
         content={
             "status": "error",
             "code": "INTERNAL_SERVER_ERROR",
             "message": error_msg,
+            "request_id": req_id,
             "details": {"path": request.url.path},
             "recoverable": True
-        }
+        },
+        headers={"X-Request-ID": req_id}
     )
+
+# Security, Request Correlation & Latency Middleware
+@app.middleware("http")
+async def security_and_timing_middleware(request: Request, call_next: Callable):
+    req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = req_id
+
+    # Enforce sliding-window rate limiting
+    try:
+        enforce_rate_limit(request)
+    except HTTPException as exc:
+        headers = dict(exc.headers) if exc.headers else {}
+        headers["X-Request-ID"] = req_id
+        return JSONResponse(status_code=exc.status_code, content=exc.detail, headers=headers)
+
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+
+    # Attach observation & security headers
+    response.headers["X-Request-ID"] = req_id
+    response.headers["X-Response-Time"] = f"{duration_ms}ms"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    if hasattr(request.state, "rate_limit_limit"):
+        response.headers["X-RateLimit-Limit"] = str(request.state.rate_limit_limit)
+        response.headers["X-RateLimit-Remaining"] = str(request.state.rate_limit_remaining)
+        response.headers["X-RateLimit-Reset"] = str(request.state.rate_limit_reset)
+
+    if request.url.path != "/api/health":
+        generation_logger.info(
+            "[HTTP] %s %s status=%d duration=%.2fms request_id=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            req_id,
+        )
+
+    return response
 
 # Robust CORS Configuration supporting local dev & remote production (e.g. Vercel/Render)
 default_origins = [
@@ -100,7 +182,8 @@ if env_origins:
 else:
     allowed_origins = default_origins
     allow_creds = True
-    origin_regex = r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.onrender\.com)(:\d+)?"
+    # Restrict regex to localhost and designated preview hosts
+    origin_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
 
 app.add_middleware(
     CORSMiddleware,
@@ -739,7 +822,7 @@ async def floorplan_reconstruct_endpoint(
     Complete vector reconstruction pipeline: Converts uploaded image/drawing
     into canonical vector HouseLayout (rooms, walls, openings, stairs, quantities, estimate).
     """
-    contents = await file.read()
+    contents = await read_upload_capped(file)
     layout, verification = reconstruct_floorplan_vector(
         image_bytes=contents,
         filename=file.filename or "drawing.jpg",
@@ -784,7 +867,7 @@ async def legacy_upload_floorplan_endpoint(
     calibration_width: Optional[float] = Form(38.0)
 ):
     """Legacy floor plan upload compatible with older frontend clients."""
-    contents = await file.read()
+    contents = await read_upload_capped(file)
     layout, verification = reconstruct_floorplan_vector(
         image_bytes=contents,
         filename=file.filename or "uploaded_plan.jpg",
@@ -798,43 +881,74 @@ async def legacy_upload_floorplan_endpoint(
 
 # Project Persistence & Version History API
 @app.get("/api/projects")
-def list_projects_endpoint(limit: int = 100, offset: int = 0):
+def list_projects_endpoint(
+    limit: int = 100,
+    offset: int = 0,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user)
+):
     if limit < 1 or limit > 100 or offset < 0:
         raise HTTPException(status_code=422, detail="limit must be 1-100 and offset must be non-negative")
-    projects, total = list_projects(limit=limit, offset=offset)
+    try:
+        projects, total = list_projects(limit=limit, offset=offset, user_id=user.id if user else None)
+    except TypeError:
+        projects, total = list_projects(limit=limit, offset=offset)
     return {"projects": projects, "total": total, "limit": limit, "offset": offset}
 
 
 @app.get("/api/projects/{project_id}", response_model=HouseLayout)
-def get_project_endpoint(project_id: str):
+def get_project_endpoint(
+    project_id: str,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user)
+):
     try:
-        proj = get_project(project_id)
+        proj = get_project(project_id, user_id=user.id if user else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
+    verify_project_ownership(user, proj.user_id)
     return proj
 
 @app.post("/api/projects", response_model=HouseLayout)
-def save_project_endpoint(layout: HouseLayout):
+def save_project_endpoint(
+    layout: HouseLayout,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user)
+):
+    if user and user.is_authenticated:
+        if layout.user_id and layout.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Forbidden: You cannot modify a project owned by another user.")
+        layout.user_id = user.id
     try:
-        pid, ver = save_project(layout, layout.id)
+        pid, ver = save_project(layout, layout.id, user_id=user.id if user else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return layout
 
 @app.get("/api/projects/{project_id}/versions")
-def list_versions_endpoint(project_id: str):
+def list_versions_endpoint(
+    project_id: str,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user)
+):
+    proj = get_project(project_id)
+    if proj:
+        verify_project_ownership(user, proj.user_id)
     try:
-        versions = list_project_versions(project_id)
+        versions = list_project_versions(project_id, user_id=user.id if user else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return {"project_id": project_id, "versions": versions}
 
 @app.post("/api/projects/{project_id}/restore/{version_number}", response_model=HouseLayout)
-def restore_version_endpoint(project_id: str, version_number: int):
+def restore_version_endpoint(
+    project_id: str,
+    version_number: int,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user)
+):
+    proj = get_project(project_id)
+    if proj:
+        verify_project_ownership(user, proj.user_id)
     try:
-        restored = restore_project_version(project_id, version_number)
+        restored = restore_project_version(project_id, version_number, user_id=user.id if user else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     if not restored:
@@ -842,9 +956,15 @@ def restore_version_endpoint(project_id: str, version_number: int):
     return restored
 
 @app.post("/api/projects/{project_id}/undo", response_model=HouseLayout)
-def undo_version_endpoint(project_id: str):
+def undo_version_endpoint(
+    project_id: str,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user)
+):
+    proj = get_project(project_id)
+    if proj:
+        verify_project_ownership(user, proj.user_id)
     try:
-        undone = undo_project_version(project_id)
+        undone = undo_project_version(project_id, user_id=user.id if user else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     if not undone:
@@ -852,9 +972,16 @@ def undo_version_endpoint(project_id: str):
     return undone
 
 @app.delete("/api/projects/{project_id}")
-def delete_project_endpoint(project_id: str):
+def delete_project_endpoint(
+    project_id: str,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user)
+):
+    proj = get_project(project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+    verify_project_ownership(user, proj.user_id)
     try:
-        success = delete_project(project_id)
+        success = delete_project(project_id, user_id=user.id if user else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except OSError as error:

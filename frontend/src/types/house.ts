@@ -506,6 +506,7 @@ export interface LandscapePreferences {
 export interface HouseLayout {
   id: string;
   project_id?: string;
+  user_id?: string;
   version_number?: number;
   revision_id?: string;
   parent_revision_id?: string;

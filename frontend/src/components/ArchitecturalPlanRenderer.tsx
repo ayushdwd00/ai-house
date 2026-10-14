@@ -1529,8 +1529,8 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
         (rect.height - pad * 2) / (svgHeight + (isMobile ? 40 : 120)),
         1.5
       );
-      // On mobile, keep viewport readable rather than over-shrinking; user can pan and pinch-zoom freely
-      const resolvedZoom = isMobile ? Math.max(0.65, fitZoom) : Math.max(0.4, Math.min(2.0, fitZoom));
+      // On mobile, ensure the floor plan fits within the screen boundary
+      const resolvedZoom = isMobile ? Math.max(0.2, Math.min(1.2, fitZoom)) : Math.max(0.3, Math.min(2.0, fitZoom));
       setZoom(resolvedZoom);
       setPan({ x: 0, y: 0 });
     } else {
@@ -1698,7 +1698,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
 
       if (startDist > 0 && containerRef.current) {
         const scaleFactor = dist / startDist;
-        const newZoom = Math.min(3.5, Math.max(0.4, startZoom * scaleFactor));
+        const newZoom = Math.min(3.5, Math.max(0.2, startZoom * scaleFactor));
         const deltaX = midX - startMidX;
         const deltaY = midY - startMidY;
 
@@ -5633,7 +5633,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
             {/* BOTTOM-RIGHT FLOATING ZOOM/PAN CONTROLS */}
             {!isAiOpen && <div data-cad-ui className="edit-zoom-controls absolute bottom-16 md:bottom-4 right-3 sm:right-4 z-30 flex items-center gap-1 p-1 rounded-xl bg-[#16171B]/95 backdrop-blur-md border border-white/10 shadow-2xl text-xs font-mono text-[#94A3B8]">
               <button
-                onClick={() => setZoom((z) => Math.max(0.4, z * 0.85))}
+                onClick={() => setZoom((z) => Math.max(0.2, z * 0.85))}
                 className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white"
                 title="Zoom Out (-)"
               >
@@ -6280,7 +6280,7 @@ export const ArchitecturalPlanRenderer: React.FC<ArchitecturalPlanRendererProps>
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={() => setZoom((z) => Math.max(0.4, z * 0.85))}
+          onClick={() => setZoom((z) => Math.max(0.2, z * 0.85))}
           className="p-1.5 rounded-full hover:bg-white/5 text-[#9E9C98] hover:text-[#F5F3EF] transition-colors"
           title="Zoom Out (-)"
         >

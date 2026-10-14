@@ -182,7 +182,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
         className={`${
           placement === "responsive"
             ? "w-full justify-between rounded-2xl px-2 py-2 md:mx-auto md:w-max md:justify-center md:rounded-full md:px-3 md:py-2"
-            : ""
+            : "w-max justify-center rounded-2xl sm:rounded-full px-2.5 sm:px-3 py-1.5 sm:py-2"
         } ${
           !isVisible ? "pointer-events-none" : "pointer-events-auto"
         } relative flex max-w-full items-center gap-1 sm:gap-2 border border-[rgba(96,165,250,0.15)] ${
@@ -341,7 +341,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="lg:hidden pointer-events-auto absolute right-2 top-full mt-1 w-[min(280px,calc(100vw-32px))] rounded-2xl border border-[rgba(96,165,250,0.24)] bg-[rgba(8,12,22,0.96)] backdrop-blur-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(37,99,235,0.18)] p-2 text-xs font-mono tracking-wider space-y-1"
+            className="lg:hidden pointer-events-auto absolute right-0 sm:right-2 top-full mt-1.5 w-[min(280px,calc(100vw-24px))] max-w-[calc(100vw-24px)] rounded-2xl border border-[rgba(96,165,250,0.24)] bg-[rgba(8,12,22,0.96)] backdrop-blur-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_25px_rgba(37,99,235,0.18)] p-2 text-xs font-mono tracking-wider space-y-1"
           >
             {(isProjectWorkspace ? projectNavItems : [{ id: "home" as NavView, label: "HOME" }]).map((item) => {
               const isActive = currentView === item.id;

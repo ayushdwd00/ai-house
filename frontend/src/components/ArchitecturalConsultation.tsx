@@ -23,7 +23,6 @@ import {
   Trash2,
   Info,
 } from "lucide-react";
-import * as THREE from "three";
 import {
   IntakeRequest,
   RoomAllocationItem,
@@ -306,52 +305,64 @@ const SubtleAtmosphere3D: React.FC = () => {
     const mount = mountRef.current;
     if (!mount) return;
 
-    const width = mount.clientWidth || window.innerWidth;
-    const height = mount.clientHeight || window.innerHeight;
-
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2("#0A0B0E", 0.015);
-
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    camera.position.set(16, 12, 20);
-    camera.lookAt(0, 0, 0);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mount.appendChild(renderer.domElement);
-
-    const group = new THREE.Group();
-    scene.add(group);
-
-    const grid = new THREE.GridHelper(50, 50, 0x333742, 0x181a22);
-    grid.position.y = -0.01;
-    group.add(grid);
-
-    const boxMat = new THREE.MeshBasicMaterial({
-      color: 0x1f232d,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.35,
-    });
-    const mainBox = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 14), boxMat);
-    mainBox.position.set(0, 3, 0);
-    group.add(mainBox);
-
+    let isCancelled = false;
     let animId: number;
-    const animate = () => {
-      animId = requestAnimationFrame(animate);
-      group.rotation.y += 0.0008;
-      renderer.render(scene, camera);
-    };
-    animate();
+    let renderer: any = null;
+
+    import("three").then((THREE) => {
+      if (isCancelled || !mount) return;
+
+      const width = mount.clientWidth || window.innerWidth;
+      const height = mount.clientHeight || window.innerHeight;
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2("#0A0B0E", 0.015);
+
+      const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+      camera.position.set(16, 12, 20);
+      camera.lookAt(0, 0, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      mount.appendChild(renderer.domElement);
+
+      const group = new THREE.Group();
+      scene.add(group);
+
+      const grid = new THREE.GridHelper(50, 50, 0x333742, 0x181a22);
+      grid.position.y = -0.01;
+      group.add(grid);
+
+      const boxMat = new THREE.MeshBasicMaterial({
+        color: 0x1f232d,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.35,
+      });
+      const mainBox = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 14), boxMat);
+      mainBox.position.set(0, 3, 0);
+      group.add(mainBox);
+
+      const animate = () => {
+        animId = requestAnimationFrame(animate);
+        group.rotation.y += 0.0008;
+        renderer.render(scene, camera);
+      };
+      animate();
+    }).catch(() => {
+      // Subtle background falls back gracefully if WebGL/Three is unavailable
+    });
 
     return () => {
-      cancelAnimationFrame(animId);
-      if (mount && renderer.domElement) {
-        mount.removeChild(renderer.domElement);
+      isCancelled = true;
+      if (animId) cancelAnimationFrame(animId);
+      if (renderer) {
+        if (mount && renderer.domElement && mount.contains(renderer.domElement)) {
+          mount.removeChild(renderer.domElement);
+        }
+        renderer.dispose();
       }
-      renderer.dispose();
     };
   }, []);
 
@@ -1043,23 +1054,22 @@ export const ArchitecturalConsultation: React.FC<ArchitecturalConsultationProps>
       <SubtleAtmosphere3D />
 
       {/* Top Header Bar */}
-      <div className="relative z-10 w-full px-8 py-5 flex items-center justify-between border-b border-white/5 bg-[#0A0B0E]/70 backdrop-blur-sm shrink-0">
+      <div className="relative z-10 w-full px-3.5 sm:px-6 md:px-8 py-3.5 sm:py-5 flex items-center justify-between border-b border-white/5 bg-[#0A0B0E]/70 backdrop-blur-sm shrink-0">
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 text-xs font-mono tracking-widest text-[#9E9C98] hover:text-[#F5F3EF] transition-colors group"
+          className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono tracking-widest text-[#9E9C98] hover:text-[#F5F3EF] transition-colors group"
         >
           <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
-          <span>{step === 1 ? "RETURN TO STUDIO" : "PREVIOUS STEP"}</span>
+          <span className="hidden sm:inline">{step === 1 ? "RETURN TO STUDIO" : "PREVIOUS STEP"}</span>
+          <span className="sm:hidden">{step === 1 ? "BACK" : "PREV"}</span>
         </button>
 
         {/* Step Indicator */}
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono tracking-widest text-[#9E9C98]">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-[10px] sm:text-[11px] font-mono tracking-widest text-[#9E9C98]">
             {step === 13
-              ? "YOUR HOME BRIEF & BUILDING PROGRAM"
-              : `CONSULTATION // STEP ${String(currentStepIndex + 1).padStart(2, "0")} OF ${String(
-                  totalSteps
-                ).padStart(2, "0")}`}
+              ? "HOME BRIEF"
+              : `STEP ${String(currentStepIndex + 1).padStart(2, "0")} / ${String(totalSteps).padStart(2, "0")}`}
           </span>
         </div>
 

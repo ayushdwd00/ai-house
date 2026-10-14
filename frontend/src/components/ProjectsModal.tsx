@@ -72,7 +72,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-lg bg-[#080D1A]/95 border border-blue-500/20 rounded-3xl p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-2xl"
+          className="relative w-full max-w-lg bg-[#080D1A]/95 border border-blue-500/20 rounded-3xl p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col max-h-[85dvh] backdrop-blur-2xl"
         >
           {/* Close button */}
           <button
