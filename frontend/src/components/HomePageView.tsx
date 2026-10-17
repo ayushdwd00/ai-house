@@ -73,10 +73,10 @@ export const HomePageView: React.FC<HomePageViewProps> = ({
         <PredictiveArcCanvas
           variant="signal-particles"
           mode="dark"
-          speed={1.0}
+          speed={1.00}
           hue={0}
-          saturation={1.0}
-          brightness={1.0}
+          saturation={1.00}
+          brightness={1.00}
         />
         {/* Soft Vignette Overlay to integrate with deep dark space */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(3,3,3,0.3)_45%,rgba(3,3,3,0.85)_100%)]" />
